@@ -2,11 +2,13 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
+  FileDown,
   FileSpreadsheet,
   Plus,
   Search,
   Tags,
   WalletCards,
+  X,
 } from 'lucide-react'
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import {
@@ -25,6 +27,7 @@ import { useAppStore } from '../store/useAppStore'
 import type { LedgerEntry } from '../data/types'
 import { CategoryManager } from './CategoryManager'
 import { LedgerEditor } from './LedgerEditor'
+import { useModalLayer } from '../navigation/backNavigation'
 
 export function LedgerView() {
   const entries = useAppStore((state) => state.entries)
@@ -48,7 +51,9 @@ export function LedgerView() {
     return () => window.clearTimeout(timer)
   }, [undoEntry])
   const [managerOpen, setManagerOpen] = useState(false)
+  const [exportMenuOpen, setExportMenuOpen] = useState(false)
   const [query, setQuery] = useState('')
+  useModalLayer(() => setExportMenuOpen(false), exportMenuOpen)
 
   const monthEntries = useMemo(
     () => getLedgerMonthEntries(entries, yearMonth),
@@ -129,20 +134,11 @@ export function LedgerView() {
           <button
             type="button"
             className="icon-button export-button"
-            onClick={handleExport}
-            aria-label="导出账本CSV"
-            title="导出账本CSV"
+            onClick={() => setExportMenuOpen(true)}
+            aria-label="导出账本"
+            title="导出账本"
           >
             <Download size={20} />
-          </button>
-          <button
-            type="button"
-            className="icon-button export-button"
-            onClick={handleExportExcel}
-            aria-label="导出账本Excel"
-            title="导出账本Excel"
-          >
-            <FileSpreadsheet size={20} />
           </button>
         </div>
       </header>
@@ -287,6 +283,61 @@ export function LedgerView() {
 
       {managerOpen ? (
         <CategoryManager onClose={() => setManagerOpen(false)} />
+      ) : null}
+
+      {exportMenuOpen ? (
+        <div className="sheet-backdrop" onClick={() => setExportMenuOpen(false)}>
+          <section
+            className="action-sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-label="导出账本"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="sheet-header">
+              <h2>导出账本</h2>
+              <button
+                type="button"
+                className="icon-button"
+                onClick={() => setExportMenuOpen(false)}
+                aria-label="关闭"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <p className="field-note">选择导出格式，文件会保存到本地或系统分享面板。</p>
+            <div className="action-sheet-list">
+              <button
+                type="button"
+                className="action-sheet-item"
+                onClick={() => {
+                  setExportMenuOpen(false)
+                  void handleExport()
+                }}
+              >
+                <span className="action-sheet-icon"><FileDown size={19} /></span>
+                <span>
+                  <strong>CSV 文件</strong>
+                  <small>通用表格，邮箱/Excel 都能打开</small>
+                </span>
+              </button>
+              <button
+                type="button"
+                className="action-sheet-item"
+                onClick={() => {
+                  setExportMenuOpen(false)
+                  void handleExportExcel()
+                }}
+              >
+                <span className="action-sheet-icon excel"><FileSpreadsheet size={19} /></span>
+                <span>
+                  <strong>Excel 表格 (.xlsx)</strong>
+                  <small>带格式的电子表格，方便汇总处理</small>
+                </span>
+              </button>
+            </div>
+          </section>
+        </div>
       ) : null}
 
       {editorOpen ? (

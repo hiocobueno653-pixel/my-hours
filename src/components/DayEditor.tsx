@@ -189,6 +189,7 @@ export function DayEditor({ date, record, onClose, onSaved, onDeleted, onPreviou
               max="24"
               step="0.01"
               value={hours}
+              autoFocus
               onChange={(event) => {
                 setHours(event.target.value)
                 setError('')

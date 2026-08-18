@@ -1,4 +1,4 @@
-import { FileDown, FileSpreadsheet, HardDrive, Moon, SlidersHorizontal, Sun } from 'lucide-react'
+import { ChevronDown, FileDown, FileSpreadsheet, HardDrive, Moon, SlidersHorizontal, Sun } from 'lucide-react'
 import { useState } from 'react'
 import { currentMonthKey, parseMonthKey } from '../data/dates'
 import { exportMonthOverviewCsv, exportMonthOverviewExcel } from '../services/exportService'
@@ -30,6 +30,7 @@ export function MyView({
   const [exportState, setExportState] = useState('')
   const [confirmClear, setConfirmClear] = useState(false)
   const [workManagerOpen, setWorkManagerOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const year = parseMonthKey(yearMonth)?.year ?? new Date().getFullYear()
 
   const handleOverviewExport = async () => {
@@ -75,7 +76,11 @@ export function MyView({
         <BudgetPanel yearMonth={yearMonth} />
       </div>
       <div className="my-section">
-        <StatsPanels year={year} yearMonth={yearMonth} />
+        <StatsPanels
+          year={year}
+          yearMonth={yearMonth}
+          onSelectMonth={(selected) => setYearMonth(selected)}
+        />
       </div>
 
       <section className="my-section backup-section" aria-label="数据备份">
@@ -116,31 +121,41 @@ export function MyView({
       </section>
 
       <section className="my-section settings-section" aria-label="使用设置">
-        <div className="section-heading my-section-heading">
-          <div>
-            <h3>使用设置</h3>
-            <span>按你的习惯调整显示</span>
+        <button
+          type="button"
+          className="section-heading my-section-heading collapsible-heading"
+          onClick={() => setSettingsOpen((open) => !open)}
+          aria-expanded={settingsOpen}
+        >
+          <span className="collapsible-title">
+            <SlidersHorizontal size={17} color="var(--text-3)" aria-hidden="true" />
+            <span>
+              <strong>使用设置</strong>
+              <small>大字模式、深色模式、数据清理</small>
+            </span>
+          </span>
+          <ChevronDown size={18} className={settingsOpen ? 'chevron open' : 'chevron'} aria-hidden="true" />
+        </button>
+        {settingsOpen ? (
+          <div className="settings-panel panel collapse-panel">
+            <label className="inline-toggle">
+              <input
+                type="checkbox"
+                checked={largeText}
+                onChange={onLargeTextChange}
+              />
+              <span>大字模式</span>
+            </label>
+            <ThemeSetting />
+            <button
+              type="button"
+              className="button danger full"
+              onClick={() => setConfirmClear(true)}
+            >
+              清空全部数据
+            </button>
           </div>
-          <SlidersHorizontal size={18} color="var(--text-3)" aria-hidden="true" />
-        </div>
-        <div className="settings-panel panel">
-          <label className="inline-toggle">
-            <input
-              type="checkbox"
-              checked={largeText}
-              onChange={onLargeTextChange}
-            />
-            <span>大字模式</span>
-          </label>
-          <ThemeSetting />
-          <button
-            type="button"
-            className="button danger full"
-            onClick={() => setConfirmClear(true)}
-          >
-            清空全部数据
-          </button>
-        </div>
+        ) : null}
       </section>
 
       {confirmClear ? (

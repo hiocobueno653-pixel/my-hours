@@ -8,6 +8,8 @@ interface BarChartProps {
   height?: number
   valueFormatter?: (value: number) => string
   ariaLabel: string
+  /** 点击某一组（月份）时的回调，index 对应 data 下标 */
+  onGroupClick?: (groupIndex: number) => void
 }
 
 /**
@@ -19,6 +21,7 @@ export function BarChart({
   height = 150,
   valueFormatter = (value) => String(value),
   ariaLabel,
+  onGroupClick,
 }: BarChartProps) {
   const width = 320
   const padTop = 10
@@ -61,7 +64,7 @@ export function BarChart({
         const groupX = groupIndex * groupWidth
         const groupCenter = groupX + groupWidth / 2
         return (
-          <g key={groupIndex}>
+          <g key={groupIndex} className={onGroupClick ? 'bar-group clickable' : 'bar-group'}>
             {group.values.map((item, seriesIndex) => {
               const barH = item.value > 0 ? Math.max(2, (item.value / maxValue) * plotH) : 0
               const x =
@@ -80,6 +83,16 @@ export function BarChart({
                   rx={Math.min(3, barWidth / 3)}
                   fill={item.color}
                   className={`bar-chart-bar series-${seriesIndex}${item.value > 0 ? '' : ' is-empty'}`}
+                  role={onGroupClick ? 'button' : undefined}
+                  tabIndex={onGroupClick ? 0 : undefined}
+                  onClick={onGroupClick ? () => onGroupClick(groupIndex) : undefined}
+                  onKeyDown={onGroupClick ? (event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault()
+                      onGroupClick(groupIndex)
+                    }
+                  } : undefined}
+                  aria-label={`${group.label}：${valueFormatter(item.value)}`}
                 >
                   <title>{`${group.label}：${valueFormatter(item.value)}`}</title>
                 </rect>

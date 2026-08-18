@@ -14,6 +14,8 @@ import { DonutChart } from './charts/DonutChart'
 interface StatsPanelsProps {
   year: number
   yearMonth: string
+  /** 点击趋势图中某个月份时回调（切换整套面板到该月） */
+  onSelectMonth?: (yearMonth: string) => void
 }
 
 const CATEGORY_COLORS = [
@@ -29,7 +31,7 @@ const CATEGORY_COLORS = [
   '#64748b',
 ];
 
-export function StatsPanels({ year, yearMonth }: StatsPanelsProps) {
+export function StatsPanels({ year, yearMonth, onSelectMonth }: StatsPanelsProps) {
   const records = useAppStore((state) => state.records)
   const entries = useAppStore((state) => state.entries)
   const hoursTrend = getYearHoursTrend(records, year)
@@ -89,8 +91,9 @@ export function StatsPanels({ year, yearMonth }: StatsPanelsProps) {
           </div>
           <BarChart
             data={hoursGroups}
-            ariaLabel={`${year} 年每月工时柱状图`}
+            ariaLabel={`${year} 年每月工时柱状图，点击查看对应月份`}
             valueFormatter={(value) => `${formatHours(value)} 小时`}
+            onGroupClick={onSelectMonth ? (index) => onSelectMonth(hoursTrend[index].yearMonth) : undefined}
           />
         </div>
       ) : (
@@ -108,8 +111,9 @@ export function StatsPanels({ year, yearMonth }: StatsPanelsProps) {
           </div>
           <BarChart
             data={ledgerGroups}
-            ariaLabel={`${year} 年每月收支柱状图`}
+            ariaLabel={`${year} 年每月收支柱状图，点击查看对应月份`}
             valueFormatter={(value) => `¥${formatMoney(value)}`}
+            onGroupClick={onSelectMonth ? (index) => onSelectMonth(ledgerTrend[index].yearMonth) : undefined}
           />
         </div>
       ) : null}

@@ -1,4 +1,4 @@
-import { CalendarDays, ChevronLeft, ChevronRight, Download, FileSpreadsheet, PenLine, Sparkles } from 'lucide-react'
+import { CalendarDays, ChevronLeft, ChevronRight, Download, FileDown, FileSpreadsheet, PenLine, Sparkles, X } from 'lucide-react'
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import {
   currentMonthKey,
@@ -22,6 +22,7 @@ import type { LedgerEntry, WorkDayRecord } from '../data/types'
 import { useAppStore } from '../store/useAppStore'
 import { haptic } from '../utils/haptics'
 import { DayEditor } from './DayEditor'
+import { useModalLayer } from '../navigation/backNavigation'
 
 interface MonthViewProps {
   initialEditingDate?: string | null
@@ -46,6 +47,8 @@ export function MonthView({
     }
   }, [initialEditingDate])
   const [exportState, setExportState] = useState('')
+  const [exportMenuOpen, setExportMenuOpen] = useState(false)
+  useModalLayer(() => setExportMenuOpen(false), exportMenuOpen)
   const [savedMessage, setSavedMessage] = useState('')
   const [undoRecord, setUndoRecord] = useState<WorkDayRecord | null>(null)
   const [undoLinkedIncome, setUndoLinkedIncome] = useState<LedgerEntry | null>(null)
@@ -153,20 +156,11 @@ export function MonthView({
           <button
             type="button"
             className="icon-button"
-            onClick={handleExport}
-            aria-label="导出CSV"
-            title="导出CSV"
+            onClick={() => setExportMenuOpen(true)}
+            aria-label="导出工时表"
+            title="导出工时表"
           >
             <Download size={20} />
-          </button>
-          <button
-            type="button"
-            className="icon-button"
-            onClick={handleExportExcel}
-            aria-label="导出Excel"
-            title="导出Excel"
-          >
-            <FileSpreadsheet size={20} />
           </button>
         </div>
       </header>
@@ -201,7 +195,7 @@ export function MonthView({
         ) : null}
       </div>
 
-      <section className="summary-strip" aria-label="月总计">
+      <section className="summary-strip work-summary" aria-label="月总计">
         <div className="summary-item">
           <span>月总计</span>
           <strong>{formatHours(summary.totalHours)}</strong>
@@ -217,10 +211,10 @@ export function MonthView({
           <strong>{formatHours(summary.averageHours)}</strong>
           <small>小时</small>
         </div>
-        <div className={`summary-item wage${monthPay > 0 ? ' has-wage' : ''}`}>
-          <span>工资</span>
+        <div className={`summary-item wage wide${monthPay > 0 ? ' has-wage' : ''}`}>
+          <span>本月工资</span>
           <strong>¥{formatMoney(monthPay)}</strong>
-          <small>{unsettledCount > 0 ? `${unsettledCount}笔待结` : '已结'}</small>
+          <small>{monthPay > 0 ? (unsettledCount > 0 ? `${unsettledCount} 笔待结算` : '已全部结算 ✓') : '未设时薪'}</small>
         </div>
       </section>
 
@@ -386,6 +380,61 @@ export function MonthView({
         <p className="status-line" role="status">
           {exportState}
         </p>
+      ) : null}
+
+      {exportMenuOpen ? (
+        <div className="sheet-backdrop" onClick={() => setExportMenuOpen(false)}>
+          <section
+            className="action-sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-label="导出工时表"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="sheet-header">
+              <h2>导出工时表</h2>
+              <button
+                type="button"
+                className="icon-button"
+                onClick={() => setExportMenuOpen(false)}
+                aria-label="关闭"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <p className="field-note">{formatMonthLabel(yearMonth)} 的工时明细，选择导出格式。</p>
+            <div className="action-sheet-list">
+              <button
+                type="button"
+                className="action-sheet-item"
+                onClick={() => {
+                  setExportMenuOpen(false)
+                  void handleExport()
+                }}
+              >
+                <span className="action-sheet-icon"><FileDown size={19} /></span>
+                <span>
+                  <strong>CSV 文件</strong>
+                  <small>通用表格，邮箱/Excel 都能打开</small>
+                </span>
+              </button>
+              <button
+                type="button"
+                className="action-sheet-item"
+                onClick={() => {
+                  setExportMenuOpen(false)
+                  void handleExportExcel()
+                }}
+              >
+                <span className="action-sheet-icon excel"><FileSpreadsheet size={19} /></span>
+                <span>
+                  <strong>Excel 表格 (.xlsx)</strong>
+                  <small>带格式的电子表格，方便汇总处理</small>
+                </span>
+              </button>
+            </div>
+          </section>
+        </div>
       ) : null}
 
       {editingDate ? (

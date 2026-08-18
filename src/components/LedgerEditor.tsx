@@ -144,6 +144,7 @@ export function LedgerEditor({ entry, onClose, onSaved, onDeleted }: LedgerEdito
                 min="0.01"
                 step="0.01"
                 value={amount}
+                autoFocus
                 onChange={(event) => {
                   setAmount(event.target.value)
                   setError('')
