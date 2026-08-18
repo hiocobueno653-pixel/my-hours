@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Download, FileSpreadsheet, PenLine } from 'lucide-react'
+import { CalendarDays, ChevronLeft, ChevronRight, Download, FileSpreadsheet, PenLine, Sparkles } from 'lucide-react'
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import {
   currentMonthKey,
@@ -20,6 +20,7 @@ import {
 import { exportMonthCsv, exportMonthExcel } from '../services/exportService'
 import type { LedgerEntry, WorkDayRecord } from '../data/types'
 import { useAppStore } from '../store/useAppStore'
+import { haptic } from '../utils/haptics'
 import { DayEditor } from './DayEditor'
 
 interface MonthViewProps {
@@ -117,6 +118,7 @@ export function MonthView({
     setUndoRecord(null)
     setUndoLinkedIncome(null)
     setSavedMessage('已恢复')
+    haptic()
   }
 
   const handleExport = async () => {
@@ -187,6 +189,16 @@ export function MonthView({
         >
           <ChevronRight size={22} />
         </button>
+        {!isCurrentMonth ? (
+          <button
+            type="button"
+            className="back-to-now"
+            onClick={() => setYearMonth(currentMonthKey())}
+          >
+            <CalendarDays size={14} />
+            回到本月
+          </button>
+        ) : null}
       </div>
 
       <section className="summary-strip" aria-label="月总计">
@@ -268,6 +280,16 @@ export function MonthView({
             </div>
           ) : null}
         </section>
+      ) : null}
+
+      {records.length === 0 && isCurrentMonth ? (
+        <aside className="onboarding-card" role="note">
+          <Sparkles size={18} />
+          <div>
+            <strong>从今天开始记录</strong>
+            <span>点上方「记工时」填工时，存下第一笔记录；再在「我的」页设个时薪，工资自动算。</span>
+          </div>
+        </aside>
       ) : null}
 
       <section

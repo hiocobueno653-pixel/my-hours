@@ -12,6 +12,7 @@ import { formatHours, MAX_REMARK_LENGTH, parseHoursInput } from '../data/records
 import { DEFAULT_WORK_ID, getWorkById } from '../data/profiles'
 import type { LedgerEntry, WorkDayRecord } from '../data/types'
 import { useAppStore } from '../store/useAppStore'
+import { haptic } from '../utils/haptics'
 import { useModalLayer } from '../navigation/backNavigation'
 
 const QUICK_HOURS = [0, 4, 8, 8.5, 10, 12]
@@ -133,6 +134,7 @@ export function DayEditor({ date, record, onClose, onSaved, onDeleted, onPreviou
     saveDay(date, hoursResult.hours, remark.trim(), dayOptions)
     if (linkedIncome) deleteLedgerEntry(linkedIncome.id)
     onSaved?.()
+    haptic()
     onClose()
   }
 
@@ -366,6 +368,7 @@ export function DayEditor({ date, record, onClose, onSaved, onDeleted, onPreviou
             deleteDay(date)
             if (linkedIncome) deleteLedgerEntry(linkedIncome.id)
             onDeleted?.(record, linkedIncome)
+            haptic([20, 40, 20])
             onClose()
           }}
           onCancel={() => setConfirmDelete(false)}

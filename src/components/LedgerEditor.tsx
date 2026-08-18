@@ -11,6 +11,7 @@ import {
 import { formatHours } from '../data/records'
 import type { LedgerEntry, LedgerType } from '../data/types'
 import { useAppStore } from '../store/useAppStore'
+import { haptic } from '../utils/haptics'
 import { useModalLayer } from '../navigation/backNavigation'
 import { CategoryManager } from './CategoryManager'
 import { ConfirmDialog } from './ConfirmDialog'
@@ -76,6 +77,7 @@ export function LedgerEditor({ entry, onClose, onSaved, onDeleted }: LedgerEdito
       ...(workDate ? { workDate } : {}),
     })
     onSaved?.()
+    haptic()
     onClose()
   }
 
@@ -247,6 +249,7 @@ export function LedgerEditor({ entry, onClose, onSaved, onDeleted }: LedgerEdito
             if (!entry) return
             deleteLedgerEntry(entry.id)
             onDeleted?.(entry)
+            haptic([20, 40, 20])
             onClose()
           }}
           onCancel={() => setConfirmDelete(false)}

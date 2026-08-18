@@ -2492,6 +2492,59 @@ select {
   font-size: 12px;
   color: var(--text-3);
 }
+/* 回到本月按钮 */
+.back-to-now {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 32px;
+  padding: 0 10px;
+  color: var(--accent-strong);
+  background: var(--accent-soft);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  flex: 0 0 auto;
+  transition: transform 160ms var(--ease-out), background-color 160ms ease;
+}
+.back-to-now:active {
+  transform: scale(0.95);
+}
+
+/* 首次使用引导卡片 */
+.onboarding-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0 0 12px;
+  padding: 13px 14px;
+  color: var(--link);
+  background: var(--link-soft);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+.onboarding-card > svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+.onboarding-card div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.onboarding-card strong {
+  font-size: 13.5px;
+  font-weight: 850;
+  color: var(--text);
+}
+.onboarding-card span {
+  font-size: 12px;
+  color: var(--text-2);
+  line-height: 1.55;
+}
+
 /* ============ 新功能组件样式 ============ */
 
 .field-note {
@@ -3105,7 +3158,8 @@ select {
   background: var(--surface);
 }
 [data-theme='dark'] .today-entry-row,
-[data-theme='dark'] .undo-bar {
+[data-theme='dark'] .undo-bar,
+[data-theme='dark'] .bottom-nav {
   background: rgb(22 30 46 / 96%);
   box-shadow: none;
 }
@@ -3122,6 +3176,15 @@ select {
 [data-theme='dark'] .quick-hour.active,
 [data-theme='dark'] .quick-amount.active {
   border-color: var(--border-strong);
+}
+[data-theme='dark'] .day-row.today {
+  background: var(--accent-soft);
+}
+[data-theme='dark'] .day-row.weekend:not(.today) {
+  background: var(--surface-soft);
+}
+[data-theme='dark'] .calendar-day.has-hours {
+  background: var(--accent-soft);
 }
 [data-theme='dark'] :focus-visible {
   outline-color: rgb(106 147 255 / 40%);

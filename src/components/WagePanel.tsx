@@ -3,6 +3,7 @@ import { formatMoney } from '../data/ledger'
 import { getMonthWorkBreakdown } from '../data/stats'
 import { formatHours, getMonthPay, getSettlementSummary } from '../data/records'
 import { useAppStore } from '../store/useAppStore'
+import { haptic } from '../utils/haptics'
 import { ProgressBar } from './charts/ProgressBar'
 
 interface WagePanelProps {
@@ -56,7 +57,10 @@ export function WagePanel({ yearMonth, onManageWork }: WagePanelProps) {
             <button
               type="button"
               className="button"
-              onClick={() => settleMonth(yearMonth, true)}
+              onClick={() => {
+                settleMonth(yearMonth, true)
+                haptic(50)
+              }}
             >
               <CheckCheck size={16} />
               全部标记已结算
@@ -65,7 +69,10 @@ export function WagePanel({ yearMonth, onManageWork }: WagePanelProps) {
               <button
                 type="button"
                 className="button ghost"
-                onClick={() => settleMonth(yearMonth, false)}
+                onClick={() => {
+                  settleMonth(yearMonth, false)
+                  haptic(40)
+                }}
               >
                 撤销结算
               </button>
