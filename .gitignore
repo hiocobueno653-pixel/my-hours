@@ -15,6 +15,7 @@ dist-ssr
 # 构建/调试产物
 *.apk
 myhours-home.png
+ui-baseline.png
 android/.gradle
 android/local.properties
 android/build
