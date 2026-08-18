@@ -236,17 +236,17 @@ export function MonthView({
             </button>
           </div>
           <div className="today-card-body">
-            <div className="today-metric">
+            <div className="today-metric hours">
               <span>工时</span>
               <strong>{todayRecord ? formatHours(todayRecord.hours) : '--'}</strong>
               <small>小时</small>
             </div>
-            <div className="today-metric">
+            <div className="today-metric income">
               <span>收入</span>
               <strong>{todayIncome > 0 ? `¥${formatMoney(todayIncome)}` : '--'}</strong>
               <small>元</small>
             </div>
-            <div className="today-metric">
+            <div className="today-metric count">
               <span>账目</span>
               <strong>{todayEntries.length}</strong>
               <small>笔</small>

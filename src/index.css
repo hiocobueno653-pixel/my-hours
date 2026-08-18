@@ -22,6 +22,10 @@
   --gold-soft: #fff3d6;
   --shadow-sm: 0 1px 2px rgb(23 32 51 / 5%), 0 8px 20px rgb(23 32 51 / 5%);
   --shadow: 0 18px 44px rgb(23 32 51 / 13%);
+  --radius-s: 8px;
+  --radius-m: 12px;
+  --radius-l: 16px;
+  --radius-xl: 22px;
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
@@ -285,7 +289,7 @@ select {
   color: var(--text-2);
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-m);
   box-shadow: var(--shadow-sm);
   transition:
     color 180ms ease,
@@ -331,7 +335,7 @@ select {
   padding: 15px 12px 14px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-m);
   box-shadow: var(--shadow-sm);
 }
 
@@ -444,7 +448,7 @@ select {
   color: var(--text);
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-m);
   box-shadow: var(--shadow-sm);
   transition:
     background-color 180ms ease,
@@ -498,7 +502,7 @@ select {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
+  border-radius: var(--radius-s);
   background: var(--surface-muted);
   font-size: 15px;
   font-weight: 700;
@@ -620,7 +624,7 @@ select {
   color: var(--text-2);
   background: var(--surface-soft);
   border: 1px dashed var(--border-strong);
-  border-radius: 8px;
+  border-radius: var(--radius-s);
 }
 
 .empty-state strong {
@@ -635,7 +639,7 @@ select {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
+  border-radius: var(--radius-s);
   color: var(--accent);
   background: var(--accent-soft);
 }
@@ -644,10 +648,11 @@ select {
   margin: 12px 0 0;
   padding: 10px 12px;
   font-size: 13px;
+  animation: fade-in 220ms var(--ease-out) backwards;
   color: var(--accent-strong);
   background: var(--accent-soft);
   border: 1px solid #cdd8ff;
-  border-radius: 8px;
+  border-radius: var(--radius-s);
 }
 
 .panel {
@@ -657,7 +662,7 @@ select {
   padding: 16px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-l);
   box-shadow: var(--shadow-sm);
 }
 
@@ -678,7 +683,7 @@ select {
   padding: 10px;
   background: var(--surface-soft);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-s);
 }
 
 .backup-stat span {
@@ -712,7 +717,7 @@ select {
   color: var(--text);
   background: var(--surface);
   border: 1px solid var(--border-strong);
-  border-radius: 12px;
+  border-radius: var(--radius-m);
   font-weight: 700;
   box-shadow: var(--shadow-sm);
   transition:
@@ -783,7 +788,7 @@ select {
     calc(24px + var(--safe-bottom))
     calc(16px + var(--safe-left));
   background: var(--surface);
-  border-radius: 16px 16px 0 0;
+  border-radius: var(--radius-l) 16px 0 0;
   box-shadow: 0 -16px 44px rgb(13 28 23 / 18%);
   animation: sheet-in 320ms var(--ease-drawer);
 }
@@ -834,7 +839,7 @@ select {
   color: var(--text);
   background: var(--surface);
   border: 1px solid var(--border-strong);
-  border-radius: 8px;
+  border-radius: var(--radius-m);
   outline: none;
   font-size: 16px;
   transition:
@@ -890,7 +895,7 @@ select {
   padding: 4px;
   background: var(--surface-muted);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-m);
 }
 
 .segment {
@@ -1039,7 +1044,7 @@ select {
   color: #fff;
   background: rgb(22 33 29 / 92%);
   border: 1px solid rgb(255 255 255 / 12%);
-  border-radius: 8px;
+  border-radius: var(--radius-s);
   box-shadow: 0 10px 24px rgb(22 33 29 / 22%);
   font-size: 13px;
   line-height: 1.35;
@@ -1068,7 +1073,7 @@ select {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
+  border-radius: var(--radius-s);
   transition:
     color 180ms ease,
     background-color 180ms ease,
@@ -1124,7 +1129,7 @@ select {
   padding: 6px 10px;
   background: var(--surface-soft);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-s);
 }
 
 .category-row > span:first-child {
@@ -1155,7 +1160,7 @@ select {
   font-size: 16px;
   background: var(--surface);
   border: 1px solid var(--border-strong);
-  border-radius: 8px;
+  border-radius: var(--radius-s);
   outline: none;
 }
 
@@ -1197,7 +1202,7 @@ select {
   padding: 20px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-l);
   box-shadow: var(--shadow);
   animation: dialog-in 220ms var(--ease-out);
 }
@@ -1319,7 +1324,7 @@ select {
 
   .day-sheet {
     margin-bottom: 16px;
-    border-radius: 16px;
+    border-radius: var(--radius-l);
   }
 }
 
@@ -1468,7 +1473,7 @@ select {
   color: var(--text-2);
   background: var(--surface-soft);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-s);
   font-size: 15px;
   font-weight: 700;
   cursor: pointer;
@@ -1498,7 +1503,7 @@ select {
   padding: 14px;
   background: var(--surface-soft);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-s);
   animation: fade-in 180ms var(--ease-out);
 }
 
@@ -1507,13 +1512,23 @@ select {
   background: var(--surface);
 }
 .today-card {
+  position: relative;
+  overflow: hidden;
   margin-bottom: 18px;
-  padding: 16px;
-  color: #fff;
+  padding: 16px 16px 16px 20px;
+  color: var(--text);
+  background: linear-gradient(180deg, var(--surface) 0%, var(--surface-soft) 100%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-l);
+  box-shadow: var(--shadow-sm);
+}
+
+.today-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
   background: var(--accent);
-  border: 1px solid var(--accent-strong);
-  border-radius: 8px;
-  box-shadow: 0 12px 28px rgb(29 78 216 / 24%);
 }
 
 .today-card-header {
@@ -1535,13 +1550,15 @@ select {
   font-size: 13px;
   font-weight: 800;
   letter-spacing: 0.02em;
-  opacity: 0.86;
+  color: var(--accent-strong);
 }
 
 .today-title-block strong {
   overflow: hidden;
   font-size: 22px;
-  font-weight: 800;
+  font-weight: 850;
+  letter-spacing: -0.01em;
+  color: var(--text);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1557,45 +1574,59 @@ select {
   flex-direction: column;
   gap: 3px;
   min-width: 0;
-  padding: 10px;
-  background: rgb(255 255 255 / 12%);
-  border: 1px solid rgb(255 255 255 / 18%);
-  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
 }
 
 .today-metric span {
   font-size: 12px;
   font-weight: 650;
-  opacity: 0.9;
+  color: var(--text-2);
 }
 
 .today-metric strong {
   overflow: hidden;
   font-size: 20px;
-  font-weight: 800;
+  font-weight: 850;
   font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  color: var(--text);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.today-metric.hours strong {
+  color: var(--accent-strong);
+}
+
+.today-metric.income strong {
+  color: var(--income);
+}
+
+.today-metric.count strong {
+  color: var(--text);
 }
 
 .today-metric small {
   margin-left: 2px;
   font-size: 12px;
   font-weight: 600;
-  opacity: 0.86;
+  color: var(--text-3);
 }
 
 .today-remark {
   margin: 12px 0 0;
   font-size: 14px;
   font-weight: 600;
-  opacity: 0.94;
+  color: var(--text-2);
 }
 
 .today-card .button.today-action {
   flex: 0 0 auto;
-  color: var(--accent-strong);
-  background: #fff;
+  color: #fff;
+  background: var(--accent);
   border-color: transparent;
   box-shadow: none;
 }
@@ -1616,9 +1647,9 @@ select {
   gap: 10px;
   padding: 8px 10px;
   color: var(--text);
-  background: rgb(255 255 255 / 94%);
-  border: 1px solid transparent;
-  border-radius: 8px;
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-s);
   transition:
     background-color 180ms ease,
     transform 160ms var(--ease-out);
@@ -1641,7 +1672,7 @@ select {
 
 .today-entry-row:active {
   transform: scale(0.98);
-  background: #fff;
+  background: var(--surface-muted);
 }
 
 .today-entry-category {
@@ -1657,14 +1688,14 @@ select {
   margin: 12px 0 0;
   font-size: 14px;
   font-weight: 650;
-  opacity: 0.92;
+  color: var(--text-3);
 }
 .overview-panel {
   margin-bottom: 18px;
   padding: 14px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-s);
   box-shadow: var(--shadow-sm);
 }
 
@@ -1713,7 +1744,7 @@ select {
   padding: 10px;
   background: var(--surface-soft);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-s);
 }
 
 .overview-stat span {
@@ -1779,7 +1810,7 @@ select {
   color: var(--text-2);
   background: var(--surface-soft);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-s);
   transition:
     background-color 180ms ease,
     border-color 180ms ease,
@@ -1926,7 +1957,7 @@ select {
   color: var(--text-2);
   background: var(--surface-muted);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-s);
   font-size: 12px;
   font-weight: 700;
 }
@@ -2001,7 +2032,7 @@ select {
   color: var(--accent-strong);
   background: var(--accent-soft);
   border: 1px solid #cdd8ff;
-  border-radius: 8px;
+  border-radius: var(--radius-s);
   font-size: 12px;
   font-weight: 800;
 }
@@ -2022,7 +2053,7 @@ select {
   color: var(--text);
   background: var(--surface-soft);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-s);
   font-size: 16px;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
@@ -2060,7 +2091,7 @@ select {
   color: var(--accent-strong);
   background: var(--surface);
   border: 1px solid var(--border-strong);
-  border-radius: 8px;
+  border-radius: var(--radius-s);
   font-size: 15px;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
@@ -2255,7 +2286,11 @@ select {
   color: var(--text);
   background: #fff7ed;
   border: 1px solid #fed7aa;
-  border-radius: 8px;
+  border-radius: var(--radius-s);
+}
+
+.undo-bar {
+  animation: toast-in 240ms var(--ease-out) backwards;
 }
 
 .undo-bar span {
@@ -2353,7 +2388,7 @@ select {
   padding: 10px;
   background: var(--surface-soft);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-s);
 }
 
 .overview-day-stat span {
@@ -2391,7 +2426,7 @@ select {
   color: var(--text-2);
   background: var(--surface-soft);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-s);
   font-size: 14px;
   line-height: 1.5;
 }
@@ -2411,7 +2446,7 @@ select {
   padding: 8px 10px;
   background: var(--surface-soft);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-s);
 }
 
 .overview-day-row-main {
@@ -2463,7 +2498,7 @@ select {
   padding: 10px;
   background: var(--surface-soft);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-s);
 }
 
 .category-block h3 {
@@ -2535,7 +2570,7 @@ select {
   padding: 14px 14px 12px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-l);
   box-shadow: var(--shadow-sm);
 }
 .week-strip-head {
@@ -2588,7 +2623,7 @@ select {
   align-items: center;
   gap: 3px;
   padding: 6px 2px 5px;
-  border-radius: 10px;
+  border-radius: var(--radius-s);
   transition: background-color 160ms ease, transform 160ms var(--ease-out);
 }
 .week-dot:not(:disabled):active {
@@ -2650,7 +2685,7 @@ select {
   padding: 9px 12px;
   color: var(--text-2);
   background: var(--surface-soft);
-  border-radius: 10px;
+  border-radius: var(--radius-s);
   font-size: 12.5px;
 }
 .month-cumulative strong {
@@ -2674,7 +2709,7 @@ select {
   padding: 9px 12px;
   background: var(--surface-soft);
   border: 1px dashed var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-s);
   font-size: 12.5px;
 }
 .today-ledger-label {
@@ -2727,7 +2762,7 @@ select {
   color: var(--link);
   background: var(--link-soft);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-l);
 }
 .onboarding-card > svg {
   flex: 0 0 auto;
@@ -2758,7 +2793,7 @@ select {
   color: var(--text-2);
   background: var(--surface-soft);
   border: 1px dashed var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-s);
   font-size: 12.5px;
   line-height: 1.5;
 }
@@ -2783,7 +2818,7 @@ select {
   color: var(--text-3);
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-m);
   transition: border-color 180ms ease, box-shadow 180ms ease;
 }
 .search-box:focus-within {
@@ -2846,7 +2881,7 @@ select {
   padding: 16px;
   background: linear-gradient(160deg, var(--surface) 0%, var(--surface-soft) 100%);
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--radius-l);
 }
 .wage-hero {
   display: flex;
@@ -2857,7 +2892,7 @@ select {
   padding: 14px 16px;
   background: var(--gold-soft);
   border: 1px solid rgb(183 121 31 / 22%);
-  border-radius: 14px;
+  border-radius: var(--radius-l);
 }
 .wage-hero-value {
   display: flex;
@@ -2913,7 +2948,7 @@ select {
   min-height: 40px;
   padding: 0 12px;
   background: var(--surface-soft);
-  border-radius: 10px;
+  border-radius: var(--radius-s);
 }
 .work-breakdown-name {
   flex: 1;
@@ -3033,7 +3068,7 @@ select {
   padding: 10px 12px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-m);
 }
 .stats-hero-item span {
   font-size: 11px;
@@ -3060,7 +3095,7 @@ select {
   padding: 14px 16px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-l);
 }
 .chart-block-head {
   display: flex;
@@ -3223,7 +3258,7 @@ select {
   min-height: 56px;
   padding: 10px 12px;
   background: var(--surface-soft);
-  border-radius: 12px;
+  border-radius: var(--radius-m);
 }
 .work-row.editing {
   flex-direction: column;
@@ -3291,7 +3326,7 @@ select {
   overflow-y: auto;
   padding: 18px 18px calc(18px + var(--safe-bottom));
   background: var(--surface);
-  border-radius: 22px 22px 0 0;
+  border-radius: var(--radius-xl) 22px 0 0;
   box-shadow: var(--shadow);
   animation: sheet-in 300ms var(--ease-drawer);
 }
@@ -3311,7 +3346,7 @@ select {
   text-align: left;
   background: var(--surface-soft);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-m);
   transition: transform 160ms var(--ease-out), background-color 160ms ease;
 }
 .action-sheet-item:active {
@@ -3327,7 +3362,7 @@ select {
   height: 38px;
   color: var(--accent-strong);
   background: var(--accent-soft);
-  border-radius: 10px;
+  border-radius: var(--radius-s);
 }
 .action-sheet-icon.excel {
   color: var(--income);
@@ -3357,7 +3392,7 @@ select {
   gap: 10px;
   text-align: left;
   cursor: pointer;
-  border-radius: 14px;
+  border-radius: var(--radius-l);
   transition: background-color 160ms ease;
 }
 .collapsible-heading:active {
@@ -3475,8 +3510,8 @@ select {
     0 24px 60px rgb(0 0 0 / 50%);
 }
 [data-theme='dark'] .today-card .button.today-action {
-  color: var(--accent-strong);
-  background: var(--surface);
+  color: #fff;
+  background: var(--accent);
 }
 [data-theme='dark'] .today-entry-row,
 [data-theme='dark'] .undo-bar,
@@ -3510,4 +3545,5 @@ select {
 [data-theme='dark'] :focus-visible {
   outline-color: rgb(106 147 255 / 40%);
 }
+
 
