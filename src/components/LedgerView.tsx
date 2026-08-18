@@ -15,6 +15,7 @@ import {
   currentMonthKey,
   formatMonthLabel,
   shiftMonth,
+  todayISO,
 } from '../data/dates'
 import {
   formatMoney,
@@ -76,6 +77,23 @@ export function LedgerView() {
     () => getLedgerMonthSummary(entries, yearMonth),
     [entries, yearMonth],
   )
+  const today = todayISO()
+  const todayEntries = useMemo(
+    () => entries.filter((entry) => entry.date === today),
+    [entries, today],
+  )
+  const todayIncome =
+    Math.round(
+      todayEntries
+        .filter((entry) => entry.type === 'income')
+        .reduce((sum, entry) => sum + entry.amount, 0) * 100,
+    ) / 100
+  const todayExpense =
+    Math.round(
+      todayEntries
+        .filter((entry) => entry.type === 'expense')
+        .reduce((sum, entry) => sum + entry.amount, 0) * 100,
+    ) / 100
 
   const openNew = () => {
     setSelectedEntry(undefined)
@@ -208,6 +226,19 @@ export function LedgerView() {
           </strong>
         </div>
       </section>
+
+      <div className="today-ledger-strip" aria-label="今天账目">
+        <span className="today-ledger-label">今天</span>
+        {todayEntries.length > 0 ? (
+          <>
+            <span className="today-ledger-count">{todayEntries.length} 笔</span>
+            {todayIncome > 0 ? <span className="today-ledger-income">+¥{formatMoney(todayIncome)}</span> : null}
+            {todayExpense > 0 ? <span className="today-ledger-expense">-¥{formatMoney(todayExpense)}</span> : null}
+          </>
+        ) : (
+          <span className="today-ledger-empty">还没有账目，点下方记一笔</span>
+        )}
+      </div>
 
       <button type="button" className="button primary full add-entry" onClick={openNew}>
         <Plus size={18} />

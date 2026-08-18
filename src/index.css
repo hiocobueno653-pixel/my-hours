@@ -2528,6 +2528,175 @@ select {
   font-size: 12px;
 }
 
+
+/* 本周概览条 */
+.week-strip {
+  margin: 0 0 14px;
+  padding: 14px 14px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow-sm);
+}
+.week-strip-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.week-strip-title {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+.week-strip-title span {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-3);
+}
+.week-strip-title strong {
+  font-size: 15px;
+  font-weight: 850;
+  font-variant-numeric: tabular-nums;
+}
+.week-strip-title .week-pay {
+  color: var(--gold-strong);
+}
+.week-strip-title .week-days {
+  font-size: 12px;
+  color: var(--text-2);
+}
+.week-pending {
+  flex: 0 0 auto;
+  padding: 3px 8px;
+  color: var(--gold-strong);
+  background: var(--gold-soft);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+}
+.week-dots {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+}
+.week-dot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 6px 2px 5px;
+  border-radius: 10px;
+  transition: background-color 160ms ease, transform 160ms var(--ease-out);
+}
+.week-dot:not(:disabled):active {
+  transform: scale(0.92);
+}
+.week-dot.has-record {
+  background: var(--surface-muted);
+}
+.week-dot.today {
+  background: var(--accent-soft);
+}
+.week-dot.future {
+  opacity: 0.38;
+}
+.week-dot-day {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 13px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.week-dot.has-record .week-dot-day {
+  color: #fff;
+  background: var(--accent);
+}
+.week-dot.today .week-dot-day {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+.week-dot-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--text-3);
+}
+.week-dot.today .week-dot-label {
+  color: var(--accent-strong);
+}
+
+/* 未来日期（防误记） */
+.day-row.future {
+  opacity: 0.42;
+  cursor: default;
+}
+.day-row.future:disabled {
+  pointer-events: none;
+}
+.day-row.future .day-chevron {
+  opacity: 0;
+}
+
+/* 编辑器内本月累计 */
+.month-cumulative {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 12px;
+  color: var(--text-2);
+  background: var(--surface-soft);
+  border-radius: 10px;
+  font-size: 12.5px;
+}
+.month-cumulative strong {
+  color: var(--text);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.month-cumulative .month-cumulative-pay {
+  color: var(--gold-strong);
+}
+.month-cumulative-sep {
+  opacity: 0.5;
+}
+
+/* 记账页今天小结 */
+.today-ledger-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  padding: 9px 12px;
+  background: var(--surface-soft);
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  font-size: 12.5px;
+}
+.today-ledger-label {
+  font-weight: 800;
+  color: var(--text-2);
+}
+.today-ledger-count {
+  color: var(--text-2);
+}
+.today-ledger-income {
+  color: var(--income);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.today-ledger-expense {
+  color: var(--expense);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.today-ledger-empty {
+  color: var(--text-3);
+}
 /* 回到本月按钮 */
 .back-to-now {
   display: inline-flex;

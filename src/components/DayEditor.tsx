@@ -8,7 +8,7 @@ import {
   parseAmountInput,
 } from '../data/ledger'
 import { formatDateLabel, todayISO, weekdayName } from '../data/dates'
-import { formatHours, MAX_REMARK_LENGTH, parseHoursInput } from '../data/records'
+import { formatHours, getMonthPay, getMonthSummary, MAX_REMARK_LENGTH, parseHoursInput } from '../data/records'
 import { DEFAULT_WORK_ID, getWorkById } from '../data/profiles'
 import type { LedgerEntry, WorkDayRecord } from '../data/types'
 import { useAppStore } from '../store/useAppStore'
@@ -36,6 +36,7 @@ export function DayEditor({ date, record, onClose, onSaved, onDeleted, onPreviou
   const deleteLedgerEntry = useAppStore((state) => state.deleteLedgerEntry)
   const customCategories = useAppStore((state) => state.customCategories)
   const entries = useAppStore((state) => state.entries)
+  const records = useAppStore((state) => state.records)
   const workProfiles = useAppStore((state) => state.workProfiles)
   const [hours, setHours] = useState(record ? formatHours(record.hours) : '')
   const [remark, setRemark] = useState(record?.remark ?? '')
@@ -66,6 +67,9 @@ export function DayEditor({ date, record, onClose, onSaved, onDeleted, onPreviou
   const parsedHours = parseHoursInput(hours)
   const hoursValue = parsedHours.ok ? parsedHours.hours : 0
   const dayPay = Math.round(hoursValue * effectiveRate * 100) / 100
+  const monthKey = date.slice(0, 7)
+  const monthSummary = getMonthSummary(records, monthKey)
+  const monthPay = getMonthPay(records, monthKey)
 
   useEffect(() => {
     if (withIncome) incomeAmountRef.current?.focus()
@@ -262,6 +266,19 @@ export function DayEditor({ date, record, onClose, onSaved, onDeleted, onPreviou
             尚未设置时薪，工资不会自动计算。到「我的」页设置后，这里会显示本日工资。
           </p>
         )}
+
+        {monthSummary.totalHours > 0 ? (
+          <p className="month-cumulative">
+            <span>本月累计</span>
+            <strong>{formatHours(monthSummary.totalHours)} 小时</strong>
+            {monthPay > 0 ? (
+              <>
+                <span className="month-cumulative-sep">·</span>
+                <strong className="month-cumulative-pay">¥{formatMoney(monthPay)}</strong>
+              </>
+            ) : null}
+          </p>
+        ) : null}
 
         <label className="inline-toggle">
           <input

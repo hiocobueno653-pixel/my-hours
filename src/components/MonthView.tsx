@@ -22,6 +22,7 @@ import type { LedgerEntry, WorkDayRecord } from '../data/types'
 import { useAppStore } from '../store/useAppStore'
 import { haptic } from '../utils/haptics'
 import { DayEditor } from './DayEditor'
+import { WeekStrip } from './WeekStrip'
 import { useModalLayer } from '../navigation/backNavigation'
 
 interface MonthViewProps {
@@ -276,6 +277,13 @@ export function MonthView({
         </section>
       ) : null}
 
+      <WeekStrip
+        onSelectDate={(date) => {
+          setEditingDate(date)
+          setYearMonth(date.slice(0, 7))
+        }}
+      />
+
       {records.length === 0 && isCurrentMonth ? (
         <aside className="onboarding-card" role="note">
           <Sparkles size={18} />
@@ -313,14 +321,16 @@ export function MonthView({
             (entry) => entry.workDate === day.date,
           ).length
           const hasAmount = dayIncome > 0 || dayExpense > 0
+          const isFuture = day.date > today
           return (
             <button
               type="button"
               key={day.date}
-              className={`day-row${day.isToday ? ' today' : ''}${record && record.hours > 0 ? ' has-record' : ''}${day.weekday === 0 || day.weekday === 6 ? ' weekend' : ''}`}
+              className={`day-row${day.isToday ? ' today' : ''}${record && record.hours > 0 ? ' has-record' : ''}${day.weekday === 0 || day.weekday === 6 ? ' weekend' : ''}${isFuture ? ' future' : ''}`}
               style={{ '--row-index': index } as CSSProperties}
-              onClick={() => setEditingDate(day.date)}
-              aria-label={`${day.day}周${weekdayName(day.weekday)} ${record ? `${formatHours(record.hours)}小时` : '未记录'}${hasAmount ? ` 收支${formatMoney(dayIncome - dayExpense)}元` : ''}`}
+              disabled={isFuture}
+              onClick={isFuture ? undefined : () => setEditingDate(day.date)}
+              aria-label={`${day.day}周${weekdayName(day.weekday)} ${isFuture ? '还未到' : record ? `${formatHours(record.hours)}小时` : '未记录'}${hasAmount ? ` 收支${formatMoney(dayIncome - dayExpense)}元` : ''}`}
             >
               <span className="day-date-block">
                 <span className={`day-number${day.isToday ? ' today' : ''}${record && record.hours > 0 ? ' recorded' : ''}`}>
@@ -354,7 +364,7 @@ export function MonthView({
                   {record?.remark ? <span className="remark">{record.remark}</span> : null}
                   {record && record.rate && record.settled ? <span className="settled-tag">已结算</span> : null}
                   {linkedCount > 0 ? <span className="linked-ledger">{linkedCount}笔账</span> : null}
-                  {!record?.remark && linkedCount === 0 ? <span className="day-hint">点击记录</span> : null}
+                  {isFuture ? <span className="day-hint">还未到</span> : !record?.remark && linkedCount === 0 ? <span className="day-hint">点击记录</span> : null}
                 </span>
               </span>
               <ChevronRight className="day-chevron" size={18} aria-hidden="true" />
