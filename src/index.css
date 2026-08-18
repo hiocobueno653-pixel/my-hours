@@ -1,13 +1,13 @@
 :root {
-  --bg: #f4f6fb;
+  --bg: #eef2f9;
   --surface: #ffffff;
-  --surface-soft: #f7f9fc;
-  --surface-muted: #eef2f8;
-  --text: #172033;
-  --text-2: #5b6574;
-  --text-3: #8b94a3;
-  --border: #e0e6ef;
-  --border-strong: #c6d0e0;
+  --surface-soft: #f6f8fc;
+  --surface-muted: #e6ecf6;
+  --text: #141c2e;
+  --text-2: #546072;
+  --text-3: #78849a;
+  --border: #d7e0ee;
+  --border-strong: #b7c3d8;
   --accent: #1d4ed8;
   --accent-strong: #173a99;
   --accent-soft: #e8efff;
@@ -20,8 +20,8 @@
   --gold: #b7791f;
   --gold-strong: #8a5a13;
   --gold-soft: #fff3d6;
-  --shadow-sm: 0 1px 2px rgb(23 32 51 / 5%), 0 8px 20px rgb(23 32 51 / 5%);
-  --shadow: 0 18px 44px rgb(23 32 51 / 13%);
+  --shadow-sm: 0 1px 2px rgb(23 32 51 / 6%), 0 6px 18px rgb(23 32 51 / 7%);
+  --shadow: 0 18px 44px rgb(23 32 51 / 14%);
   --radius-s: 8px;
   --radius-m: 12px;
   --radius-l: 16px;
@@ -107,7 +107,7 @@ select {
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  background: #f8fafd;
+  background: var(--bg);
   overflow-x: hidden;
   box-shadow:
     0 0 0 1px rgb(23 32 51 / 5%),
@@ -344,19 +344,19 @@ select {
   position: absolute;
   inset: 0 0 auto;
   height: 3px;
-  background: var(--accent-soft);
+  background: rgb(29 78 216 / 16%);
 }
 
 .summary-item.income::before {
-  background: var(--income-soft);
+  background: rgb(22 128 61 / 18%);
 }
 
 .summary-item.expense::before {
-  background: var(--expense-soft);
+  background: rgb(194 65 58 / 18%);
 }
 
 .summary-item.balance::before {
-  background: var(--link-soft);
+  background: rgb(53 92 157 / 16%);
 }
 
 .summary-item span {
@@ -1517,7 +1517,7 @@ select {
   margin-bottom: 18px;
   padding: 16px 16px 16px 20px;
   color: var(--text);
-  background: linear-gradient(180deg, var(--surface) 0%, var(--surface-soft) 100%);
+  background: linear-gradient(165deg, var(--surface) 0%, var(--surface-soft) 58%, var(--accent-soft) 150%);
   border: 1px solid var(--border);
   border-radius: var(--radius-l);
   box-shadow: var(--shadow-sm);
@@ -3468,24 +3468,29 @@ select {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+  flex: 0 1 auto;
 }
 .section-actions .section-action {
-  padding: 8px 12px;
-  font-size: 13px;
+  padding: 8px 10px;
+  font-size: 12.5px;
+  white-space: nowrap;
+  flex: 0 1 auto;
+  min-width: 0;
 }
 
 /* ============ 深色模式 ============ */
 
 [data-theme='dark'] {
-  --bg: #0e1420;
-  --surface: #161e2e;
-  --surface-soft: #1b2435;
-  --surface-muted: #232d40;
-  --text: #e8edf6;
-  --text-2: #a5aec0;
-  --text-3: #6e778a;
-  --border: #29334a;
-  --border-strong: #3a4560;
+  --bg: #0b101b;
+  --surface: #151d2c;
+  --surface-soft: #1e283c;
+  --surface-muted: #2b3650;
+  --text: #eaf0fa;
+  --text-2: #acb6c9;
+  --text-3: #8490a8;
+  --border: #36415c;
+  --border-strong: #4b5876;
   --accent: #6a93ff;
   --accent-strong: #9db8ff;
   --accent-soft: #1d2b4e;
@@ -3498,8 +3503,8 @@ select {
   --gold: #e3a54b;
   --gold-strong: #f0bd6a;
   --gold-soft: #3a2f14;
-  --shadow-sm: 0 1px 2px rgb(0 0 0 / 25%), 0 8px 20px rgb(0 0 0 / 25%);
-  --shadow: 0 18px 44px rgb(0 0 0 / 45%);
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 30%), 0 6px 18px rgb(0 0 0 / 28%);
+  --shadow: 0 18px 44px rgb(0 0 0 / 50%);
   color-scheme: dark;
 }
 
