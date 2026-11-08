@@ -1,9 +1,12 @@
 import { BadgeCheck, CheckCheck, Wrench } from 'lucide-react'
+import { useState } from 'react'
 import { formatMoney } from '../data/ledger'
 import { getMonthWorkBreakdown } from '../data/stats'
 import { formatHours, getMonthPay, getSettlementSummary } from '../data/records'
+import { formatMonthLabel } from '../data/dates'
 import { useAppStore } from '../store/useAppStore'
 import { haptic } from '../utils/haptics'
+import { ConfirmDialog } from './ConfirmDialog'
 import { ProgressBar } from './charts/ProgressBar'
 
 interface WagePanelProps {
@@ -15,10 +18,22 @@ export function WagePanel({ yearMonth, onManageWork }: WagePanelProps) {
   const records = useAppStore((state) => state.records)
   const workProfiles = useAppStore((state) => state.workProfiles)
   const settleMonth = useAppStore((state) => state.settleMonth)
-  const monthPay = getMonthPay(records, yearMonth)
-  const settlement = getSettlementSummary(records, yearMonth)
+  const [confirmUnsettle, setConfirmUnsettle] = useState(false)
+  const monthPay = getMonthPay(records, yearMonth, workProfiles)
+  const settlement = getSettlementSummary(records, yearMonth, workProfiles)
   const rows = getMonthWorkBreakdown(records, workProfiles, yearMonth)
   const hasWage = monthPay > 0
+
+  const handleUnsettleAll = () => {
+    if (settlement.settled <= 0) return
+    setConfirmUnsettle(true)
+  }
+
+  const confirmUnsettleAll = () => {
+    settleMonth(yearMonth, false)
+    setConfirmUnsettle(false)
+    haptic(40)
+  }
 
   return (
     <section className="panel wage-panel" aria-label="本月工资">
@@ -31,8 +46,9 @@ export function WagePanel({ yearMonth, onManageWork }: WagePanelProps) {
           <Wrench size={18} />
         </button>
       </div>
-      <div className="wage-hero">
-        <div className="wage-hero-value">
+      {hasWage ? (
+        <div className="wage-hero">
+          <div className="wage-hero-value">
           <span>应得工资</span>
           <strong>¥{formatMoney(monthPay)}</strong>
         </div>
@@ -44,13 +60,14 @@ export function WagePanel({ yearMonth, onManageWork }: WagePanelProps) {
           </div>
         ) : null}
       </div>
+      ) : null}
 
       {hasWage ? (
         <>
           <ProgressBar
             value={settlement.settled}
             max={settlement.total}
-            tone="gold"
+            tone="dark"
             height={8}
           />
           <div className="wage-actions">
@@ -69,10 +86,7 @@ export function WagePanel({ yearMonth, onManageWork }: WagePanelProps) {
               <button
                 type="button"
                 className="button ghost"
-                onClick={() => {
-                  settleMonth(yearMonth, false)
-                  haptic(40)
-                }}
+                onClick={handleUnsettleAll}
               >
                 撤销结算
               </button>
@@ -85,22 +99,34 @@ export function WagePanel({ yearMonth, onManageWork }: WagePanelProps) {
         </p>
       )}
 
-      {rows.length > 0 ? (
-        <div className="work-breakdown">
-          {rows.map((row) => (
-            <div className="work-breakdown-row" key={row.workId}>
-              <span className="work-breakdown-name">{row.name}</span>
-              <span className="work-breakdown-hours">{formatHours(row.hours)} 时</span>
-              <strong className="work-breakdown-pay">¥{formatMoney(row.pay)}</strong>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="wage-empty">
-          <BadgeCheck size={20} />
-          <span>本月的工时记录会显示在这里</span>
-        </div>
-      )}
+      {hasWage ? (
+        rows.length > 0 ? (
+          <div className="work-breakdown">
+            {rows.map((row) => (
+              <div className="work-breakdown-row" key={row.workId}>
+                <span className="work-breakdown-name">{row.name}</span>
+                <span className="work-breakdown-hours">{formatHours(row.hours)} 时</span>
+                <strong className="work-breakdown-pay">¥{formatMoney(row.pay)}</strong>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="wage-empty">
+            <BadgeCheck size={20} />
+            <span>本月的工时记录会显示在这里</span>
+          </div>
+        )
+      ) : null}
+
+      {confirmUnsettle ? (
+        <ConfirmDialog
+          title="撤销本月全部结算？"
+          message={`${formatMonthLabel(yearMonth)} 已结算的 ${settlement.settledCount} 笔将全部标记为未到账。`}
+          danger
+          onConfirm={confirmUnsettleAll}
+          onCancel={() => setConfirmUnsettle(false)}
+        />
+      ) : null}
     </section>
   )
 }

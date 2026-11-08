@@ -9,7 +9,6 @@ import {
   sortLedgerEntries,
 } from './ledger'
 import {
-  DEFAULT_BUDGET_TARGETS,
   dedupeWorkProfiles,
   ensureDefaultWorkProfile,
   normalizeBudgetTargets,
@@ -35,9 +34,9 @@ import type {
 export function createBackupPayload(
   records: WorkDayRecord[],
   entries: LedgerEntry[],
-  customCategories: CustomLedgerCategory[] = [],
-  workProfiles: WorkProfile[] = [],
-  budgetTargets: BudgetTargets = { ...DEFAULT_BUDGET_TARGETS },
+  customCategories: CustomLedgerCategory[],
+  workProfiles: WorkProfile[],
+  budgetTargets: BudgetTargets,
 ): BackupFile {
   return {
     app: 'my-hours',
@@ -138,10 +137,16 @@ export function parseBackupText(text: string): ParsedBackupData {
 }
 
 function csvCell(value: string): string {
-  if (/[",\r\n]/.test(value)) {
-    return `"${value.replaceAll('"', '""')}"`
+  // 公式注入防护（OWASP）：= + - @ 或制表符开头的单元格会被 Excel/WPS 当公式执行，
+  // 前置单引号强制按文本解释（Excel 显示时不出现该撇号）
+  let text = value
+  if (/^[=+@\t\r]/.test(text) || text.startsWith('-')) {
+    text = `'${text}`
   }
-  return value
+  if (/[",\r\n]/.test(text)) {
+    return `"${text.replaceAll('"', '""')}"`
+  }
+  return text
 }
 
 export function buildMonthCsv(
@@ -412,4 +417,3 @@ export function buildLedgerRows(
   rows.push(['', '', '月结余', formatMoney(summary.balance), '', ''])
   return rows
 }
-

@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
@@ -10,6 +10,17 @@ import {
 import { useAppStore } from '../store/useAppStore'
 import { DayEditor } from './DayEditor'
 import { MonthView } from './MonthView'
+
+// 夹具固定在 2026-08（8/1 为周六）；冻结「今天」避免真实时钟推移
+// 让「当前月」漂离夹具月份（例如 10 月时 /1周六/ 只匹配到被禁用的未来日）
+vi.mock('../data/dates', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../data/dates')>()
+  return {
+    ...actual,
+    todayISO: () => '2026-08-15',
+    currentMonthKey: () => '2026-08',
+  }
+})
 
 describe('month UI', () => {
   beforeEach(() => {
@@ -41,14 +52,14 @@ describe('month UI', () => {
     expect(within(todayRegion).getByText(formatDateLabel(today))).toBeInTheDocument()
     expect(within(todayRegion).getByRole('button', { name: '记工时' })).toBeInTheDocument()
 
-    const daysRegion = screen.getByRole('region', { name: '本月其他日期' })
+    const calendarRegion = screen.getByRole('region', { name: '本月日历' })
     expect(
-      within(daysRegion).queryByRole('button', {
-        name: `${day}周${weekday}`,
+      within(calendarRegion).getByRole('button', {
+        name: new RegExp(`^${day}周${weekday}`),
       }),
-    ).not.toBeInTheDocument()
+    ).toBeInTheDocument()
     expect(
-      within(daysRegion).getByRole('button', { name: /1周六/ }),
+      within(calendarRegion).getByRole('button', { name: /1周六/ }),
     ).toBeInTheDocument()
   })
 
@@ -56,8 +67,10 @@ describe('month UI', () => {
     const onClose = vi.fn()
     render(<DayEditor date="2026-08-01" onClose={onClose} />)
 
-    await userEvent.type(screen.getByRole('spinbutton'), '8.5')
-    await userEvent.type(screen.getByRole('textbox'), '上午')
+    await userEvent.type(screen.getAllByRole('spinbutton')[0], '8.5')
+    // 备注走 change 事件：userEvent.type 在高负载下偶发丢字符，
+    // 本用例验证的是「保存记录」而非打字机行为
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: '上午' } })
     await userEvent.click(screen.getByRole('button', { name: '保存' }))
 
     expect(onClose).toHaveBeenCalled()
@@ -72,28 +85,19 @@ describe('month UI', () => {
     expect(screen.getByText('请填写工时')).toBeInTheDocument()
   })
 
-  it('saves work hours and linked income together', async () => {
+  it('saves work hours without creating income entries', async () => {
     render(<DayEditor date="2026-08-01" onClose={vi.fn()} />)
 
-    await userEvent.type(screen.getByRole('spinbutton'), '8.5')
-    await userEvent.click(screen.getByRole('checkbox', { name: '同时记收入' }))
-    await userEvent.click(screen.getByRole('button', { name: '¥200' }))
+    await userEvent.type(screen.getAllByRole('spinbutton')[0], '8.5')
     await userEvent.click(screen.getByRole('button', { name: '保存' }))
 
     expect(useAppStore.getState().records).toEqual([
       { date: '2026-08-01', hours: 8.5, remark: '' },
     ])
-    expect(useAppStore.getState().entries).toContainEqual(
-      expect.objectContaining({
-        date: '2026-08-01',
-        type: 'income',
-        amount: 200,
-        workDate: '2026-08-01',
-      }),
-    )
+    expect(useAppStore.getState().entries).toHaveLength(0)
   })
 
-  it('updates one linked income instead of duplicating it', async () => {
+  it('removes old linked income when saving a record', async () => {
     const date = '2026-08-01'
     useAppStore.setState({
       records: [{ date, hours: 8, remark: '' }],
@@ -117,17 +121,10 @@ describe('month UI', () => {
       />,
     )
 
-    const amountInputs = screen.getAllByRole('spinbutton')
-    await userEvent.clear(amountInputs[1])
-    await userEvent.type(amountInputs[1], '200')
     await userEvent.click(screen.getByRole('button', { name: '保存' }))
 
-    expect(useAppStore.getState().entries).toHaveLength(1)
-    expect(useAppStore.getState().entries[0]).toMatchObject({
-      id: 'income-1',
-      amount: 200,
-      workDate: date,
-    })
+    // 旧的关联收入应被清除（工资由工时×时薪自动计算，不再手动记收入）
+    expect(useAppStore.getState().entries).toHaveLength(0)
   })
 
   it('restores a deleted day record from undo', async () => {
@@ -137,14 +134,51 @@ describe('month UI', () => {
     render(<MonthView />)
 
     await userEvent.click(screen.getByRole('button', { name: /1周六/ }))
+    await userEvent.click(screen.getByRole('button', { name: '修改' }))
     await userEvent.click(screen.getByRole('button', { name: '删除' }))
     const dialog = screen.getByRole('alertdialog')
-    await userEvent.click(within(dialog).getByRole('button', { name: '删除' }))
+    await userEvent.click(within(dialog).getByRole('button', { name: '确认' }))
 
     expect(screen.getByText('已删除这天的记录')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: '撤销' }))
     expect(useAppStore.getState().records).toEqual([
       { date: '2026-08-01', hours: 8, remark: '早班' },
+    ])
+  })
+
+  it('restores rate, workId and settled when undoing a delete', async () => {
+    useAppStore.setState({
+      records: [
+        {
+          date: '2026-08-01',
+          hours: 8,
+          remark: '早班',
+          rate: 50,
+          fixedPay: 450,
+          workId: 'work-a',
+          settled: true,
+        },
+      ],
+    })
+    render(<MonthView />)
+
+    await userEvent.click(screen.getByRole('button', { name: /1周六/ }))
+    await userEvent.click(screen.getByRole('button', { name: '修改' }))
+    await userEvent.click(screen.getByRole('button', { name: '删除' }))
+    const dialog = screen.getByRole('alertdialog')
+    await userEvent.click(within(dialog).getByRole('button', { name: '确认' }))
+
+    await userEvent.click(screen.getByRole('button', { name: '撤销' }))
+    expect(useAppStore.getState().records).toEqual([
+      {
+        date: '2026-08-01',
+        hours: 8,
+        remark: '早班',
+        rate: 50,
+        fixedPay: 450,
+        workId: 'work-a',
+        settled: true,
+      },
     ])
   })
 
@@ -166,9 +200,10 @@ describe('month UI', () => {
     render(<MonthView />)
 
     await userEvent.click(screen.getByRole('button', { name: /1周六/ }))
+    await userEvent.click(screen.getByRole('button', { name: '修改' }))
     await userEvent.click(screen.getByRole('button', { name: '删除' }))
     const dialog = screen.getByRole('alertdialog')
-    await userEvent.click(within(dialog).getByRole('button', { name: '删除' }))
+    await userEvent.click(within(dialog).getByRole('button', { name: '确认' }))
 
     expect(useAppStore.getState().records).toHaveLength(0)
     expect(useAppStore.getState().entries).toHaveLength(0)

@@ -1,37 +1,71 @@
-import { ChevronDown, FileDown, FileSpreadsheet, HardDrive, Moon, SlidersHorizontal, Sun } from 'lucide-react'
-import { useState } from 'react'
-import { currentMonthKey, parseMonthKey } from '../data/dates'
+import { ChevronLeft, ChevronRight, FileDown, FileSpreadsheet, HardDrive, Moon, Sun } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { currentMonthKey, formatMonthLabel, parseMonthKey, shiftMonth } from '../data/dates'
 import { exportMonthOverviewCsv, exportMonthOverviewExcel } from '../services/exportService'
+import { formatMoney, getLedgerMonthSummary } from '../data/ledger'
+import { formatHours, getMonthDelta, getMonthSummary, getSettlementSummary } from '../data/records'
 import { useAppStore } from '../store/useAppStore'
+import { applyThemeMode, type ThemeMode } from '../utils/theme'
+import { useBackDismiss } from '../navigation/backNavigation'
 import { ConfirmDialog } from './ConfirmDialog'
 import { BackupView } from './BackupView'
-import { OverviewView } from './OverviewView'
 import { WagePanel } from './WagePanel'
 import { StatsPanels } from './StatsPanels'
 import { BudgetPanel } from './BudgetPanel'
 import { WorkManager } from './WorkManager'
+import { MonthPicker } from './MonthPicker'
 
-export type ThemeMode = 'auto' | 'light' | 'dark'
+// 「只记工时」变体（VITE_HOURS_ONLY=1 构建）：隐藏预算、账目收入/结余、分类占比
+const HOURS_ONLY = import.meta.env.VITE_HOURS_ONLY === '1'
+
 
 interface MyViewProps {
   largeText: boolean
   onLargeTextChange: () => void
-  onOpenDay: (date: string) => void
+  /** 二级页面（年度统计/备份/设置）打开/关闭时通知父层，用于隐藏底部导航栏 */
+  onSubPageChange?: (open: boolean) => void
 }
+
+const SUBPAGE_BACK_THRESHOLD = 72 // 右滑超过 72px 触发返回（可预测性动画的跟手阈值）
 
 export function MyView({
   largeText,
   onLargeTextChange,
-  onOpenDay,
+  onSubPageChange,
 }: MyViewProps) {
   const records = useAppStore((state) => state.records)
   const entries = useAppStore((state) => state.entries)
+  const workProfiles = useAppStore((state) => state.workProfiles)
+  const budgetTargets = useAppStore((state) => state.budgetTargets)
   const [yearMonth, setYearMonth] = useState(currentMonthKey)
+  const [monthPickerOpen, setMonthPickerOpen] = useState(false)
   const [exportState, setExportState] = useState('')
   const [confirmClear, setConfirmClear] = useState(false)
   const [workManagerOpen, setWorkManagerOpen] = useState(false)
-  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [subPage, setSubPage] = useState<'stats' | 'backup' | null>(null)
+  const [dragX, setDragX] = useState(0)
+  const [dragging, setDragging] = useState(false)
+  const dragStartRef = useRef<{ x: number; y: number } | null>(null)
+  const dragOffsetRef = useRef(0)
   const year = parseMonthKey(yearMonth)?.year ?? new Date().getFullYear()
+  const monthSummary = useMemo(
+    () => getMonthSummary(records, yearMonth),
+    [records, yearMonth],
+  )
+  const settlement = useMemo(
+    () => getSettlementSummary(records, yearMonth, workProfiles),
+    [records, yearMonth, workProfiles],
+  )
+  const monthDelta = useMemo(
+    () => getMonthDelta(records, yearMonth, shiftMonth),
+    [records, yearMonth],
+  )
+  const ledgerSummary = useMemo(
+    () => getLedgerMonthSummary(entries, yearMonth),
+    [entries, yearMonth],
+  )
+  const hasBudget =
+    budgetTargets.monthlyExpenseBudget > 0 || budgetTargets.monthlyIncomeGoal > 0
 
   const handleOverviewExport = async () => {
     setExportState('导出中')
@@ -43,126 +77,257 @@ export function MyView({
     }
   }
 
+  // 二级页面打开时隐藏底部导航栏并回到顶部（避免保留上次滚动位置），返回时恢复
+  useEffect(() => {
+    onSubPageChange?.(subPage !== null)
+    if (subPage !== null) window.scrollTo(0, 0)
+  }, [subPage, onSubPageChange])
+
+  const closeSubPage = () => setSubPage(null)
+
+  // 二级页面打开时，Android 返回键关闭二级页而不是切到首页
+  useBackDismiss(closeSubPage, subPage !== null)
+
+  // 右滑跟手返回（可预测性动画）：二级页面向右拖动时页面跟随位移，
+  // 松手超过阈值则滑出返回，否则回弹——让用户预见到返回的目标页面。
+  const onTouchStart = (event: React.TouchEvent) => {
+    if (subPage === null) return
+    const touch = event.touches[0]
+    dragStartRef.current = { x: touch.clientX, y: touch.clientY }
+    dragOffsetRef.current = 0
+    setDragging(true)
+  }
+
+  const onTouchMove = (event: React.TouchEvent) => {
+    if (subPage === null || !dragStartRef.current) return
+    const touch = event.touches[0]
+    const dx = touch.clientX - dragStartRef.current.x
+    const dy = touch.clientY - dragStartRef.current.y
+    // 仅右滑且横向为主时跟手
+    if (dx > 0 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      dragOffsetRef.current = Math.min(dx, 220)
+      setDragX(dragOffsetRef.current)
+    }
+  }
+
+  const onTouchEnd = () => {
+    if (subPage === null || !dragStartRef.current) return
+    dragStartRef.current = null
+    setDragging(false)
+    if (dragOffsetRef.current >= SUBPAGE_BACK_THRESHOLD) {
+      setSubPage(null)
+    }
+    setDragX(0)
+  }
+
+  // 触摸被系统中断（来电/下拉通知）时也要复位，避免 transform 卡住
+  const onTouchCancel = () => {
+    if (subPage === null) return
+    dragStartRef.current = null
+    setDragging(false)
+    setDragX(0)
+  }
+
+  const subpageClass = `subpage${dragging ? ' dragging' : ''}`
+  const subpageStyle = dragging && dragX > 0 ? { transform: `translateX(${dragX}px)` } : undefined
+
   return (
-    <div className="my-view page-enter">
-      <header className="page-header">
-        <h2>我的</h2>
-        <p className="page-subtitle">看工资、管预算，把数据带走</p>
+    <div
+      className={`my-view page-enter${subPage !== null ? ' subpage-open' : ''}${HOURS_ONLY ? ' hours-only' : ''}`}
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+      onTouchCancel={onTouchCancel}
+    >
+      {subPage === 'stats' ? (
+        <div className={subpageClass} style={subpageStyle}>
+          <header className="subpage-header">
+            <button type="button" className="icon-button" onClick={closeSubPage} aria-label="返回">
+              <ChevronLeft size={20} />
+            </button>
+            <h2>年度统计</h2>
+            <span className="subpage-header-spacer" />
+          </header>
+          <div className="subpage-content">
+            <StatsPanels year={year} yearMonth={yearMonth} onSelectMonth={setYearMonth} />
+          </div>
+        </div>
+      ) : null}
+
+      {subPage === 'backup' ? (
+        <div className={subpageClass} style={subpageStyle}>
+          <header className="subpage-header">
+            <button type="button" className="icon-button" onClick={closeSubPage} aria-label="返回">
+              <ChevronLeft size={20} />
+            </button>
+            <h2>数据与设置</h2>
+            <span className="subpage-header-spacer" />
+          </header>
+          <div className="subpage-content">
+            <BackupView />
+            <section className="settings-panel panel">
+              <div className="section-heading">
+                <h3>导出本月概览</h3>
+              </div>
+              <div className="section-actions backup-export-actions">
+                <button type="button" className="button section-action" onClick={handleOverviewExport}>
+                  <FileDown size={17} /> CSV
+                </button>
+                <button
+                  type="button"
+                  className="button section-action"
+                  onClick={async () => {
+                    setExportState('导出中')
+                    try {
+                      await exportMonthOverviewExcel(yearMonth, records, entries)
+                      setExportState('本月概览已导出 Excel')
+                    } catch {
+                      setExportState('导出失败')
+                    }
+                  }}
+                >
+                  <FileSpreadsheet size={17} /> Excel
+                </button>
+              </div>
+              {exportState ? <p className="status-line" role="status">{exportState}</p> : null}
+            </section>
+            <section className="settings-panel panel">
+              <div className="section-heading">
+                <h3>显示</h3>
+              </div>
+              <label className="inline-toggle">
+                <input type="checkbox" checked={largeText} onChange={onLargeTextChange} />
+                <span>大字模式</span>
+              </label>
+              <ThemeSetting />
+            </section>
+            <section className="settings-panel panel">
+              <div className="section-heading">
+                <h3>危险操作</h3>
+              </div>
+              <button type="button" className="button danger full" onClick={() => setConfirmClear(true)}>
+                清空全部数据
+              </button>
+            </section>
+          </div>
+        </div>
+      ) : null}
+
+      {subPage === null ? (
+      <>
+      <header className="mine-page-header">
+        <div className="mine-heading-row">
+          <div className="screen-header-copy">
+            <span className="screen-kicker">个人数据</span>
+            <h1>我的</h1>
+          </div>
+          <div className="header-tool-group">
+            <span className="local-only-mark"><HardDrive size={14} /> {hasBudget ? '已备份' : '仅本机'}</span>
+            <div className="inline-month-nav" aria-label="月份切换">
+              <button type="button" className="month-nav-button" onClick={() => setYearMonth((current) => shiftMonth(current, -1))} aria-label="上个月">
+                <ChevronLeft size={19} />
+              </button>
+              <h2
+                className="month-nav-label"
+                tabIndex={0}
+                title="选择月份"
+                onClick={() => setMonthPickerOpen(true)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault()
+                    setMonthPickerOpen(true)
+                  }
+                }}
+              >
+                {formatMonthLabel(yearMonth)}
+              </h2>
+              <button type="button" className="month-nav-button" onClick={() => setYearMonth((current) => shiftMonth(current, 1))} aria-label="下个月">
+                <ChevronRight size={19} />
+              </button>
+            </div>
+          </div>
+        </div>
       </header>
 
-      <section className="my-section" aria-label="本月总览">
-        <div className="section-heading my-section-heading">
-          <div>
-            <h3>本月总览</h3>
-            <span>点日期查看当天详情</span>
-          </div>
-          <span className="section-chip"><HardDrive size={14} /> 仅本机</span>
+      <section className="mine-summary" aria-label="本月概览">
+        <div className="mine-summary-hours">
+          <span>本月工时</span>
+          <strong>{formatHours(monthSummary.totalHours)}<small> 小时</small></strong>
+          <small>{monthSummary.workDays} 个工作日</small>
+          {monthDelta ? (
+            <span className={`hero-delta${monthDelta.delta >= 0 ? ' up' : ' down'}`}>
+              {monthDelta.delta >= 0 ? '↑' : '↓'} 比上月 {monthDelta.delta >= 0 ? '+' : ''}{formatHours(monthDelta.delta)} 小时（{monthDelta.delta >= 0 ? '+' : ''}{monthDelta.percent}%）
+            </span>
+          ) : null}
         </div>
-        <OverviewView
-          yearMonth={yearMonth}
-          onYearMonthChange={setYearMonth}
-          onOpenDay={onOpenDay}
-          embedded
-        />
+        {HOURS_ONLY ? null : (
+        <dl className={`mine-summary-money${HOURS_ONLY ? ' hours-only' : ''}`}>
+          <div className="pay">
+            <dt>待结算</dt>
+            <dd>¥{formatMoney(settlement.pending)}</dd>
+            {settlement.total > 0 ? (
+              <small>已结算 ¥{formatMoney(settlement.settled)}</small>
+            ) : monthSummary.workDays > 0 ? (
+              <small className="setup-wage-hint">未设时薪</small>
+            ) : null}
+          </div>
+          <div className="income">
+            <dt>账目收入</dt>
+            <dd>¥{formatMoney(ledgerSummary.income)}</dd>
+          </div>
+          <div className={ledgerSummary.balance < 0 ? 'expense' : 'pay'}>
+            <dt>本月结余</dt>
+            <dd>
+              {ledgerSummary.balance < 0 ? '-' : ''}¥{formatMoney(Math.abs(ledgerSummary.balance))}
+            </dd>
+          </div>
+        </dl>
+        )}
       </section>
 
-      <div className="my-section">
-        <WagePanel
-          yearMonth={yearMonth}
-          onManageWork={() => setWorkManagerOpen(true)}
-        />
-      </div>
-      <div className="my-section">
+      {HOURS_ONLY ? null : (
+      <section className="my-section">
+        <WagePanel yearMonth={yearMonth} onManageWork={() => setWorkManagerOpen(true)} />
+      </section>
+      )}
+      {HOURS_ONLY ? null : (
+      <section className="my-section">
         <BudgetPanel yearMonth={yearMonth} />
-      </div>
-      <div className="my-section">
-        <StatsPanels
-          year={year}
-          yearMonth={yearMonth}
-          onSelectMonth={(selected) => setYearMonth(selected)}
-        />
-      </div>
-
-      <section className="my-section backup-section" aria-label="数据备份">
-        <div className="section-heading my-section-heading">
-          <div>
-            <h3>数据备份</h3>
-            <span>导出文件后，可在系统分享面板选择云盘</span>
-          </div>
-          <div className="section-actions">
-            <button type="button" className="button section-action" onClick={handleOverviewExport}>
-              <FileDown size={17} />
-              CSV
-            </button>
-            <button
-              type="button"
-              className="button section-action"
-              onClick={async () => {
-                setExportState('导出中')
-                try {
-                  await exportMonthOverviewExcel(yearMonth, records, entries)
-                  setExportState('本月概览已导出 Excel')
-                } catch {
-                  setExportState('导出失败')
-                }
-              }}
-            >
-              <FileSpreadsheet size={17} />
-              Excel
-            </button>
-          </div>
-        </div>
-        {exportState ? (
-          <p className="status-line" role="status">
-            {exportState}
-          </p>
-        ) : null}
-        <BackupView compact />
       </section>
+      )}
 
-      <section className="my-section settings-section" aria-label="使用设置">
+      <section className="my-section my-nav-group" aria-label="更多功能">
         <button
           type="button"
-          className="section-heading my-section-heading collapsible-heading"
-          onClick={() => setSettingsOpen((open) => !open)}
-          aria-expanded={settingsOpen}
+          className="my-nav-row"
+          onClick={() => setSubPage('stats')}
         >
-          <span className="collapsible-title">
-            <SlidersHorizontal size={17} color="var(--text-3)" aria-hidden="true" />
-            <span>
-              <strong>使用设置</strong>
-              <small>大字模式、深色模式、数据清理</small>
-            </span>
+          <span className="my-nav-row-copy">
+            <strong>年度统计</strong>
+            <small>{HOURS_ONLY ? '工时趋势' : '趋势图与分类占比'}</small>
           </span>
-          <ChevronDown size={18} className={settingsOpen ? 'chevron open' : 'chevron'} aria-hidden="true" />
+          <ChevronRight size={18} className="my-nav-arrow" aria-hidden="true" />
         </button>
-        {settingsOpen ? (
-          <div className="settings-panel panel collapse-panel">
-            <label className="inline-toggle">
-              <input
-                type="checkbox"
-                checked={largeText}
-                onChange={onLargeTextChange}
-              />
-              <span>大字模式</span>
-            </label>
-            <ThemeSetting />
-            <button
-              type="button"
-              className="button danger full"
-              onClick={() => setConfirmClear(true)}
-            >
-              清空全部数据
-            </button>
-          </div>
-        ) : null}
+        <button
+          type="button"
+          className="my-nav-row"
+          onClick={() => setSubPage('backup')}
+        >
+          <span className="my-nav-row-copy">
+            <strong>数据与设置</strong>
+            <small>备份恢复、导出、外观与数据清理</small>
+          </span>
+          <ChevronRight size={18} className="my-nav-arrow" aria-hidden="true" />
+        </button>
       </section>
+      </>
+      ) : null}
 
       {confirmClear ? (
         <ConfirmDialog
           title="清空全部数据？"
           message="会删除所有工时、账目、自定义分类、工作与预算，建议先保存备份。"
-          confirmLabel="清空"
+          confirmLabel="确认"
           danger
           onConfirm={() => {
             useAppStore.getState().clearAll()
@@ -173,6 +338,17 @@ export function MyView({
       ) : null}
 
       {workManagerOpen ? <WorkManager onClose={() => setWorkManagerOpen(false)} /> : null}
+
+      {monthPickerOpen ? (
+        <MonthPicker
+          value={yearMonth}
+          onSelect={(next) => {
+            setYearMonth(next)
+            setMonthPickerOpen(false)
+          }}
+          onClose={() => setMonthPickerOpen(false)}
+        />
+      ) : null}
     </div>
   )
 }
@@ -195,12 +371,7 @@ export function ThemeSetting() {
     } catch {
       // 隐私模式下忽略
     }
-    const dark =
-      mode === 'dark' ||
-      (mode === 'auto' &&
-        typeof window !== 'undefined' &&
-        window.matchMedia('(prefers-color-scheme: dark)').matches)
-    document.documentElement.dataset.theme = dark ? 'dark' : 'light'
+    applyThemeMode(mode)
   }
 
   const options: { value: ThemeMode; label: string }[] = [

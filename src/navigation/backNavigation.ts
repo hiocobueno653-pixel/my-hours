@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 
 type BackAction = () => void
 
@@ -77,8 +77,65 @@ export function useBackDismiss(onDismiss: BackAction, active = true): void {
   }, [active])
 }
 
-export function useModalLayer(onDismiss: BackAction, active = true): void {
+export function useModalLayer(
+  onDismiss: BackAction,
+  active = true,
+): { containerRef: React.RefObject<HTMLDivElement | null>; onKeyDown: (event: ReactKeyboardEvent) => void } {
   useBackDismiss(onDismiss, active)
+
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const previousFocusRef = useRef<HTMLElement | null>(null)
+
+  // Escape 关闭：弹层打开时注册，浅层弹层不会被深层同时消费
+  useEffect(() => {
+    if (!active) return undefined
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        onDismiss()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [active, onDismiss])
+
+  // 打开时记录当前焦点并移入弹层；关闭时恢复
+  useEffect(() => {
+    if (!active) return undefined
+    previousFocusRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const container = containerRef.current
+    const focusable = container?.querySelector<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+    )
+    focusable?.focus()
+    return () => {
+      previousFocusRef.current?.focus?.()
+      previousFocusRef.current = null
+    }
+  }, [active])
+
+  // Tab 焦点陷阱：只允许在弹层内循环
+  const onKeyDown = (event: ReactKeyboardEvent) => {
+    if (event.key !== 'Tab') return
+    const container = containerRef.current
+    if (!container) return
+    const focusable = Array.from(
+      container.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      ),
+    ).filter((el) => !el.hasAttribute('disabled') && el.offsetParent !== null)
+    if (focusable.length === 0) return
+    const first = focusable[0]
+    const last = focusable[focusable.length - 1]
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault()
+      last.focus()
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault()
+      first.focus()
+    }
+  }
 
   useEffect(() => {
     if (!active) return undefined
@@ -89,4 +146,6 @@ export function useModalLayer(onDismiss: BackAction, active = true): void {
       if (modalDepth === 0) document.body.classList.remove('modal-open')
     }
   }, [active])
+
+  return { containerRef, onKeyDown }
 }

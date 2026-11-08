@@ -93,16 +93,8 @@ export function getWorkById(
   profiles: WorkProfile[],
   workId: string | undefined,
 ): WorkProfile | null {
-  if (!workId || workId === DEFAULT_WORK_ID) return null
+  if (!workId) return null
   return profiles.find((profile) => profile.id === workId) ?? null
-}
-
-export function getWorkName(
-  profiles: WorkProfile[],
-  workId: string | undefined,
-): string {
-  const profile = getWorkById(profiles, workId)
-  return profile ? profile.name : DEFAULT_WORK_NAME
 }
 
 /** 记录的实际单价：优先记录快照，其次当前工作时薪，最后 0 */

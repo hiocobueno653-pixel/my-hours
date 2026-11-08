@@ -127,7 +127,9 @@ export function BudgetPanel({ yearMonth }: BudgetPanelProps) {
               <span>本月支出</span>
               <strong>
                 ¥{formatMoney(summary.expense)}
-                {hasBudget ? ` / ¥${formatMoney(budgetTargets.monthlyExpenseBudget)}` : ''}
+                {hasBudget ? (
+                  <span className="budget-limit"> / ¥{formatMoney(budgetTargets.monthlyExpenseBudget)}</span>
+                ) : ''}
               </strong>
             </div>
             {hasBudget ? (
@@ -150,7 +152,9 @@ export function BudgetPanel({ yearMonth }: BudgetPanelProps) {
               <span>本月收入</span>
               <strong>
                 ¥{formatMoney(summary.income)}
-                {hasGoal ? ` / ¥${formatMoney(budgetTargets.monthlyIncomeGoal)}` : ''}
+                {hasGoal ? (
+                  <span className="budget-limit"> / ¥{formatMoney(budgetTargets.monthlyIncomeGoal)}</span>
+                ) : ''}
               </strong>
             </div>
             {hasGoal ? (
@@ -158,10 +162,10 @@ export function BudgetPanel({ yearMonth }: BudgetPanelProps) {
                 <ProgressBar
                   value={summary.income}
                   max={budgetTargets.monthlyIncomeGoal}
-                  tone={goalReached ? 'income' : 'gold'}
+                  tone={goalReached ? 'income' : 'dark'}
                 />
                 <span className={goalReached ? 'budget-hint reached' : 'budget-hint'}>
-                  {goalReached ? '目标已达成 🎉' : `已完成 ${Math.round((summary.income / budgetTargets.monthlyIncomeGoal) * 100)}%`}
+                  {goalReached ? '目标已达成' : `已完成 ${Math.round((summary.income / budgetTargets.monthlyIncomeGoal) * 100)}%`}
                 </span>
               </>
             ) : (

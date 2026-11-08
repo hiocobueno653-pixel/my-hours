@@ -11,7 +11,13 @@ import {
   createBackupPayload,
 } from '../data/backup'
 import { todayISO } from '../data/dates'
-import type { CustomLedgerCategory, LedgerEntry, WorkDayRecord } from '../data/types'
+import type {
+  BudgetTargets,
+  CustomLedgerCategory,
+  LedgerEntry,
+  WorkDayRecord,
+  WorkProfile,
+} from '../data/types'
 
 async function saveTextFile(
   filename: string,
@@ -50,17 +56,20 @@ async function saveTableAsExcel(
   sheetName: string,
   rows: (string | number)[][],
 ): Promise<void> {
-  // 动态加载 xlsx：仅导出 Excel 时才拉取，减小首屏体积
-  const XLSX = await import('xlsx')
-  const worksheet = XLSX.utils.aoa_to_sheet(rows)
-  const workbook = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(workbook, worksheet, sheetName)
-  const output = XLSX.write(workbook, { bookType: 'xlsx', type: 'base64' })
+  // 动态加载 write-excel-file：仅导出 Excel 时才拉取，减小首屏体积
+  const writeExcelFile = (await import('write-excel-file/browser')).default
+  const blob = await writeExcelFile(rows, { sheet: sheetName }).toBlob()
   if (Capacitor.isNativePlatform()) {
     // 不传 encoding：插件会把 data 按 base64 解码后写为二进制文件
+    const bytes = new Uint8Array(await blob.arrayBuffer())
+    let binary = ''
+    for (let index = 0; index < bytes.length; index += 32768) {
+      binary += String.fromCharCode(...bytes.subarray(index, index + 32768))
+    }
+    const base64 = btoa(binary)
     const result = await Filesystem.writeFile({
       path: filename,
-      data: output,
+      data: base64,
       directory: Directory.Cache,
     })
     await Share.share({
@@ -70,14 +79,6 @@ async function saveTableAsExcel(
     })
     return
   }
-  const binary = XLSX.write(workbook, { bookType: 'xlsx', type: 'binary' })
-  const buffer = new Uint8Array(binary.length)
-  for (let index = 0; index < binary.length; index += 1) {
-    buffer[index] = binary.charCodeAt(index) & 0xff
-  }
-  const blob = new Blob([buffer], {
-    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  })
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
@@ -92,9 +93,17 @@ export async function exportBackupFile(
   records: WorkDayRecord[],
   entries: LedgerEntry[],
   customCategories: CustomLedgerCategory[],
+  workProfiles: WorkProfile[],
+  budgetTargets: BudgetTargets,
 ): Promise<void> {
   const payload = JSON.stringify(
-    createBackupPayload(records, entries, customCategories),
+    createBackupPayload(
+      records,
+      entries,
+      customCategories,
+      workProfiles,
+      budgetTargets,
+    ),
     null,
     2,
   )

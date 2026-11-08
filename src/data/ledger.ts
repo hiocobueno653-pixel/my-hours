@@ -206,11 +206,6 @@ export function isLedgerCategoryInUse(
   return entries.some((entry) => entry.type === type && entry.category === name)
 }
 
-
-export function createLedgerCategoryId(): string {
-  return createId('category')
-}
-
 function createId(prefix: string): string {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
     return `${prefix}-${crypto.randomUUID()}`

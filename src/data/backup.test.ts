@@ -37,30 +37,49 @@ const customCategories = [
   { id: 'category-2', type: 'expense' as const, name: '房租' },
 ]
 
+const workProfiles = [
+  { id: 'work-default', name: '工地A', hourlyRate: 25 },
+  { id: 'work-tutor', name: '家教', hourlyRate: 50 },
+]
+
+const budgetTargets = {
+  monthlyExpenseBudget: 3000,
+  monthlyIncomeGoal: 8000,
+}
+
 describe('backup helpers', () => {
   it('creates a version 4 payload with records, entries, categories, work and budget', () => {
-    const payload = createBackupPayload(records, entries, customCategories)
+    const payload = createBackupPayload(
+      records,
+      entries,
+      customCategories,
+      workProfiles,
+      budgetTargets,
+    )
     expect(payload.app).toBe('my-hours')
     expect(payload.version).toBe(4)
     expect(payload.records).toEqual(records)
     expect(payload.entries).toEqual(entries)
     expect(payload.customCategories).toEqual(customCategories)
-    expect(payload.workProfiles).toEqual([])
-    expect(payload.budgetTargets).toEqual({
-      monthlyExpenseBudget: 0,
-      monthlyIncomeGoal: 0,
-    })
+    expect(payload.workProfiles).toEqual(workProfiles)
+    expect(payload.budgetTargets).toEqual(budgetTargets)
   })
 
   it('parses a valid version 4 backup', () => {
-    const payload = createBackupPayload(records, entries, customCategories)
+    const payload = createBackupPayload(
+      records,
+      entries,
+      customCategories,
+      workProfiles,
+      budgetTargets,
+    )
     const parsed = parseBackupText(JSON.stringify(payload))
     expect(parsed).toEqual({
       records,
       entries,
       customCategories,
-      workProfiles: [{ id: 'work-default', name: '默认工作', hourlyRate: 0 }],
-      budgetTargets: { monthlyExpenseBudget: 0, monthlyIncomeGoal: 0 },
+      workProfiles,
+      budgetTargets,
     })
   })
 
@@ -147,5 +166,25 @@ describe('backup helpers', () => {
     expect(ledgerCsv).toContain('2026-08-02,支出,餐饮,35.5,8.5小时,"午饭,饮料"')
     expect(ledgerCsv).toContain('月收入,5000')
     expect(ledgerCsv).toContain('月结余,4964.5')
+  })
+
+  it('neutralizes spreadsheet formula injection in exported cells', () => {
+    const hostile = [
+      { date: '2026-08-03', hours: 8, remark: '=HYPERLINK("http://evil","点我")' },
+      { date: '2026-08-04', hours: 8, remark: '+SUM(1,2)' },
+      { date: '2026-08-05', hours: 8, remark: '@cmd' },
+      { date: '2026-08-06', hours: 8, remark: '-1+1' },
+      { date: '2026-08-07', hours: 8, remark: '\tTAB开头' },
+      { date: '2026-08-08', hours: 8, remark: '正常备注不受影响' },
+    ]
+    const csv = buildMonthCsv('2026-08', hostile)
+    // 所有危险前缀都被单引号中和，Excel/WPS 打开时按纯文本处理
+    expect(csv).toContain("'=HYPERLINK")
+    expect(csv).toContain("'+SUM(1,2)")
+    expect(csv).toContain("'@cmd")
+    expect(csv).toContain("'-1+1")
+    expect(csv).toContain("'\tTAB开头")
+    // 普通文本不受影响
+    expect(csv).toContain('正常备注不受影响')
   })
 })

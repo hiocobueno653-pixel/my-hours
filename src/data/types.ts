@@ -6,6 +6,8 @@ export interface WorkDayRecord {
   workId?: string
   /** 记录时的时薪快照（元/小时）；改工作时薪不影响历史记录 */
   rate?: number
+  /** 自定义当日工资（元）；填了之后优先于「工时 × 时薪」 */
+  fixedPay?: number
   /** 结算标记：工资已结算/未结算 */
   settled?: boolean
 }

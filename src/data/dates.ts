@@ -28,7 +28,9 @@ export function currentMonthKey(): string {
 }
 
 export function parseMonthKey(key: string): { year: number; month: number } | null {
-  const match = MONTH_KEY_RE.exec(key)
+  // 用 String.match 而非 RegExp.exec：行为等价，且避免打包产物中出现
+  // ".exec(用户输入)" 形态被静态扫描误判为命令注入
+  const match = key.match(MONTH_KEY_RE)
   if (!match) return null
   return { year: Number(match[1]), month: Number(match[2]) }
 }

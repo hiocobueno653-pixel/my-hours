@@ -16,9 +16,32 @@ dist-ssr
 *.apk
 myhours-home.png
 ui-baseline.png
+*.work.png
+/*.png
+_apkcheck/
+
 android/.gradle
 android/local.properties
 android/build
+
+# 签名密钥（严禁提交！丢失无法升级应用）
+android/*.keystore
+android/*.jks
+android/keystore.properties
+
+# 构建产物（「只记工时」变体）与评审截图
+dist-hours/
+screenshots/
+android/app/src/hours/assets/
+
+# 临时输出
+test-output.txt
+
+# 工具运行时目录
+.playwright-mcp/
+.zcode/
+.mimosa/
+android/.mimosa/
 
 # Editor directories and files
 .vscode/*
@@ -30,3 +53,6 @@ android/build
 *.njsproj
 *.sln
 *.sw?
+
+# Hallmark 设计系统记忆
+.hallmark/

@@ -15,7 +15,7 @@ interface CategoryManagerProps {
 }
 
 export function CategoryManager({ initialType, onClose }: CategoryManagerProps) {
-  useModalLayer(onClose)
+  const { containerRef, onKeyDown } = useModalLayer(onClose)
   const customCategories = useAppStore((state) => state.customCategories)
   const entries = useAppStore((state) => state.entries)
   const addCustomCategory = useAppStore((state) => state.addCustomCategory)
@@ -44,7 +44,7 @@ export function CategoryManager({ initialType, onClose }: CategoryManagerProps) 
   }
 
   return (
-    <div className="sheet-backdrop" onClick={onClose}>
+    <div className="sheet-backdrop" ref={containerRef} onClick={onClose} onKeyDown={onKeyDown}>
       <section
         className="day-sheet category-sheet"
         role="dialog"

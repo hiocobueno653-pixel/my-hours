@@ -1,5 +1,5 @@
-import { DEFAULT_WORK_ID, getRecordRate } from './profiles'
-import { getMonthRecords } from './records'
+import { DEFAULT_WORK_ID } from './profiles'
+import { getMonthRecords, getRecordPay } from './records'
 import type { LedgerEntry, WorkProfile, WorkDayRecord } from './types'
 
 export function pad2(value: number): string {
@@ -26,22 +26,30 @@ export interface MonthHoursPoint {
 export function getYearHoursTrend(
   records: WorkDayRecord[],
   year: number,
+  workProfiles?: WorkProfile[],
 ): MonthHoursPoint[] {
-  return getYearMonthKeys(year).map((yearMonth) => {
-    const monthRecords = getMonthRecords(records, yearMonth)
-    let hours = 0
-    let pay = 0
-    let workDays = 0
-    for (const record of monthRecords) {
-      hours += record.hours
-      pay += record.hours * getRecordRate(record)
-      if (record.hours > 0) workDays += 1
-    }
+  const monthKeys = getYearMonthKeys(year)
+  const byMonth = new Map<string, { hours: number; pay: number; workDays: number }>()
+  for (const yearMonth of monthKeys) {
+    byMonth.set(yearMonth, { hours: 0, pay: 0, workDays: 0 })
+  }
+  const yearPrefix = year + '-'
+  for (const record of records) {
+    if (!record.date.startsWith(yearPrefix)) continue
+    const yearMonth = record.date.slice(0, 7)
+    const point = byMonth.get(yearMonth)
+    if (!point) continue
+    point.hours += record.hours
+    point.pay += getRecordPay(record, workProfiles)
+    if (record.hours > 0) point.workDays += 1
+  }
+  return monthKeys.map((yearMonth) => {
+    const point = byMonth.get(yearMonth) as { hours: number; pay: number; workDays: number }
     return {
       yearMonth,
-      hours: Math.round(hours * 100) / 100,
-      pay: Math.round(pay * 100) / 100,
-      workDays,
+      hours: Math.round(point.hours * 100) / 100,
+      pay: Math.round(point.pay * 100) / 100,
+      workDays: point.workDays,
     }
   })
 }
@@ -57,18 +65,26 @@ export function getYearLedgerTrend(
   entries: LedgerEntry[],
   year: number,
 ): MonthLedgerPoint[] {
-  return getYearMonthKeys(year).map((yearMonth) => {
-    let income = 0
-    let expense = 0
-    for (const entry of entries) {
-      if (!entry.date.startsWith(`${yearMonth}-`)) continue
-      if (entry.type === 'income') income += entry.amount
-      else expense += entry.amount
-    }
+  const monthKeys = getYearMonthKeys(year)
+  const byMonth = new Map<string, { income: number; expense: number }>()
+  for (const yearMonth of monthKeys) {
+    byMonth.set(yearMonth, { income: 0, expense: 0 })
+  }
+  const yearPrefix = year + '-'
+  for (const entry of entries) {
+    if (!entry.date.startsWith(yearPrefix)) continue
+    const yearMonth = entry.date.slice(0, 7)
+    const point = byMonth.get(yearMonth)
+    if (!point) continue
+    if (entry.type === 'income') point.income += entry.amount
+    else point.expense += entry.amount
+  }
+  return monthKeys.map((yearMonth) => {
+    const point = byMonth.get(yearMonth) as { income: number; expense: number }
     return {
       yearMonth,
-      income: Math.round(income * 100) / 100,
-      expense: Math.round(expense * 100) / 100,
+      income: Math.round(point.income * 100) / 100,
+      expense: Math.round(point.expense * 100) / 100,
     }
   })
 }
@@ -124,7 +140,7 @@ export function getMonthWorkBreakdown(
     }
     existing.hours = Math.round((existing.hours + record.hours) * 100) / 100
     existing.pay =
-      Math.round((existing.pay + record.hours * getRecordRate(record)) * 100) / 100
+      Math.round((existing.pay + getRecordPay(record, workProfiles)) * 100) / 100
     rows.set(workId, existing)
   }
   for (const record of getMonthRecords(records, yearMonth)) {
@@ -147,6 +163,7 @@ export function getYearSummary(
   records: WorkDayRecord[],
   entries: LedgerEntry[],
   year: number,
+  workProfiles?: WorkProfile[],
 ): { totalHours: number; totalPay: number; totalIncome: number; totalExpense: number } {
   const prefix = `${year}-`
   let totalHours = 0
@@ -156,7 +173,7 @@ export function getYearSummary(
   for (const record of records) {
     if (!record.date.startsWith(prefix)) continue
     totalHours += record.hours
-    totalPay += record.hours * getRecordRate(record)
+    totalPay += getRecordPay(record, workProfiles)
   }
   for (const entry of entries) {
     if (!entry.date.startsWith(prefix)) continue

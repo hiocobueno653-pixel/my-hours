@@ -1,4 +1,5 @@
 import { PieChart, TrendingUp } from 'lucide-react'
+import { useMemo } from 'react'
 import { formatMoney } from '../data/ledger'
 import { formatHours } from '../data/records'
 import {
@@ -11,6 +12,9 @@ import { useAppStore } from '../store/useAppStore'
 import { BarChart } from './charts/BarChart'
 import { DonutChart } from './charts/DonutChart'
 
+// 「只记工时」变体（VITE_HOURS_ONLY=1 构建）：隐藏收支图表与分类占比
+const HOURS_ONLY = import.meta.env.VITE_HOURS_ONLY === '1'
+
 interface StatsPanelsProps {
   year: number
   yearMonth: string
@@ -19,26 +23,38 @@ interface StatsPanelsProps {
 }
 
 const CATEGORY_COLORS = [
-  'var(--accent)',
-  'var(--income)',
-  'var(--expense)',
-  'var(--gold)',
-  '#8b5cf6',
-  '#0891b2',
-  '#db2777',
-  '#65a30d',
-  '#ea580c',
-  '#64748b',
+  'var(--chart-1)',
+  'var(--chart-2)',
+  'var(--chart-3)',
+  'var(--chart-4)',
+  'var(--chart-5)',
+  'var(--chart-6)',
 ];
 
 export function StatsPanels({ year, yearMonth, onSelectMonth }: StatsPanelsProps) {
   const records = useAppStore((state) => state.records)
   const entries = useAppStore((state) => state.entries)
-  const hoursTrend = getYearHoursTrend(records, year)
-  const ledgerTrend = getYearLedgerTrend(entries, year)
-  const yearSummary = getYearSummary(records, entries, year)
-  const categories = getMonthCategoryTotals(entries, yearMonth)
-  const categoryTotal = categories.reduce((sum, item) => sum + item.total, 0)
+  const workProfiles = useAppStore((state) => state.workProfiles)
+  const hoursTrend = useMemo(
+    () => getYearHoursTrend(records, year, workProfiles),
+    [records, year, workProfiles],
+  )
+  const ledgerTrend = useMemo(
+    () => getYearLedgerTrend(entries, year),
+    [entries, year],
+  )
+  const yearSummary = useMemo(
+    () => getYearSummary(records, entries, year, workProfiles),
+    [records, entries, year, workProfiles],
+  )
+  const categories = useMemo(
+    () => getMonthCategoryTotals(entries, yearMonth),
+    [entries, yearMonth],
+  )
+  const categoryTotal = useMemo(
+    () => categories.reduce((sum, item) => sum + item.total, 0),
+    [categories],
+  )
 
   const monthLabel = (key: string) => `${Number(key.slice(5))}月`
   const hoursGroups = hoursTrend.map((point) => ({
@@ -54,25 +70,34 @@ export function StatsPanels({ year, yearMonth, onSelectMonth }: StatsPanelsProps
   }))
   const hasLedger = yearSummary.totalIncome > 0 || yearSummary.totalExpense > 0
   const hasHours = yearSummary.totalHours > 0
+  const yearWorkDays = hoursTrend.reduce((sum, point) => sum + point.workDays, 0)
 
   return (
     <section className="stats-panels" aria-label="年度统计">
       <div className="section-heading my-section-heading">
         <div>
           <h3>{year} 年度统计</h3>
-          <span>全年趋势与分类占比</span>
+          <span>{HOURS_ONLY ? '全年工时与工资趋势' : '全年趋势与分类占比'}</span>
         </div>
-        <TrendingUp size={18} color="var(--text-3)" aria-hidden="true" />
+        <TrendingUp size={18} aria-hidden="true" />
       </div>
       <div className="stats-hero">
         <div className="stats-hero-item">
           <span>全年工时</span>
           <strong>{formatHours(yearSummary.totalHours)}<small> 小时</small></strong>
         </div>
+        {HOURS_ONLY ? (
+        <div className="stats-hero-item">
+          <span>全年工作日</span>
+          <strong>{yearWorkDays}<small> 天</small></strong>
+        </div>
+        ) : (
         <div className="stats-hero-item">
           <span>全年工资</span>
           <strong>¥{formatMoney(yearSummary.totalPay)}</strong>
         </div>
+        )}
+        {HOURS_ONLY ? null : (
         <div className="stats-hero-item">
           <span>收支结余</span>
           <strong
@@ -81,6 +106,7 @@ export function StatsPanels({ year, yearMonth, onSelectMonth }: StatsPanelsProps
             ¥{formatMoney(yearSummary.totalIncome - yearSummary.totalExpense)}
           </strong>
         </div>
+        )}
       </div>
 
       {hasHours ? (
@@ -100,7 +126,7 @@ export function StatsPanels({ year, yearMonth, onSelectMonth }: StatsPanelsProps
         <p className="field-note chart-empty-note">全年还没有工时记录，记工时后这里会展示每月趋势。</p>
       )}
 
-      {hasLedger ? (
+      {!HOURS_ONLY && hasLedger ? (
         <div className="chart-block">
           <div className="chart-block-head">
             <strong>每月收支</strong>
@@ -118,11 +144,11 @@ export function StatsPanels({ year, yearMonth, onSelectMonth }: StatsPanelsProps
         </div>
       ) : null}
 
-      {categories.length > 0 ? (
+      {!HOURS_ONLY && categories.length > 0 ? (
         <div className="chart-block category-chart-block">
           <div className="chart-block-head">
             <strong>本月分类占比</strong>
-            <PieChart size={15} color="var(--text-3)" aria-hidden="true" />
+            <PieChart size={15} aria-hidden="true" />
           </div>
           <div className="category-chart-layout">
             <DonutChart

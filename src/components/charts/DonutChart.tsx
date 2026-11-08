@@ -69,6 +69,12 @@ export function DonutChart({
           })
         : null}
       </svg>
+      {/* 新拟态浮雕中心盘：垫在环孔与文字之间，形成凸起白盘质感 */}
+      <div
+        className="donut-disk"
+        aria-hidden="true"
+        style={{ width: size - thickness * 2, height: size - thickness * 2 }}
+      />
       {centerLabel || centerValue ? (
         <div className="donut-center">
           {centerLabel ? <span>{centerLabel}</span> : null}

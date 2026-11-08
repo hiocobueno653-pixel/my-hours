@@ -1,5 +1,15 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "ignorePatterns": [
+    "**/node_modules/**",
+    "dist/**",
+    "_apkcheck/**",
+    ".playwright-mcp/**",
+    ".zcode/**",
+    ".hallmark/**",
+    "android/**",
+    "public/**"
+  ],
   "plugins": ["react", "typescript", "oxc"],
   "rules": {
     "react/rules-of-hooks": "error",

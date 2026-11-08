@@ -1,5 +1,5 @@
 import { Check, Pencil, Plus, Trash2, X } from 'lucide-react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { formatMoney } from '../data/ledger'
 import {
   createWorkProfileId,
@@ -24,7 +24,7 @@ interface EditingRow {
 }
 
 export function WorkManager({ onClose }: WorkManagerProps) {
-  useModalLayer(onClose)
+  const { containerRef, onKeyDown } = useModalLayer(onClose)
   const workProfiles = useAppStore((state) => state.workProfiles)
   const records = useAppStore((state) => state.records)
   const saveWorkProfile = useAppStore((state) => state.saveWorkProfile)
@@ -35,10 +35,14 @@ export function WorkManager({ onClose }: WorkManagerProps) {
   const [message, setMessage] = useState('')
   const [pendingDelete, setPendingDelete] = useState<WorkProfile | null>(null)
 
-  const recordCount = (workId: string) =>
-    workId === DEFAULT_WORK_ID
-      ? records.filter((record) => !record.workId || record.workId === DEFAULT_WORK_ID).length
-      : records.filter((record) => record.workId === workId).length
+  const recordCounts = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const record of records) {
+      const workId = record.workId ?? DEFAULT_WORK_ID
+      counts.set(workId, (counts.get(workId) ?? 0) + 1)
+    }
+    return counts
+  }, [records])
 
   const handleAdd = () => {
     const normalized = name.trim().slice(0, MAX_WORK_NAME_LENGTH)
@@ -52,7 +56,7 @@ export function WorkManager({ onClose }: WorkManagerProps) {
       return
     }
     const duplicate = workProfiles.some(
-      (profile) => profile.id !== DEFAULT_WORK_ID && profile.name === normalized,
+      (profile) => profile.name === normalized,
     )
     if (duplicate) {
       setMessage('已存在同名工作')
@@ -86,22 +90,33 @@ export function WorkManager({ onClose }: WorkManagerProps) {
       setMessage('名称不能为空')
       return
     }
+    const duplicate = workProfiles.some(
+      (profile) => profile.id !== editing.id && profile.name === normalized,
+    )
+    if (duplicate) {
+      setMessage('已存在同名工作')
+      return
+    }
     const rateResult = parseRateInput(editing.rate)
     if (!rateResult.ok) {
       setMessage(rateResult.error)
       return
     }
-    saveWorkProfile({
+    const saved = saveWorkProfile({
       id: target.id,
       name: normalized,
       hourlyRate: rateResult.rate,
     })
+    if (!saved) {
+      setMessage('已存在同名工作')
+      return
+    }
     setEditing(null)
     setMessage('已保存')
   }
 
   return (
-    <div className="sheet-backdrop" onClick={onClose}>
+    <div className="sheet-backdrop" ref={containerRef} onClick={onClose} onKeyDown={onKeyDown}>
       <section
         className="day-sheet work-sheet"
         role="dialog"
@@ -122,7 +137,7 @@ export function WorkManager({ onClose }: WorkManagerProps) {
         <div className="work-list">
           {workProfiles.map((profile) => {
             const isDefault = profile.id === DEFAULT_WORK_ID
-            const count = recordCount(profile.id)
+            const count = recordCounts.get(profile.id) ?? 0
             if (editing?.id === profile.id) {
               return (
                 <div className="work-row editing" key={profile.id}>
@@ -243,11 +258,11 @@ export function WorkManager({ onClose }: WorkManagerProps) {
       {pendingDelete ? (
         <ConfirmDialog
           title={`删除「${pendingDelete.name}」？`}
-          message={recordCount(pendingDelete.id) > 0
-            ? `该工作有 ${recordCount(pendingDelete.id)} 天记录，删除后记录归入默认工作，历史工资不受影响。`
-            : '删除后无法恢复。'
-          }
-          confirmLabel="删除"
+          message={(recordCounts.get(pendingDelete.id) ?? 0) > 0
+            ? `该工作有 ${recordCounts.get(pendingDelete.id) ?? 0} 天记录，删除后记录归入默认工作，历史工资不受影响。`
+          : '删除后无法恢复。'
+        }
+          confirmLabel="确认"
           danger
           onConfirm={() => {
             deleteWorkProfile(pendingDelete.id)

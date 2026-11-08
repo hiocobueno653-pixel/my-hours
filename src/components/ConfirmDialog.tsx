@@ -13,16 +13,16 @@ interface ConfirmDialogProps {
 export function ConfirmDialog({
   title,
   message,
-  confirmLabel = '确定',
+  confirmLabel = '确认',
   cancelLabel = '取消',
   danger = false,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
-  useModalLayer(onCancel)
+  const { containerRef, onKeyDown } = useModalLayer(onCancel)
 
   return (
-    <div className="confirm-backdrop" onClick={onCancel}>
+    <div className="confirm-backdrop" ref={containerRef} onClick={onCancel} onKeyDown={onKeyDown}>
       <section
         className="confirm-dialog"
         role="alertdialog"

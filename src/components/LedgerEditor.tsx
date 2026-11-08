@@ -1,5 +1,5 @@
 import { Tags, Trash2, X } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { todayISO } from '../data/dates'
 import {
   createLedgerEntryId,
@@ -18,20 +18,31 @@ import { ConfirmDialog } from './ConfirmDialog'
 
 interface LedgerEditorProps {
   entry?: LedgerEntry
+  /** 新建账目时的初始日期（如从记工页某天快捷记账） */
+  initialDate?: string
   onClose: () => void
   onSaved?: () => void
   onDeleted?: (entry: LedgerEntry) => void
 }
 
-export function LedgerEditor({ entry, onClose, onSaved, onDeleted }: LedgerEditorProps) {
-  useModalLayer(onClose)
+export function LedgerEditor({ entry, initialDate, onClose, onSaved, onDeleted }: LedgerEditorProps) {
+  const { containerRef, onKeyDown } = useModalLayer(onClose)
   const records = useAppStore((state) => state.records)
   const customCategories = useAppStore((state) => state.customCategories)
   const saveLedgerEntry = useAppStore((state) => state.saveLedgerEntry)
   const deleteLedgerEntry = useAppStore((state) => state.deleteLedgerEntry)
   const [type, setType] = useState<LedgerType>(entry?.type ?? 'expense')
-  const [date, setDate] = useState(entry?.date ?? todayISO())
+  const [date, setDate] = useState(entry?.date ?? initialDate ?? todayISO())
   const [amount, setAmount] = useState(entry ? formatMoney(entry.amount) : '')
+  const amountInputRef = useRef<HTMLInputElement>(null)
+
+  // 弹窗滑入动画结束后再聚焦金额输入框，避免键盘弹出与动画竞争导致屏幕闪烁
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      amountInputRef.current?.focus()
+    }, 380)
+    return () => window.clearTimeout(timer)
+  }, [])
   const [category, setCategory] = useState(
     entry?.category ??
       getAvailableLedgerCategories('expense', customCategories)[0],
@@ -100,7 +111,7 @@ export function LedgerEditor({ entry, onClose, onSaved, onDeleted }: LedgerEdito
 
   return (
     <>
-      <div className="sheet-backdrop" onClick={onClose}>
+      <div className="sheet-backdrop" ref={containerRef} onClick={onClose} onKeyDown={onKeyDown}>
         <section
           className="day-sheet"
           role="dialog"
@@ -139,12 +150,13 @@ export function LedgerEditor({ entry, onClose, onSaved, onDeleted }: LedgerEdito
             <span className="input-with-prefix">
               <span className="field-prefix">¥</span>
               <input
+                ref={amountInputRef}
                 type="number"
                 inputMode="decimal"
+                className="numeric-hero-input"
                 min="0.01"
                 step="0.01"
                 value={amount}
-                autoFocus
                 onChange={(event) => {
                   setAmount(event.target.value)
                   setError('')
@@ -244,7 +256,7 @@ export function LedgerEditor({ entry, onClose, onSaved, onDeleted }: LedgerEdito
         <ConfirmDialog
           title="删除这笔记录？"
           message="删除后无法恢复。"
-          confirmLabel="删除"
+          confirmLabel="确认"
           danger
           onConfirm={() => {
             if (!entry) return

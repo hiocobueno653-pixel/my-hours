@@ -4,13 +4,20 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/app-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#1d4ed8" />
+    <meta name="theme-color" content="#f4f5f7" />
     <meta name="description" content="离线记录工时和收支，按月汇总并支持本地备份。" />
-    <meta name="color-scheme" content="light" />
+    <meta name="color-scheme" content="light dark" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <title>我的工时</title>
+    <!-- 数据安全：CSP 限制脚本/样式仅来自自身，阻断注入读取本地数据 -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; worker-src 'self' blob:"
+    />
+    <title>时账</title>
+    <!-- 首屏主题预设：阻塞执行，在首次绘制前落 data-theme，消除深色模式闪白 -->
+    <script src="/theme-init.js"></script>
   </head>
   <body>
     <div id="root"></div>

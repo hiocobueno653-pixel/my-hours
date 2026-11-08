@@ -213,6 +213,15 @@ export function loadBudgetTargets(): BudgetTargets {
   return { ...DEFAULT_BUDGET_TARGETS }
 }
 
+/** 是否存在任何本地主数据（键存在且可解析）。自动备份恢复用它判断“主数据为空”。 */
+export function hasStoredAppData(): boolean {
+  if (loadRecords().length > 0 || loadLedgerEntries().length > 0) return true
+  if (loadCustomCategories().length > 0) return true
+  if (loadWorkProfiles().some((profile) => profile.id !== 'work-default')) return true
+  const budget = loadBudgetTargets()
+  return budget.monthlyExpenseBudget > 0 || budget.monthlyIncomeGoal > 0
+}
+
 export function saveBudgetTargets(targets: BudgetTargets): void {
   if (typeof window === 'undefined') return
   const next = normalizeBudgetTargets(targets)

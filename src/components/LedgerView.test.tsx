@@ -1,9 +1,20 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { currentMonthKey, formatMonthLabel } from '../data/dates'
 import { useAppStore } from '../store/useAppStore'
 import { LedgerView } from './LedgerView'
+
+// 账目夹具固定在 2026-08；冻结「今天」让默认展示月与夹具月份一致，
+// 不随真实时钟漂移（否则 8 月账目在 10 月的账本里不可见）
+vi.mock('../data/dates', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../data/dates')>()
+  return {
+    ...actual,
+    todayISO: () => '2026-08-15',
+    currentMonthKey: () => '2026-08',
+  }
+})
 
 describe('ledger UI', () => {
   beforeEach(() => {

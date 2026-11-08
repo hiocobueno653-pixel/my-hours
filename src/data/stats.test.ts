@@ -72,4 +72,9 @@ describe('getYearSummary', () => {
       totalExpense: 155.5,
     })
   })
+
+  it('refreshes year pay when fixed pay is present', () => {
+    const fixedRecords = [{ date: '2026-08-01', hours: 8, remark: '', fixedPay: 320 }]
+    expect(getYearSummary(fixedRecords, [], 2026).totalPay).toBe(320)
+  })
 })

@@ -1,3 +1,5 @@
+import type { CSSProperties } from 'react'
+
 export interface BarGroup {
   label: string
   values: { value: number; color: string }[]
@@ -23,20 +25,20 @@ export function BarChart({
   ariaLabel,
   onGroupClick,
 }: BarChartProps) {
-  const width = 320
-  const padTop = 10
-  const padBottom = 22
+  const width = 340
+  const padTop = 14
+  const padBottom = 24
   const plotH = height - padTop - padBottom
-  const plotW = width
+  const plotW = width - 4
   const maxValue = Math.max(
     1,
     ...data.flatMap((group) => group.values.map((item) => item.value)),
   )
   const groupWidth = plotW / Math.max(1, data.length)
   const seriesCount = Math.max(1, ...data.map((group) => group.values.length))
-  const barGroupWidth = groupWidth * 0.62
+  const barGroupWidth = groupWidth * 0.58
   const barWidth = barGroupWidth / seriesCount
-  const gap = barWidth * 0.18
+  const gap = barWidth * 0.2
   const gridLines = [0.25, 0.5, 0.75, 1]
 
   return (
@@ -80,9 +82,10 @@ export function BarChart({
                   y={y}
                   width={Math.max(2, barWidth - gap)}
                   height={barH}
-                  rx={Math.min(3, barWidth / 3)}
+                  rx={Math.min(4, barWidth / 2.5)}
                   fill={item.color}
                   className={`bar-chart-bar series-${seriesIndex}${item.value > 0 ? '' : ' is-empty'}`}
+                  style={{ '--bar-index': groupIndex * seriesCount + seriesIndex } as CSSProperties}
                   role={onGroupClick ? 'button' : undefined}
                   tabIndex={onGroupClick ? 0 : undefined}
                   onClick={onGroupClick ? () => onGroupClick(groupIndex) : undefined}

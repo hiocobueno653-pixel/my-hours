@@ -8,7 +8,7 @@
 import { chromium } from 'playwright-core'
 
 const CHROME = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
-const BASE = 'http://localhost:4173/'
+const BASE = process.env.MY_HOURS_BASE ?? 'http://localhost:4173/'
 const VIEWPORTS = [
   { name: 'phone-360', width: 360, height: 740 },
   { name: 'phone-320', width: 320, height: 640 },
@@ -29,7 +29,10 @@ function auditFn() {
     if (cs.display === 'none' || cs.visibility === 'hidden') continue
     const rect = el.getBoundingClientRect()
     if (rect.width === 0 && rect.height === 0) continue
-    if (el.scrollWidth > el.clientWidth + 1 && cs.overflowX === 'visible') {
+    const outOfViewport = rect.right > vw + 1 || rect.left < -1
+    // 横向溢出：只报"真问题"——内容被裁切的滚动容器，或元素本身越出视口；
+    // 粘性头部的全出血贴边（负边距）不产生可见溢出，不计入。
+    if (el.scrollWidth > el.clientWidth + 1 && (cs.overflowX !== 'visible' || outOfViewport)) {
       issues.push({
         type: 'h-overflow',
         sel: el.id ? '#' + el.id : el.className && typeof el.className === 'string' ? '.' + el.className.split(' ').join('.') : tag,
@@ -72,15 +75,15 @@ async function auditPage(page, viewport) {
   await page.waitForTimeout(900)
   const results = {}
   results.work = await page.evaluate(auditFn)
-  await page.click('nav button:nth-child(2)')
+  await page.click('nav button:nth-of-type(2)')
   await page.waitForTimeout(700)
   results.ledger = await page.evaluate(auditFn)
-  await page.click('nav button:nth-child(3)')
+  await page.click('nav button:nth-of-type(3)')
   await page.waitForTimeout(700)
   results.mine = await page.evaluate(auditFn)
-  await page.click('nav button:nth-child(1)')
+  await page.click('nav button:nth-of-type(1)')
   await page.waitForTimeout(600)
-  const todayBtn = await page.locator('.today-action').first()
+  const todayBtn = await page.locator('.today-record-button').first()
   if (await todayBtn.count()) {
     await todayBtn.click()
     await page.waitForTimeout(600)

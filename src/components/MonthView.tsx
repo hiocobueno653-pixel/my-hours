@@ -1,5 +1,5 @@
-import { CalendarDays, ChevronLeft, ChevronRight, Download, FileDown, FileSpreadsheet, PenLine, Sparkles, X } from 'lucide-react'
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { CalendarDays, ChevronLeft, ChevronRight, Download, FileDown, FileSpreadsheet, PenLine, WalletCards } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import {
   currentMonthKey,
   formatDateLabel,
@@ -13,31 +13,46 @@ import {
 import { formatMoney } from '../data/ledger'
 import {
   formatHours,
-  getMonthPay,
+  getMonthDelta,
   getMonthSummary,
   getRecordByDate,
+  getSettlementSummary,
 } from '../data/records'
+import { getMonthActivities, type DayActivity } from '../data/activity'
 import { exportMonthCsv, exportMonthExcel } from '../services/exportService'
 import type { LedgerEntry, WorkDayRecord } from '../data/types'
 import { useAppStore } from '../store/useAppStore'
 import { haptic } from '../utils/haptics'
+import { DayDetail } from './DayDetail'
 import { DayEditor } from './DayEditor'
-import { WeekStrip } from './WeekStrip'
+import { MonthDetail } from './MonthDetail'
+import { MonthPicker } from './MonthPicker'
 import { useModalLayer } from '../navigation/backNavigation'
+
+// 「只记工时」变体（VITE_HOURS_ONLY=1 构建）：隐藏记账入口与账目读数
+const HOURS_ONLY = import.meta.env.VITE_HOURS_ONLY === '1'
 
 interface MonthViewProps {
   initialEditingDate?: string | null
   onEditorClosed?: () => void
+  onOpenLedger?: (date: string) => void
 }
+
+type CalendarCell =
+  | { key: string; blank: true }
+  | { blank: false; date: string; day: number; weekday: number; isToday: boolean }
 
 export function MonthView({
   initialEditingDate,
   onEditorClosed,
+  onOpenLedger,
 }: MonthViewProps = {}) {
   const records = useAppStore((state) => state.records)
   const entries = useAppStore((state) => state.entries)
+  const workProfiles = useAppStore((state) => state.workProfiles)
   const [yearMonth, setYearMonth] = useState(currentMonthKey)
   const [editingDate, setEditingDate] = useState<string | null>(initialEditingDate ?? null)
+  const [viewingDate, setViewingDate] = useState<string | null>(null)
   const today = todayISO()
   const isCurrentMonth = yearMonth === today.slice(0, 7)
 
@@ -49,7 +64,13 @@ export function MonthView({
   }, [initialEditingDate])
   const [exportState, setExportState] = useState('')
   const [exportMenuOpen, setExportMenuOpen] = useState(false)
-  useModalLayer(() => setExportMenuOpen(false), exportMenuOpen)
+  const [monthPickerOpen, setMonthPickerOpen] = useState(false)
+  const [detailOpen, setDetailOpen] = useState(false)
+  const [exitingDate, setExitingDate] = useState<string | null>(null)
+  const [slideDir, setSlideDir] = useState<'left' | 'right' | null>(null)
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null)
+  const swipedRef = useRef(false)
+  const exportModal = useModalLayer(() => setExportMenuOpen(false), exportMenuOpen)
   const [savedMessage, setSavedMessage] = useState('')
   const [undoRecord, setUndoRecord] = useState<WorkDayRecord | null>(null)
   const [undoLinkedIncome, setUndoLinkedIncome] = useState<LedgerEntry | null>(null)
@@ -65,40 +86,54 @@ export function MonthView({
     const timer = window.setTimeout(() => {
       setUndoRecord(null)
       setUndoLinkedIncome(null)
+      setExitingDate(null)
     }, 6000)
     return () => window.clearTimeout(timer)
   }, [undoRecord])
 
   const dates = useMemo(() => getMonthDates(yearMonth), [yearMonth])
-  const regularDates = useMemo(
-    () => (isCurrentMonth ? dates.filter((day) => !day.isToday) : dates),
-    [dates, isCurrentMonth],
+  const dayActivities = useMemo<DayActivity[]>(
+    () => getMonthActivities(yearMonth, records, entries),
+    [yearMonth, entries, records],
   )
+  const activityByDate = useMemo(
+    () => new Map(dayActivities.map((activity) => [activity.date, activity])),
+    [dayActivities],
+  )
+  const calendarDays = useMemo<CalendarCell[]>(() => {
+    const firstWeekday = new Date(`${yearMonth}-01T00:00:00`).getDay()
+    const leading = firstWeekday === 0 ? 6 : firstWeekday - 1
+    return [
+      ...Array.from({ length: leading }, (_, index) => ({ key: `blank-${index}`, blank: true as const })),
+      ...dates.map((day) => ({ ...day, blank: false as const })),
+    ]
+  }, [dates, yearMonth])
   const summary = useMemo(
     () => getMonthSummary(records, yearMonth),
     [records, yearMonth],
   )
-  const monthPay = useMemo(
-    () => getMonthPay(records, yearMonth),
+  const settlement = useMemo(
+    () => getSettlementSummary(records, yearMonth, workProfiles),
+    [records, yearMonth, workProfiles],
+  )
+  const monthDelta = useMemo(
+    () => getMonthDelta(records, yearMonth, shiftMonth),
     [records, yearMonth],
   )
-  const unsettledCount = useMemo(() => {
-    return records.filter(
-      (record) =>
-        record.date.startsWith(`${yearMonth}-`) &&
-        record.hours * (record.rate ?? 0) > 0 &&
-        !record.settled,
-    ).length
-  }, [records, yearMonth])
-  const todayRecord = getRecordByDate(records, today)
-  const todayEntries = entries.filter((entry) => entry.date === today)
+  // 当前月复用月活动聚合；切到其他月份时再回退整表查询
+  const todayActivity = activityByDate.get(today)
+  const todayRecord = todayActivity?.record ?? getRecordByDate(records, today)
+  const todayEntries =
+    todayActivity?.dayEntries ?? entries.filter((entry) => entry.date === today)
   const todayIncome =
+    todayActivity?.dayIncome ??
     Math.round(
       todayEntries
         .filter((entry) => entry.type === 'income')
         .reduce((sum, entry) => sum + entry.amount, 0) * 100,
     ) / 100
   const todayExpense =
+    todayActivity?.dayExpense ??
     Math.round(
       todayEntries
         .filter((entry) => entry.type === 'expense')
@@ -115,12 +150,19 @@ export function MonthView({
       undoRecord.date,
       undoRecord.hours,
       undoRecord.remark,
-    )
+      {
+        workId: undoRecord.workId,
+        rate: undoRecord.rate,
+          settled: undoRecord.settled,
+          fixedPay: undoRecord.fixedPay,
+        },
+      )
     if (undoLinkedIncome) {
       useAppStore.getState().saveLedgerEntry(undoLinkedIncome)
     }
     setUndoRecord(null)
     setUndoLinkedIncome(null)
+    setExitingDate(null)
     setSavedMessage('已恢复')
     haptic()
   }
@@ -147,115 +189,175 @@ export function MonthView({
 
 
   return (
-    <div className="month-view page-enter">
-      <header className="screen-header">
-        <div className="screen-header-copy">
-          <span className="screen-kicker">工作记录</span>
-          <h1>记工</h1>
-        </div>
-        <div className="screen-header-actions">
-          <button
-            type="button"
-            className="icon-button"
-            onClick={() => setExportMenuOpen(true)}
-            aria-label="导出工时表"
-            title="导出工时表"
-          >
-            <Download size={20} />
-          </button>
-        </div>
-      </header>
-
-      <div className="month-switcher" aria-label="月份切换">
-        <button
-          type="button"
-          className="icon-button"
-          onClick={() => setYearMonth((current) => shiftMonth(current, -1))}
-          aria-label="上个月"
-        >
-          <ChevronLeft size={22} />
-        </button>
-        <h2 className="month-switcher-label">{formatMonthLabel(yearMonth)}</h2>
-        <button
-          type="button"
-          className="icon-button"
-          onClick={() => setYearMonth((current) => shiftMonth(current, 1))}
-          aria-label="下个月"
-        >
-          <ChevronRight size={22} />
-        </button>
-        {!isCurrentMonth ? (
-          <button
-            type="button"
-            className="back-to-now"
-            onClick={() => setYearMonth(currentMonthKey())}
-          >
-            <CalendarDays size={14} />
-            回到本月
-          </button>
-        ) : null}
-      </div>
-
-      <section className="summary-strip work-summary" aria-label="月总计">
-        <div className="summary-item">
-          <span>月总计</span>
-          <strong>{formatHours(summary.totalHours)}</strong>
-          <small>小时</small>
-        </div>
-        <div className="summary-item">
-          <span>工作天数</span>
-          <strong>{summary.workDays}</strong>
-          <small>天</small>
-        </div>
-        <div className="summary-item">
-          <span>日均</span>
-          <strong>{formatHours(summary.averageHours)}</strong>
-          <small>小时</small>
-        </div>
-        <div className={`summary-item wage wide${monthPay > 0 ? ' has-wage' : ''}`}>
-          <span>本月工资</span>
-          <strong>¥{formatMoney(monthPay)}</strong>
-          <small>{monthPay > 0 ? (unsettledCount > 0 ? `${unsettledCount} 笔待结算` : '已全部结算 ✓') : '未设时薪'}</small>
-        </div>
-      </section>
-
-      {isCurrentMonth ? (
-        <section className="today-card page-enter" aria-label="今天">
-          <div className="today-card-header">
-            <div className="today-title-block">
-              <span className="today-kicker">今天 · 周{weekdayName(new Date(`${today}T00:00:00`).getDay())}</span>
-              <strong>{formatDateLabel(today)}</strong>
+    <div className={`month-view page-enter${HOURS_ONLY ? ' hours-only' : ''}`}>
+      <header className="work-page-header">
+        <div className="work-heading-row">
+          <div className="screen-header-copy">
+            <span className="screen-kicker">工作记录</span>
+            <h1>记工</h1>
+          </div>
+          <div className="header-tool-group">
+            <div className="inline-month-nav" aria-label="月份切换">
+              <button
+                type="button"
+                className="month-nav-button"
+                onClick={() => {
+                  setSlideDir('right')
+                  setYearMonth((current) => shiftMonth(current, -1))
+                }}
+                aria-label="上个月"
+              >
+                <ChevronLeft size={19} />
+              </button>
+              <h2
+                className="month-nav-label"
+                tabIndex={0}
+                title="选择月份"
+                onClick={() => setMonthPickerOpen(true)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault()
+                    setMonthPickerOpen(true)
+                  }
+                }}
+              >
+                {formatMonthLabel(yearMonth)}
+              </h2>
+              <button
+                type="button"
+                className="month-nav-button"
+                onClick={() => {
+                  setSlideDir('left')
+                  setYearMonth((current) => shiftMonth(current, 1))
+                }}
+                aria-label="下个月"
+              >
+                <ChevronRight size={19} />
+              </button>
             </div>
             <button
               type="button"
-              className="button primary today-action"
-              onClick={() => setEditingDate(today)}
+              className="icon-button quiet"
+              onClick={() => setExportMenuOpen(true)}
+              aria-label="导出工时表"
+              title="导出工时表"
             >
-              <PenLine size={17} />
-              {todayRecord ? '修改记录' : '记工时'}
+              <Download size={19} />
             </button>
           </div>
-          <div className="today-card-body">
-            <div className="today-metric hours">
-              <span>工时</span>
-              <strong>{todayRecord ? formatHours(todayRecord.hours) : '--'}</strong>
-              <small>小时</small>
+        </div>
+      </header>
+
+      <section className="work-overview" aria-label="月总计">
+        <div className="work-overview-primary">
+          <span>本月总工时</span>
+          <div className="work-overview-number">
+            <strong>{formatHours(summary.totalHours)}</strong>
+            <small>小时</small>
+          </div>
+          {monthDelta ? (
+            <span className={`hero-delta${monthDelta.delta >= 0 ? ' up' : ' down'}`}>
+              {monthDelta.delta >= 0 ? '↑' : '↓'} 比上月 {monthDelta.delta >= 0 ? '+' : ''}{formatHours(monthDelta.delta)} 小时（{monthDelta.delta >= 0 ? '+' : ''}{monthDelta.percent}%）
+            </span>
+          ) : null}
+        </div>
+        <div className="work-overview-details hours-only-layout">
+          {HOURS_ONLY ? null : (
+          <div className="work-overview-pay">
+            <span>待结算</span>
+            <strong>¥{formatMoney(settlement.pending)}</strong>
+            {settlement.total > 0 ? (
+              <small>已结算 ¥{formatMoney(settlement.settled)}</small>
+            ) : summary.workDays > 0 ? (
+              <small className="setup-wage-hint">未设时薪 · 去我的页设置</small>
+            ) : (
+              <small>未设时薪</small>
+            )}
+          </div>
+          )}
+          <dl className="work-overview-stats">
+            <div>
+              <dt>工作日</dt>
+              <dd>{summary.workDays}<small> 天</small></dd>
             </div>
-            <div className="today-metric income">
-              <span>收入</span>
-              <strong>{todayIncome > 0 ? `¥${formatMoney(todayIncome)}` : '--'}</strong>
-              <small>元</small>
+            <div>
+              <dt>日均</dt>
+              <dd>{formatHours(summary.averageHours)}<small> 小时</small></dd>
             </div>
-            <div className="today-metric count">
-              <span>账目</span>
-              <strong>{todayEntries.length}</strong>
-              <small>笔</small>
+          </dl>
+        </div>
+      </section>
+
+      {!isCurrentMonth ? (
+        <button type="button" className="back-to-now" onClick={() => setYearMonth(currentMonthKey())}>
+          <CalendarDays size={14} />
+          回到本月
+        </button>
+      ) : null}
+
+      {isCurrentMonth ? (
+        <section className="today-workspace" aria-label="今天">
+          <div className="today-workspace-main">
+            <div className="today-workspace-copy">
+              <span>今天 · 周{weekdayName(new Date(`${today}T00:00:00`).getDay())}</span>
+              <strong>{formatDateLabel(today)}</strong>
+              <p>{todayRecord?.remark || (!todayRecord && todayEntries.length === 0 ? '今天还没有记录' : HOURS_ONLY ? '今天的工作' : '今天的工作与账目')}</p>
+            </div>
+            <div className="today-workspace-actions">
+              {onOpenLedger ? (
+              <button
+                type="button"
+                className="today-ledger-button"
+                onClick={() => onOpenLedger?.(today)}
+                aria-label="今天记一笔账"
+                title="记一笔账"
+              >
+                <WalletCards size={16} />
+                记一笔
+              </button>
+              ) : null}
+              <button type="button" className="today-record-button" onClick={() => setEditingDate(today)}>
+                <PenLine size={17} />
+                {todayRecord ? '修改记录' : '记工时'}
+              </button>
             </div>
           </div>
-          {todayRecord?.remark ? <p className="today-remark">{todayRecord.remark}</p> : null}
-          {!todayRecord && todayEntries.length === 0 ? (
-            <p className="today-empty">今天还没有记录</p>
-          ) : null}
+          <div className={`today-readout${HOURS_ONLY ? ' hours-only' : ''}`} aria-label="今天汇总">
+            <div>
+              <span>工时</span>
+              <strong>
+                {todayRecord ? (
+                  <>
+                    {formatHours(todayRecord.hours)}
+                    <small> 小时</small>
+                  </>
+                ) : (
+                  '--'
+                )}
+              </strong>
+            </div>
+            {HOURS_ONLY ? null : (
+            <div>
+              <span>收入</span>
+              <strong className="income">{todayIncome > 0 ? `¥${formatMoney(todayIncome)}` : '--'}</strong>
+            </div>
+            )}
+            {HOURS_ONLY ? null : (
+            <div>
+              <span>账目</span>
+              <strong>
+                {todayEntries.length > 0 ? (
+                  <>
+                    {todayEntries.length}
+                    <small> 笔</small>
+                  </>
+                ) : (
+                  '--'
+                )}
+              </strong>
+            </div>
+            )}
+          </div>
           {todayIncome > 0 || todayExpense > 0 ? (
             <div className="today-entry-list">
               {todayEntries.map((entry) => (
@@ -277,104 +379,157 @@ export function MonthView({
         </section>
       ) : null}
 
-      <WeekStrip
-        onSelectDate={(date) => {
-          setEditingDate(date)
-          setYearMonth(date.slice(0, 7))
-        }}
-      />
-
-      {records.length === 0 && isCurrentMonth ? (
-        <aside className="onboarding-card" role="note">
-          <Sparkles size={18} />
-          <div>
-            <strong>从今天开始记录</strong>
-            <span>点上方「记工时」填工时，存下第一笔记录；再在「我的」页设个时薪，工资自动算。</span>
-          </div>
-        </aside>
-      ) : null}
-
       <section
-        className="day-list"
-        aria-label={isCurrentMonth ? '本月其他日期' : '本月日期'}
+        className={`month-calendar${slideDir ? ` slide-${slideDir}` : ''}`}
+        key={yearMonth}
+        onAnimationEnd={() => setSlideDir(null)}
+        aria-label={isCurrentMonth ? '本月日历' : '每月日历'}
+        onTouchStart={(event) => {
+          const touch = event.touches[0]
+          touchStartRef.current = { x: touch.clientX, y: touch.clientY }
+          swipedRef.current = false
+        }}
+        onTouchEnd={(event) => {
+          const start = touchStartRef.current
+          touchStartRef.current = null
+          if (!start) return
+          const touch = event.changedTouches[0]
+          const dx = touch.clientX - start.x
+          const dy = touch.clientY - start.y
+          // 横向滑动超过 50px 且横向位移大于纵向（避免误触垂直滚动）
+          if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+            swipedRef.current = true
+            const next = dx < 0 ? 1 : -1
+            setSlideDir(dx < 0 ? 'left' : 'right')
+            setYearMonth((current) => shiftMonth(current, next))
+          }
+        }}
       >
         <div className="day-list-heading">
-          <span>{isCurrentMonth ? '本月其他日期' : '每日记录'}</span>
-          <small>{regularDates.length}天</small>
+          <span>{isCurrentMonth ? '本月日历' : '每日记录'}</span>
+          <small>{dates.length}天 · 点击日期记录</small>
         </div>
-        {regularDates.map((day, index) => {
-          const record = getRecordByDate(records, day.date)
-          const dayEntries = entries.filter((entry) => entry.date === day.date)
-          const dayIncome =
-            Math.round(
-              dayEntries
-                .filter((entry) => entry.type === 'income')
-                .reduce((sum, entry) => sum + entry.amount, 0) * 100,
-            ) / 100
-          const dayExpense =
-            Math.round(
-              dayEntries
-                .filter((entry) => entry.type === 'expense')
-                .reduce((sum, entry) => sum + entry.amount, 0) * 100,
-            ) / 100
-          const linkedCount = entries.filter(
-            (entry) => entry.workDate === day.date,
-          ).length
-          const hasAmount = dayIncome > 0 || dayExpense > 0
-          const isFuture = day.date > today
-          return (
-            <button
-              type="button"
-              key={day.date}
-              className={`day-row${day.isToday ? ' today' : ''}${record && record.hours > 0 ? ' has-record' : ''}${day.weekday === 0 || day.weekday === 6 ? ' weekend' : ''}${isFuture ? ' future' : ''}`}
-              style={{ '--row-index': index } as CSSProperties}
-              disabled={isFuture}
-              onClick={isFuture ? undefined : () => setEditingDate(day.date)}
-              aria-label={`${day.day}周${weekdayName(day.weekday)} ${isFuture ? '还未到' : record ? `${formatHours(record.hours)}小时` : '未记录'}${hasAmount ? ` 收支${formatMoney(dayIncome - dayExpense)}元` : ''}`}
-            >
-              <span className="day-date-block">
-                <span className={`day-number${day.isToday ? ' today' : ''}${record && record.hours > 0 ? ' recorded' : ''}`}>
+        <div className="calendar-week-labels" aria-hidden="true">
+          {['一', '二', '三', '四', '五', '六', '日'].map((label) => (
+            <span key={label}>{label}</span>
+          ))}
+        </div>
+        <div className="calendar-grid">
+          {calendarDays.map((item, index) => {
+            if (item.blank) {
+              return <span key={item.key} className="calendar-blank" aria-hidden="true" />
+            }
+
+            const day = item
+            const activity = activityByDate.get(day.date)
+            const record = activity?.record
+            const dayIncome = activity?.dayIncome ?? 0
+            const dayExpense = activity?.dayExpense ?? 0
+            const linkedCount = activity?.linkedCount ?? 0
+            const hasAmount = dayIncome > 0 || dayExpense > 0
+            const isFuture = day.date > today
+            const classes = [
+              'calendar-day',
+              day.isToday ? 'today' : '',
+              record && record.hours > 0 ? 'has-record' : '',
+              record && record.hours === 0 ? 'rest' : '',
+              day.weekday === 0 || day.weekday === 6 ? 'weekend' : '',
+              isFuture ? 'future' : '',
+              record?.settled && !HOURS_ONLY ? 'settled' : '',
+            ]
+              .filter(Boolean)
+              .join(' ')
+
+            return (
+              <button
+                type="button"
+                key={day.date}
+                className={classes}
+                style={{ '--row-index': index } as CSSProperties}
+                disabled={isFuture}
+                onClick={
+                  isFuture
+                    ? undefined
+                    : () => {
+                        if (swipedRef.current) {
+                          swipedRef.current = false
+                          return
+                        }
+                        if (record) {
+                          setViewingDate(day.date)
+                        } else {
+                          setEditingDate(day.date)
+                        }
+                      }
+                }
+                aria-label={`${day.day}周${weekdayName(day.weekday)} ${
+                  isFuture ? '还未到' : record ? (record.hours === 0 ? '休息' : `${formatHours(record.hours)}小时`) : '未记录'
+                }${!HOURS_ONLY && record?.settled ? ' 已结算' : ''}${!HOURS_ONLY && hasAmount ? ` 收支${formatMoney(dayIncome - dayExpense)}元` : ''}${
+                  !HOURS_ONLY && linkedCount > 0 ? ` ${linkedCount}笔关联账目` : ''
+                }`}
+              >
+                <span className={`day-number${day.isToday ? " today" : ""}${record && record.hours > 0 ? " recorded" : ""}`}>
                   {day.day}
                 </span>
-                <span className="weekday">周{weekdayName(day.weekday)}</span>
-              </span>
-              <span className="day-detail">
-                <span className="day-primary">
-                  {record ? (
-                    <span className="hours-badge">
-                      {formatHours(record.hours)}
-                      <small>小时</small>
-                    </span>
+                {record ? (
+                  record.hours === 0 ? (
+                    <span className="calendar-hours rest-label">休</span>
                   ) : (
-                    <span className="empty">未记录</span>
-                  )}
-                  {record && record.rate ? (
-                    <span className={`day-amount wage${record.settled ? ' settled' : ''}`}>
-                      {record.settled ? '结' : '工'} ¥{formatMoney(record.hours * (record.rate ?? 0))}
-                    </span>
-                  ) : null}
-                  {dayIncome > 0 ? (
-                    <span className="day-amount income">收入 ¥{formatMoney(dayIncome)}</span>
-                  ) : null}
-                  {dayExpense > 0 ? (
-                    <span className="day-amount expense">支出 ¥{formatMoney(dayExpense)}</span>
-                  ) : null}
+                    <span className="calendar-hours">{formatHours(record.hours)}</span>
+                  )
+                ) : (
+                  <span className="calendar-hours muted">-</span>
+                )}
+                <span className="calendar-dots" aria-hidden="true">
+                  {!HOURS_ONLY && record?.settled ? <span className="calendar-dot settled-dot" /> : null}
+                  {!HOURS_ONLY && dayIncome > 0 ? <span className="calendar-dot income-dot" /> : null}
+                  {!HOURS_ONLY && dayExpense > 0 ? <span className="calendar-dot expense-dot" /> : null}
                 </span>
-                <span className="day-secondary">
-                  {record?.remark ? <span className="remark">{record.remark}</span> : null}
-                  {record && record.rate && record.settled ? <span className="settled-tag">已结算</span> : null}
-                  {linkedCount > 0 ? <span className="linked-ledger">{linkedCount}笔账</span> : null}
-                  {isFuture ? <span className="day-hint">还未到</span> : !record?.remark && linkedCount === 0 ? <span className="day-hint">点击记录</span> : null}
-                </span>
-              </span>
-              <ChevronRight className="day-chevron" size={18} aria-hidden="true" />
-            </button>
-          )
-        })}
+              </button>
+            )
+          })}
+        </div>
+        <div className="calendar-legend" aria-hidden="true">
+          <span className="legend-recorded">有工时</span>
+          {HOURS_ONLY ? null : (
+          <>
+          <span><i className="income" />收入</span>
+          <span><i className="expense" />支出</span>
+          <span><i className="settled" />已结算</span>
+          </>
+          )}
+        </div>
+        <button
+          type="button"
+          className="month-detail-button"
+          onClick={() => setDetailOpen(true)}
+        >
+          明细
+        </button>
       </section>
 
+      {detailOpen ? (
+        <MonthDetail
+          initialMonth={yearMonth}
+          exitingDate={exitingDate}
+          exitingRecord={undoRecord}
+          onExitComplete={() => setExitingDate(null)}
+          onClose={() => {
+            setDetailOpen(false)
+            setExitingDate(null)
+          }}
+          onOpenDay={(date) => {
+            // 明细保持打开：有记录则打开详情（DayDetail），无记录才进编辑器
+            if (getRecordByDate(records, date)) {
+              setViewingDate(date)
+            } else {
+              setEditingDate(date)
+            }
+          }}
+        />
+      ) : null}
       {undoRecord ? (
-        <div className="undo-bar" role="status">
+        <div className="undo-bar top-toast" role="status">
           <span>已删除这天的记录</span>
           <button type="button" className="button" onClick={restoreDeleted}>
             撤销
@@ -382,7 +537,7 @@ export function MonthView({
         </div>
       ) : null}
       {savedMessage ? (
-        <p className="status-line save-status" role="status">
+        <p className="status-line save-status top-toast" role="status">
           {savedMessage}
         </p>
       ) : null}
@@ -393,26 +548,14 @@ export function MonthView({
       ) : null}
 
       {exportMenuOpen ? (
-        <div className="sheet-backdrop" onClick={() => setExportMenuOpen(false)}>
+        <div className="menu-backdrop" ref={exportModal.containerRef} onClick={() => setExportMenuOpen(false)} onKeyDown={exportModal.onKeyDown}>
           <section
-            className="action-sheet"
+            className="glass-menu"
             role="dialog"
             aria-modal="true"
             aria-label="导出工时表"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="sheet-header">
-              <h2>导出工时表</h2>
-              <button
-                type="button"
-                className="icon-button"
-                onClick={() => setExportMenuOpen(false)}
-                aria-label="关闭"
-              >
-                <X size={20} />
-              </button>
-            </div>
-            <p className="field-note">{formatMonthLabel(yearMonth)} 的工时明细，选择导出格式。</p>
             <div className="action-sheet-list">
               <button
                 type="button"
@@ -447,6 +590,29 @@ export function MonthView({
         </div>
       ) : null}
 
+      {monthPickerOpen ? (
+        <MonthPicker
+          value={yearMonth}
+          onSelect={(next) => {
+            setYearMonth(next)
+            setMonthPickerOpen(false)
+          }}
+          onClose={() => setMonthPickerOpen(false)}
+        />
+      ) : null}
+
+      {viewingDate ? (
+        <DayDetail
+          date={viewingDate}
+          record={getRecordByDate(records, viewingDate)}
+          onEdit={() => {
+            setEditingDate(viewingDate)
+            setViewingDate(null)
+          }}
+          onClose={() => setViewingDate(null)}
+        />
+      ) : null}
+
       {editingDate ? (
         <DayEditor
           date={editingDate}
@@ -456,6 +622,7 @@ export function MonthView({
           onDeleted={(record, linkedIncome) => {
             setUndoRecord(record)
             setUndoLinkedIncome(linkedIncome ?? null)
+            setExitingDate(record.date)
           }}
           onPreviousDay={(current) => {
             const next = shiftDate(current, -1)

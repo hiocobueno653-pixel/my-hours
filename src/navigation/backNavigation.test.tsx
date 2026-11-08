@@ -30,6 +30,16 @@ function ModalHookLayer({
   return null
 }
 
+function TrappedModal() {
+  const { containerRef, onKeyDown } = useModalLayer(() => {})
+  return (
+    <div ref={containerRef} onKeyDown={onKeyDown}>
+      <button>First</button>
+      <button>Second</button>
+    </div>
+  )
+}
+
 afterEach(() => {
   // The test harness should never leave a layer registered. This also makes
   // failures easier to diagnose without leaking state into the next case.
@@ -108,5 +118,14 @@ describe('back navigation stack', () => {
 
     first.unmount()
     expect(document.body).not.toHaveClass('modal-open')
+  })
+
+  it('keeps focusable controls inside the modal container', () => {
+    const view = render(<TrappedModal />)
+    const buttons = view.container.querySelectorAll('button')
+    expect(buttons).toHaveLength(2)
+    expect(view.container.contains(document.activeElement)).toBe(true)
+    expect(document.activeElement).toBe(buttons[0])
+    view.unmount()
   })
 })

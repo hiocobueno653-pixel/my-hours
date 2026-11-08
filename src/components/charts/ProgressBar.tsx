@@ -1,7 +1,7 @@
 interface ProgressBarProps {
   value: number
   max: number
-  tone?: 'accent' | 'income' | 'expense' | 'gold'
+  tone?: 'accent' | 'income' | 'expense' | 'dark'
   height?: number
 }
 
@@ -12,7 +12,6 @@ export function ProgressBar({
   height = 8,
 }: ProgressBarProps) {
   const ratio = max > 0 ? Math.min(value / max, 1) : 0
-  const percent = Math.round(ratio * 100)
   const label = max > 0 ? `${Math.round((value / max) * 100)}%` : '未设置'
 
   return (
@@ -27,7 +26,7 @@ export function ProgressBar({
     >
       <div
         className={`progress-fill ${tone}`}
-        style={{ width: `${percent}%` }}
+        style={{ transform: `scaleX(${ratio})` }}
       />
     </div>
   )

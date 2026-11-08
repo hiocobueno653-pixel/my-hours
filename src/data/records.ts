@@ -1,7 +1,8 @@
-import { MAX_HOURLY_RATE } from './profiles'
-import type { MonthSummary, WorkDayRecord } from './types'
+import { DEFAULT_WORK_ID, MAX_HOURLY_RATE } from './profiles'
+import type { MonthSummary, WorkDayRecord, WorkProfile } from './types'
 
 export const MAX_REMARK_LENGTH = 200
+export const MAX_FIXED_PAY = 999999999.99
 
 const HOURS_RE = /^(?:\d{1,2}(?:\.\d{1,2})?|\.\d{1,2})$/
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
@@ -51,6 +52,13 @@ export function normalizeRecord(raw: unknown): WorkDayRecord | null {
     rate <= MAX_HOURLY_RATE &&
     Math.abs(Math.round(rate * 100) / 100 - rate) < 1e-8
   const settled = candidate.settled === true
+  const fixedPay = Number(candidate.fixedPay)
+  const hasFixedPay =
+    candidate.fixedPay !== undefined &&
+    Number.isFinite(fixedPay) &&
+    fixedPay >= 0 &&
+    fixedPay <= MAX_FIXED_PAY &&
+    Math.abs(Math.round(fixedPay * 100) / 100 - fixedPay) < 1e-8
   const record: WorkDayRecord = {
     date: candidate.date,
     hours: Math.round(hours * 100) / 100,
@@ -58,6 +66,7 @@ export function normalizeRecord(raw: unknown): WorkDayRecord | null {
   }
   if (workId) record.workId = workId
   if (hasRate) record.rate = Math.round(rate * 100) / 100
+  if (hasFixedPay) record.fixedPay = Math.round(fixedPay * 100) / 100
   if (settled) record.settled = true
   return record
 }
@@ -92,25 +101,82 @@ export function getMonthRecords(
   records: WorkDayRecord[],
   yearMonth: string,
 ): WorkDayRecord[] {
-  return sortRecords(
-    records.filter((record) => record.date.startsWith(`${yearMonth}-`)),
-  )
+  const prefix = yearMonth + '-'
+  const monthRecords: WorkDayRecord[] = []
+  for (const record of records) {
+    if (record.date.startsWith(prefix)) monthRecords.push(record)
+  }
+  return monthRecords
 }
 
-/** 每月工资汇总（按记录时薪快照计算） */
-export function getMonthPay(records: WorkDayRecord[], yearMonth: string): number {
+/** 记录的实际单价：优先记录快照，其次当前工作时薪（旧数据无快照时也能算出工资） */
+function recordRate(
+  record: Pick<WorkDayRecord, 'rate' | 'workId'>,
+  workProfiles?: WorkProfile[],
+): number {
+  if (record.rate !== undefined && Number.isFinite(record.rate) && record.rate > 0) {
+    return record.rate
+  }
+  if (workProfiles) {
+    const workId = record.workId ?? DEFAULT_WORK_ID
+    const work = workProfiles.find((profile) => profile.id === workId)
+    if (work && work.hourlyRate > 0) return work.hourlyRate
+  }
+  return 0
+}
+
+/** 记录的实际工资：固定日薪优先，其次工时 × 有效时薪。 */
+function recordPay(
+  record: WorkDayRecord,
+  workProfiles?: WorkProfile[],
+): number {
+  if (
+    record.fixedPay !== undefined &&
+    Number.isFinite(record.fixedPay) &&
+    record.fixedPay > 0
+  ) {
+    return Math.round(record.fixedPay * 100) / 100
+  }
+  return Math.round(record.hours * recordRate(record, workProfiles) * 100) / 100
+}
+
+/** 是否使用了自定义固定日薪。 */
+export function hasFixedPay(record: Pick<WorkDayRecord, 'fixedPay'>): boolean {
+  return record.fixedPay !== undefined && Number.isFinite(record.fixedPay) && record.fixedPay > 0
+}
+
+/** 公开口径：有效时薪（快照优先 → 回退当前工作时薪）。统计、结算入账、界面显示共用 */
+export function getEffectiveRate(
+  record: Pick<WorkDayRecord, 'rate' | 'workId'>,
+  workProfiles?: WorkProfile[],
+): number {
+  return recordRate(record, workProfiles)
+}
+
+/** 公开口径：记录工资（hours × 有效时薪，两位小数） */
+export function getRecordPay(record: WorkDayRecord, workProfiles?: WorkProfile[]): number {
+  return recordPay(record, workProfiles)
+}
+
+/** 每月工资汇总（按记录时薪快照计算；旧数据无快照时回退当前工作时薪） */
+export function getMonthPay(
+  records: WorkDayRecord[],
+  yearMonth: string,
+  workProfiles?: WorkProfile[],
+): number {
   const monthRecords = getMonthRecords(records, yearMonth)
   const total = monthRecords.reduce(
-    (sum, record) => sum + (record.hours * (record.rate ?? 0)),
+    (sum, record) => sum + getRecordPay(record, workProfiles),
     0,
   )
   return Math.round(total * 100) / 100
 }
 
-/** 待结算/已结算金额（按记录时薪快照计算） */
+/** 待结算/已结算金额（按记录时薪快照计算；旧数据无快照时回退当前工作时薪） */
 export function getSettlementSummary(
   records: WorkDayRecord[],
   yearMonth: string,
+  workProfiles?: WorkProfile[],
 ): { total: number; settled: number; pending: number; settledCount: number; pendingCount: number } {
   const monthRecords = getMonthRecords(records, yearMonth)
   let total = 0
@@ -118,7 +184,7 @@ export function getSettlementSummary(
   let settledCount = 0
   let pendingCount = 0
   for (const record of monthRecords) {
-    const pay = (record.hours * (record.rate ?? 0))
+    const pay = getRecordPay(record, workProfiles)
     if (pay <= 0) continue
     total += pay
     if (record.settled) {
@@ -151,4 +217,20 @@ export function getMonthSummary(
   const averageHours =
     workDays > 0 ? Math.round((totalHours / workDays) * 100) / 100 : 0
   return { totalHours, workDays, averageHours }
+}
+
+/** 环比上月：返回变化量（正=增加）与百分比，上月无记录时返回 null */
+export function getMonthDelta(
+  records: WorkDayRecord[],
+  yearMonth: string,
+  shiftMonthKey: (key: string, delta: number) => string,
+): { delta: number; percent: number } | null {
+  const lastMonth = shiftMonthKey(yearMonth, -1)
+  const current = getMonthSummary(records, yearMonth).totalHours
+  const previous = getMonthSummary(records, lastMonth).totalHours
+  if (previous === 0) return null
+  const delta = Math.round((current - previous) * 100) / 100
+  const percent =
+    Math.round((delta / previous) * 1000) / 10
+  return { delta, percent }
 }
