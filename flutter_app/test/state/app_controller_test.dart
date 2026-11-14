@@ -40,36 +40,40 @@ void main() {
     budgetTargets: const BudgetTargets(),
   );
 
-  test('改时薪固化已结算记录的快照，未结算记录跟随新价', () {
-    ctrl().replaceAll(
-      backup(
-        records: const [
-          WorkDayRecord(date: '2026-08-03', hours: 8, settled: true),
-          WorkDayRecord(date: '2026-08-04', hours: 8),
-        ],
-      ),
-    );
-    expect(
-      st().entries.firstWhere((e) => e.id == 'wage-2026-08-03').amount,
-      160,
-    );
+  test(
+    '改时薪固化已结算记录的快照，未结算记录跟随新价',
+    skip: kHoursOnly ? '只记工时变体不生成工资账目' : false,
+    () {
+      ctrl().replaceAll(
+        backup(
+          records: const [
+            WorkDayRecord(date: '2026-08-03', hours: 8, settled: true),
+            WorkDayRecord(date: '2026-08-04', hours: 8),
+          ],
+        ),
+      );
+      expect(
+        st().entries.firstWhere((e) => e.id == 'wage-2026-08-03').amount,
+        160,
+      );
 
-    final ok = ctrl().saveWorkProfile(
-      const WorkProfile(id: 'work-default', name: '默认工作', hourlyRate: 30),
-    );
-    expect(ok, isTrue);
+      final ok = ctrl().saveWorkProfile(
+        const WorkProfile(id: 'work-default', name: '默认工作', hourlyRate: 30),
+      );
+      expect(ok, isTrue);
 
-    final settled = st().records.firstWhere((r) => r.date == '2026-08-03');
-    final pending = st().records.firstWhere((r) => r.date == '2026-08-04');
-    // 已结算：旧价固化，工资与账目都不漂移
-    expect(settled.rate, 20);
-    expect(
-      st().entries.firstWhere((e) => e.id == 'wage-2026-08-03').amount,
-      160,
-    );
-    // 未结算：还没付钱，跟随新时薪
-    expect(pending.rate, isNull);
-  });
+      final settled = st().records.firstWhere((r) => r.date == '2026-08-03');
+      final pending = st().records.firstWhere((r) => r.date == '2026-08-04');
+      // 已结算：旧价固化，工资与账目都不漂移
+      expect(settled.rate, 20);
+      expect(
+        st().entries.firstWhere((e) => e.id == 'wage-2026-08-03').amount,
+        160,
+      );
+      // 未结算：还没付钱，跟随新时薪
+      expect(pending.rate, isNull);
+    },
+  );
 
   test('0 工资的一天不能被标记结算', () {
     ctrl().saveDay('2026-08-05', 0, '');
@@ -112,27 +116,31 @@ void main() {
     expect(st().records.single.settled, isFalse);
   });
 
-  test('结算时固化时薪快照，之后改时薪不影响已结算金额', () {
-    ctrl().replaceAll(
-      backup(records: const [WorkDayRecord(date: '2026-08-11', hours: 8)]),
-    );
-    expect(getMonthPay(st().records, '2026-08', st().workProfiles), 160);
+  test(
+    '结算时固化时薪快照，之后改时薪不影响已结算金额',
+    skip: kHoursOnly ? '只记工时变体不生成工资账目' : false,
+    () {
+      ctrl().replaceAll(
+        backup(records: const [WorkDayRecord(date: '2026-08-11', hours: 8)]),
+      );
+      expect(getMonthPay(st().records, '2026-08', st().workProfiles), 160);
 
-    ctrl().setRecordSettled('2026-08-11', true);
-    expect(st().records.single.rate, 20);
+      ctrl().setRecordSettled('2026-08-11', true);
+      expect(st().records.single.rate, 20);
 
-    ctrl().saveWorkProfile(
-      const WorkProfile(id: 'work-default', name: '默认工作', hourlyRate: 30),
-    );
+      ctrl().saveWorkProfile(
+        const WorkProfile(id: 'work-default', name: '默认工作', hourlyRate: 30),
+      );
 
-    // 已结算：快照锁在结算那一刻的价，工资面板与账本都不漂移。
-    expect(st().records.single.rate, 20);
-    expect(getMonthPay(st().records, '2026-08', st().workProfiles), 160);
-    expect(
-      st().entries.firstWhere((e) => e.id == 'wage-2026-08-11').amount,
-      160,
-    );
-  });
+      // 已结算：快照锁在结算那一刻的价，工资面板与账本都不漂移。
+      expect(st().records.single.rate, 20);
+      expect(getMonthPay(st().records, '2026-08', st().workProfiles), 160);
+      expect(
+        st().entries.firstWhere((e) => e.id == 'wage-2026-08-11').amount,
+        160,
+      );
+    },
+  );
 
   test('删除工作时把旧价固化到已结算记录', () {
     ctrl().replaceAll(
@@ -175,7 +183,7 @@ void main() {
     expect(store.load().status, LoadStatus.ok);
   });
 
-  test('保存工时时清掉旧版「同时记收入」，避免账本双计', () {
+  test('保存工时时清掉旧版「同时记收入」，避免账本双计', skip: kHoursOnly ? '只记工时变体不维护账本' : false, () {
     ctrl().replaceAll(
       backup(
         records: const [WorkDayRecord(date: '2026-08-07', hours: 8)],
