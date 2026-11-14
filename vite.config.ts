@@ -25,13 +25,13 @@ export default defineConfig({
         'glass-lens-map.png',
       ],
       manifest: {
-        name: hoursOnly ? '时账·工时' : '时账',
-        short_name: hoursOnly ? '时账工时' : '时账',
+        name: hoursOnly ? '时页·工时' : '时页 TIMEPAGE',
+        short_name: hoursOnly ? '时页工时' : '时页',
         description: hoursOnly
-          ? '离线记录工时与工资，按月汇总并支持本地备份。'
-          : '离线记录工时和收支，按月汇总并支持本地备份。',
-        theme_color: '#f5f5f7',
-        background_color: '#f5f5f7',
+          ? '记录时间，记下生活。离线记录工时与工资，按月汇总并支持本地备份。'
+          : '记录时间，记下生活。离线记录工时和收支，按月汇总并支持本地备份。',
+        theme_color: '#F7F9FF',
+        background_color: '#F7F9FF',
         display: 'standalone',
         start_url: '/',
         scope: '/',

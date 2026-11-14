@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="colorPrimary">#2563EB</color>
+    <color name="colorPrimaryDark">#173A99</color>
+    <color name="colorAccent">#2F7AF0</color>
+    <!-- 原生启动底色与 Flutter 首帧加载页一致；NormalTheme 接主页面页色。 -->
+    <color name="launch_background_color">#F7F9FF</color>
+    <color name="app_background">#F3F5F9</color>
+</resources>

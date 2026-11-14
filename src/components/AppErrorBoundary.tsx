@@ -46,7 +46,7 @@ export class AppErrorBoundary extends Component<
       const now = new Date()
       const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`
       link.href = url
-      link.download = `时账-诊断数据-${stamp}.json`
+      link.download = `时页-诊断数据-${stamp}.json`
       link.click()
       URL.revokeObjectURL(url)
     } catch (exportError) {

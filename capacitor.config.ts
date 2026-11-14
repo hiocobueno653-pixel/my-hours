@@ -5,7 +5,7 @@ const hoursOnly = process.env.VITE_HOURS_ONLY === '1'
 
 const config: CapacitorConfig = {
   appId: hoursOnly ? 'com.myhours.app.hours' : 'com.myhours.app',
-  appName: hoursOnly ? '时账·工时' : '时账',
+  appName: hoursOnly ? '时页·工时' : '时页',
   webDir: hoursOnly ? 'dist-hours' : 'dist',
   backgroundColor: '#F4F6FB',
   plugins: {

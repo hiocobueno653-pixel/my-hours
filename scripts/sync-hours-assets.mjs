@@ -26,7 +26,7 @@ const configPath = path.join(flavorAssets, 'capacitor.config.json')
 const config = await readFile(path.join(root, 'android', 'app', 'src', 'main', 'assets', 'capacitor.config.json'), 'utf8')
 const patched = config
   .replace(/"appId"\s*:\s*"[^"]*"/, '"appId": "com.myhours.app.hours"')
-  .replace(/"appName"\s*:\s*"[^"]*"/, '"appName": "时账·工时"')
+  .replace(/"appName"\s*:\s*"[^"]*"/, '"appName": "时页·工时"')
   .replace(/"webDir"\s*:\s*"[^"]*"/, '"webDir": "dist-hours"')
 await writeFile(configPath, patched, 'utf8')
 

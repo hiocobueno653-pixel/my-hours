@@ -1,6 +1,13 @@
-# 我的工时（My Hours）
+# 时页 TIMEPAGE
 
-一款离线优先的工时 + 收支记账应用，数据全部保存在本机，无账号、无后端。支持 Web PWA（可安装、可离线、自动更新）与 Android（Capacitor）两种运行方式。
+记录时间，记下生活。
+
+一款离线优先的工时 + 收支记账应用，数据全部保存在本机，无账号、无后端。
+
+Android 当前客户端为 `flutter_app/` 下的 Flutter 实现（包名
+`com.myhours.app`）；根目录的 React 19 + Capacitor 版本保留为可运行的
+冻结功能基线。两端共享同一份数据契约与品牌规范，见
+`docs/adr/0006-timepage-brand.md`。
 
 ## 功能
 
@@ -31,7 +38,8 @@
 - 大字模式、清空数据
 
 ### 数据
-- 数据全部存于本机 `localStorage`（多层备份写入，损坏自动回退）；并开启自动备份与自动恢复
+- Flutter 版数据存于应用私有目录的 `my-hours.json`（三代备份，损坏自动回退）；React 基线的 PWA 存于 `localStorage`
+- Flutter 每日自动留一份本机快照（保留 7 天），可在「数据与备份」页手动恢复
 - JSON 备份导出 / 导入（版本 v4，兼容 v1–v3 旧备份）
 - CSV / **Excel（.xlsx）** 导出：月工时表、月账本、月中概览
 
