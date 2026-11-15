@@ -8,6 +8,7 @@ import 'package:fluid_glass/fluid_glass.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'app.dart';
+import 'core/glass_policy.dart';
 import 'core/motion.dart';
 import 'core/motion_origin.dart';
 import 'core/settings.dart';
@@ -264,18 +265,13 @@ class MyHoursApp extends StatelessWidget {
                       : Brightness.dark,
                   systemNavigationBarContrastEnforced: false,
                 ),
-                child:
-                    reduceEffects || glassPreference == AppGlassPreference.none
-                    ? GlassQualityScope(
-                        quality: GlassQuality.plain,
-                        child: gestureAwareContent,
-                      )
-                    : glassPreference == AppGlassPreference.extreme
-                    ? GlassQualityScope(
-                        quality: GlassQuality.liquid,
-                        child: gestureAwareContent,
-                      )
-                    : gestureAwareContent,
+                child: GlassQualityScope(
+                  quality: globalGlassQualityFor(
+                    glassPreference,
+                    reduceEffects: reduceEffects,
+                  ),
+                  child: gestureAwareContent,
+                ),
               ),
             );
           },

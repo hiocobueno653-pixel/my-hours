@@ -77,6 +77,7 @@ class _MonthPickerSheetState extends State<_MonthPickerSheet> {
               BarActionButton(
                 icon: Icons.chevron_left_rounded,
                 tooltip: '上一年',
+                bright: true,
                 onTap: () => _shiftYear(-1),
               ),
               Expanded(
@@ -94,6 +95,7 @@ class _MonthPickerSheetState extends State<_MonthPickerSheet> {
               BarActionButton(
                 icon: Icons.chevron_right_rounded,
                 tooltip: '下一年',
+                bright: true,
                 onTap: () => _shiftYear(1),
               ),
             ],

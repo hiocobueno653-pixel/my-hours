@@ -15,7 +15,7 @@ import 'dates.dart';
 import 'models.dart';
 import 'money.dart';
 
-export 'money.dart' show roundMoney;
+export 'money.dart' show roundMoney, toScaledCents;
 
 /// 工时输入校验结果。
 sealed class HoursInputResult {
@@ -171,11 +171,11 @@ double effectiveRate(WorkDayRecord record, List<WorkProfile>? workProfiles) {
 
 /// 记录的实际工资：固定日薪优先，其次工时 × 有效时薪。
 double recordPay(WorkDayRecord record, List<WorkProfile>? workProfiles) {
-  final fixedPay = record.fixedPay;
-  if (fixedPay != null && fixedPay.isFinite && fixedPay > 0) {
-    return roundMoney(fixedPay);
-  }
-  return roundMoney(record.hours * effectiveRate(record, workProfiles));
+  return computeRecordPay(
+    hours: record.hours,
+    rate: effectiveRate(record, workProfiles),
+    fixedPay: record.fixedPay,
+  );
 }
 
 /// 是否使用了自定义固定日薪。
@@ -190,11 +190,11 @@ double getMonthPay(
   String yearMonth,
   List<WorkProfile>? workProfiles,
 ) {
-  var total = 0.0;
+  var totalCents = 0;
   for (final record in getMonthRecords(records, yearMonth)) {
-    total += recordPay(record, workProfiles);
+    totalCents += toScaledCents(recordPay(record, workProfiles));
   }
-  return roundMoney(total);
+  return totalCents / 100.0;
 }
 
 /// 待结算 / 已结算金额与笔数。
@@ -203,25 +203,26 @@ SettlementSummary getSettlementSummary(
   String yearMonth,
   List<WorkProfile>? workProfiles,
 ) {
-  var total = 0.0;
-  var settled = 0.0;
+  var totalCents = 0;
+  var settledCents = 0;
   var settledCount = 0;
   var pendingCount = 0;
   for (final record in getMonthRecords(records, yearMonth)) {
     final pay = recordPay(record, workProfiles);
     if (pay <= 0) continue;
-    total += pay;
+    final cents = toScaledCents(pay);
+    totalCents += cents;
     if (record.settled) {
-      settled += pay;
+      settledCents += cents;
       settledCount += 1;
     } else {
       pendingCount += 1;
     }
   }
   return SettlementSummary(
-    total: roundMoney(total),
-    settled: roundMoney(settled),
-    pending: roundMoney(total - settled),
+    total: totalCents / 100.0,
+    settled: settledCents / 100.0,
+    pending: (totalCents - settledCents) / 100.0,
     settledCount: settledCount,
     pendingCount: pendingCount,
   );

@@ -22,4 +22,12 @@ class MotionOrigin {
         ? point
         : null;
   }
+
+  /// 读取并清空起点，避免连续弹窗误用上一次点击坐标。
+  static Offset? consumeRecent() {
+    final point = recent;
+    _point = null;
+    _at = null;
+    return point;
+  }
 }

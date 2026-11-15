@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/settings.dart';
 import '../../core/theme_tokens.dart';
+import '../../ui/glass_menu.dart';
 import '../../ui/pinned_header.dart';
 import '../../ui/sheet.dart';
 import '../../ui/widgets.dart';
@@ -105,10 +106,8 @@ class ThemePage extends ConsumerWidget {
                                           settings.setAccentColor(color),
                                     ),
                                   _AddColorDot(
-                                    onTap: () => _showCustomColor(
-                                      context,
-                                      settings,
-                                    ),
+                                    onTap: () =>
+                                        _showCustomColor(context, settings),
                                   ),
                                 ],
                               ),
@@ -122,16 +121,19 @@ class ThemePage extends ConsumerWidget {
                                 ),
                               ),
                               const SizedBox(height: Gaps.sm),
-                              Segmented<AppColorStyle>(
-                                values: AppColorStyle.values,
-                                selected: settings.colorStyle,
-                                labelOf: (style) => switch (style) {
-                                  AppColorStyle.vivid => '鲜明',
-                                  AppColorStyle.atmospheric => '氛围',
-                                  AppColorStyle.soft => '柔和',
-                                  AppColorStyle.monochrome => '单色',
-                                },
-                                onChanged: settings.setColorStyle,
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: GlassSelectMenu<AppColorStyle>(
+                                  values: AppColorStyle.values,
+                                  selected: settings.colorStyle,
+                                  labelOf: (style) => switch (style) {
+                                    AppColorStyle.vivid => '鲜明',
+                                    AppColorStyle.atmospheric => '氛围',
+                                    AppColorStyle.soft => '柔和',
+                                    AppColorStyle.monochrome => '单色',
+                                  },
+                                  onChanged: settings.setColorStyle,
+                                ),
                               ),
                             ],
                           ),
@@ -187,7 +189,8 @@ class ThemePage extends ConsumerWidget {
                               ),
                               const SizedBox(height: 10),
                               Text(
-                                '无：只保留磨砂；标准：按设备能力；极致：强制折射（较耗电）',
+                                '无：只保留磨砂；标准：仅底栏镜片折射，更省电；'
+                                '极致：全界面折射，设备不支持时自动降级',
                                 style: TextStyle(
                                   fontSize: 11.5,
                                   height: 1.45,
@@ -234,8 +237,7 @@ class ThemePage extends ConsumerWidget {
                               Segmented<bool>(
                                 values: const [true, false],
                                 selected: settings.followSystemText,
-                                labelOf: (follow) =>
-                                    follow ? '跟随系统' : '自定义',
+                                labelOf: (follow) => follow ? '跟随系统' : '自定义',
                                 onChanged: (follow) {
                                   if (settings.largeText) {
                                     settings.setLargeText(false);
@@ -331,10 +333,7 @@ class ThemePage extends ConsumerWidget {
           children: [
             Text(
               '选择一个颜色，主题会立即更新。',
-              style: TextStyle(
-                fontSize: 13,
-                color: sheetContext.colors.text2,
-              ),
+              style: TextStyle(fontSize: 13, color: sheetContext.colors.text2),
             ),
             const SizedBox(height: Gaps.lg),
             Wrap(

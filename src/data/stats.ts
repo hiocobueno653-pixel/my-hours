@@ -1,5 +1,5 @@
 import { DEFAULT_WORK_ID } from './profiles'
-import { getMonthRecords, getRecordPay } from './records'
+import { getMonthRecords, getRecordPay, roundMoney, toScaledCents } from './records'
 import type { LedgerEntry, WorkProfile, WorkDayRecord } from './types'
 
 export function pad2(value: number): string {
@@ -29,9 +29,12 @@ export function getYearHoursTrend(
   workProfiles?: WorkProfile[],
 ): MonthHoursPoint[] {
   const monthKeys = getYearMonthKeys(year)
-  const byMonth = new Map<string, { hours: number; pay: number; workDays: number }>()
+  const byMonth = new Map<
+    string,
+    { hours: number; payCents: number; workDays: number }
+  >()
   for (const yearMonth of monthKeys) {
-    byMonth.set(yearMonth, { hours: 0, pay: 0, workDays: 0 })
+    byMonth.set(yearMonth, { hours: 0, payCents: 0, workDays: 0 })
   }
   const yearPrefix = year + '-'
   for (const record of records) {
@@ -40,15 +43,19 @@ export function getYearHoursTrend(
     const point = byMonth.get(yearMonth)
     if (!point) continue
     point.hours += record.hours
-    point.pay += getRecordPay(record, workProfiles)
+    point.payCents += toScaledCents(getRecordPay(record, workProfiles))
     if (record.hours > 0) point.workDays += 1
   }
   return monthKeys.map((yearMonth) => {
-    const point = byMonth.get(yearMonth) as { hours: number; pay: number; workDays: number }
+    const point = byMonth.get(yearMonth) as {
+      hours: number
+      payCents: number
+      workDays: number
+    }
     return {
       yearMonth,
-      hours: Math.round(point.hours * 100) / 100,
-      pay: Math.round(point.pay * 100) / 100,
+      hours: roundMoney(point.hours),
+      pay: point.payCents / 100,
       workDays: point.workDays,
     }
   })
@@ -66,9 +73,9 @@ export function getYearLedgerTrend(
   year: number,
 ): MonthLedgerPoint[] {
   const monthKeys = getYearMonthKeys(year)
-  const byMonth = new Map<string, { income: number; expense: number }>()
+  const byMonth = new Map<string, { incomeCents: number; expenseCents: number }>()
   for (const yearMonth of monthKeys) {
-    byMonth.set(yearMonth, { income: 0, expense: 0 })
+    byMonth.set(yearMonth, { incomeCents: 0, expenseCents: 0 })
   }
   const yearPrefix = year + '-'
   for (const entry of entries) {
@@ -76,15 +83,21 @@ export function getYearLedgerTrend(
     const yearMonth = entry.date.slice(0, 7)
     const point = byMonth.get(yearMonth)
     if (!point) continue
-    if (entry.type === 'income') point.income += entry.amount
-    else point.expense += entry.amount
+    if (entry.type === 'income') {
+      point.incomeCents += toScaledCents(entry.amount)
+    } else {
+      point.expenseCents += toScaledCents(entry.amount)
+    }
   }
   return monthKeys.map((yearMonth) => {
-    const point = byMonth.get(yearMonth) as { income: number; expense: number }
+    const point = byMonth.get(yearMonth) as {
+      incomeCents: number
+      expenseCents: number
+    }
     return {
       yearMonth,
-      income: Math.round(point.income * 100) / 100,
-      expense: Math.round(point.expense * 100) / 100,
+      income: point.incomeCents / 100,
+      expense: point.expenseCents / 100,
     }
   })
 }
@@ -108,7 +121,9 @@ export function getMonthCategoryTotals(
     totals.set(key, {
       name: entry.category,
       type: entry.type,
-      total: Math.round(((current?.total ?? 0) + entry.amount) * 100) / 100,
+      total:
+        (toScaledCents(current?.total ?? 0) + toScaledCents(entry.amount)) /
+        100,
     })
   }
   return Array.from(totals.values()).sort((a, b) => b.total - a.total)
@@ -138,9 +153,11 @@ export function getMonthWorkBreakdown(
       hours: 0,
       pay: 0,
     }
-    existing.hours = Math.round((existing.hours + record.hours) * 100) / 100
+    existing.hours = roundMoney(existing.hours + record.hours)
     existing.pay =
-      Math.round((existing.pay + getRecordPay(record, workProfiles)) * 100) / 100
+      (toScaledCents(existing.pay) +
+        toScaledCents(getRecordPay(record, workProfiles))) /
+      100
     rows.set(workId, existing)
   }
   for (const record of getMonthRecords(records, yearMonth)) {
@@ -167,24 +184,26 @@ export function getYearSummary(
 ): { totalHours: number; totalPay: number; totalIncome: number; totalExpense: number } {
   const prefix = `${year}-`
   let totalHours = 0
-  let totalPay = 0
-  let totalIncome = 0
-  let totalExpense = 0
+  let totalPayCents = 0
+  let totalIncomeCents = 0
+  let totalExpenseCents = 0
   for (const record of records) {
     if (!record.date.startsWith(prefix)) continue
     totalHours += record.hours
-    totalPay += getRecordPay(record, workProfiles)
+    totalPayCents += toScaledCents(getRecordPay(record, workProfiles))
   }
   for (const entry of entries) {
     if (!entry.date.startsWith(prefix)) continue
-    if (entry.type === 'income') totalIncome += entry.amount
-    else totalExpense += entry.amount
+    if (entry.type === 'income') {
+      totalIncomeCents += toScaledCents(entry.amount)
+    } else {
+      totalExpenseCents += toScaledCents(entry.amount)
+    }
   }
-  const round = (value: number) => Math.round(value * 100) / 100
   return {
-    totalHours: round(totalHours),
-    totalPay: round(totalPay),
-    totalIncome: round(totalIncome),
-    totalExpense: round(totalExpense),
+    totalHours: roundMoney(totalHours),
+    totalPay: totalPayCents / 100,
+    totalIncome: totalIncomeCents / 100,
+    totalExpense: totalExpenseCents / 100,
   }
 }

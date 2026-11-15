@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fluid_glass/fluid_glass.dart';
 
+import 'core/glass_policy.dart';
 import 'core/motion.dart';
 import 'core/settings.dart';
 import 'core/theme_tokens.dart';
@@ -192,12 +193,12 @@ class _AppShellState extends State<AppShell> {
           builder: (context, constraints) {
             final showSidebar = constraints.maxWidth >= 720;
             final showLabels = constraints.maxWidth >= 900;
-            final liquidDock =
-                widget.glassPreference != AppGlassPreference.none &&
-                (_liquidDockSupported ||
-                    widget.glassPreference == AppGlassPreference.extreme) &&
-                !disable &&
-                !showSidebar;
+            final glassPolicy = resolveGlassEffectPolicy(
+              widget.glassPreference,
+              liquidSupported: _liquidDockSupported,
+              reduceEffects: disable,
+            );
+            final liquidDock = glassPolicy.liquidDock && !showSidebar;
             final tabView = _FadeTabView(
               tabs: _tabs,
               active: _tab,
@@ -231,6 +232,7 @@ class _AppShellState extends State<AppShell> {
                       tabs: _tabs,
                       active: _tab,
                       backdrop: _backdrop,
+                      glassQuality: glassPolicy.dockQuality,
                       floating: widget.dockStyle == AppDockStyle.floating,
                       onSelect: _selectTab,
                       onReselect: _reselectTab,
@@ -403,6 +405,7 @@ class _AppDock extends StatelessWidget {
     required this.tabs,
     required this.active,
     required this.backdrop,
+    required this.glassQuality,
     required this.floating,
     required this.onSelect,
     required this.onReselect,
@@ -411,6 +414,7 @@ class _AppDock extends StatelessWidget {
   final List<AppTab> tabs;
   final AppTab active;
   final Backdrop backdrop;
+  final GlassQuality glassQuality;
   final bool floating;
   final ValueChanged<AppTab> onSelect;
   final VoidCallback onReselect;
@@ -476,9 +480,7 @@ class _AppDock extends StatelessWidget {
                   content: colors.text,
                   track: colors.inset,
                 ),
-            child: _liquidDockSupported
-                ? bar
-                : GlassQualityScope(quality: GlassQuality.plain, child: bar),
+            child: GlassQualityScope(quality: glassQuality, child: bar),
           ),
         ),
       ),

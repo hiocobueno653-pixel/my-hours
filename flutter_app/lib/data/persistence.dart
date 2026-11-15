@@ -192,8 +192,14 @@ class LocalStore {
     try {
       if (tmp.existsSync()) tmp.deleteSync();
       main.copySync(tmp.path);
-      if (target.existsSync()) target.deleteSync();
-      tmp.renameSync(target.path);
+      try {
+        // Android/Linux 上 rename 覆盖是同一文件系统内的原子替换。
+        tmp.renameSync(target.path);
+      } on FileSystemException {
+        // Windows 测试环境不允许 rename 覆盖既有文件，退化为删除后替换。
+        if (target.existsSync()) target.deleteSync();
+        tmp.renameSync(target.path);
+      }
     } on FileSystemException {
       return null;
     }

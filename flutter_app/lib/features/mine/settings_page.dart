@@ -145,7 +145,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    '时页 TIMEPAGE · 1.7.1',
+                                    '时页 TIMEPAGE · 1.7.2',
                                     style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w600,

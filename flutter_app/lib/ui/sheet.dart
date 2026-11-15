@@ -31,36 +31,57 @@ Future<T?> showAppSheet<T>({
       disableAnimations: disable,
     ),
     pageBuilder: (sheetContext, animation, secondaryAnimation) {
+      final scrimOpacity = animation.drive(
+        CurveTween(curve: const Interval(0, 0.42, curve: Curves.easeOutCubic)),
+      );
+      final curved = CurvedAnimation(
+        parent: animation,
+        curve: Curves2.out,
+        reverseCurve: Curves2.inCurve,
+      );
       return Stack(
         children: [
           Positioned.fill(
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: dismissible
-                  ? () {
-                      if (BackNavigation.dispatch()) return;
-                      Navigator.of(sheetContext).pop();
-                    }
-                  : null,
-              child: ColoredBox(
-                color: Colors.black.withValues(
-                  alpha: dismissible ? 0.22 : 0.30,
+            child: FadeTransition(
+              opacity: scrimOpacity,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: dismissible
+                    ? () {
+                        if (BackNavigation.dispatch()) return;
+                        Navigator.of(sheetContext).pop();
+                      }
+                    : null,
+                child: ColoredBox(
+                  key: const ValueKey('sheet-scrim'),
+                  color: Colors.black.withValues(
+                    alpha: dismissible ? 0.22 : 0.30,
+                  ),
                 ),
               ),
             ),
           ),
           Align(
             alignment: Alignment.bottomCenter,
-            // MaterialApp 的 fallback text style 会在缺少 Material 祖先时
-            // 给文字加黄色双下划线；弹层必须自己提供一层透明 Material。
-            child: Material(
-              type: MaterialType.transparency,
-              // 键盘弹出时弹层会接近满屏；必须保留顶部系统栏安全区，
-              // 否则标题和关闭键会钻到状态栏下面。
-              child: SafeArea(
-                top: true,
-                bottom: false,
-                child: builder(sheetContext),
+            child: FadeTransition(
+              opacity: curved,
+              child: SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(0, 0.08),
+                  end: Offset.zero,
+                ).animate(curved),
+                // MaterialApp 的 fallback text style 会在缺少 Material 祖先时
+                // 给文字加黄色双下划线；弹层必须自己提供一层透明 Material。
+                child: Material(
+                  type: MaterialType.transparency,
+                  // 键盘弹出时弹层会接近满屏；必须保留顶部系统栏安全区，
+                  // 否则标题和关闭键会钻到状态栏下面。
+                  child: SafeArea(
+                    top: true,
+                    bottom: false,
+                    child: builder(sheetContext),
+                  ),
+                ),
               ),
             ),
           ),
@@ -68,24 +89,7 @@ Future<T?> showAppSheet<T>({
       );
     },
     transitionBuilder: (context, animation, secondaryAnimation, child) {
-      if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) {
-        return child;
-      }
-      final curved = CurvedAnimation(
-        parent: animation,
-        curve: Curves2.out,
-        reverseCurve: Curves2.inCurve,
-      );
-      return FadeTransition(
-        opacity: curved,
-        child: SlideTransition(
-          position: Tween<Offset>(
-            begin: const Offset(0, 0.08),
-            end: Offset.zero,
-          ).animate(curved),
-          child: child,
-        ),
-      );
+      return child;
     },
   );
 }
@@ -291,6 +295,7 @@ class _SheetScaffoldState extends State<SheetScaffold> {
                               iconSize: 19,
                               size: 44,
                               radius: 22,
+                              bright: true,
                             ),
                           ],
                         ),

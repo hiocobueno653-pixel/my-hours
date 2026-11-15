@@ -4,9 +4,12 @@ import {
   formatHours,
   getEffectiveRate,
   getMonthSummary,
+  getMonthPay,
   getRecordPay,
   normalizeRecord,
   parseHoursInput,
+  roundMoney,
+  toScaledCents,
 } from './records'
 import { isWageEntryForDate, syncWageEntries } from './wageEntries'
 
@@ -81,6 +84,33 @@ describe('effective rate and record pay', () => {
     const fixed = { date: '2026-08-05', hours: 8, remark: '', fixedPay: 350 }
     expect(getRecordPay(fixed, profiles)).toBe(350)
     expect(getRecordPay({ date: '2026-08-05', hours: 8, remark: '', fixedPay: 0 }, profiles)).toBe(160)
+  })
+})
+
+describe('money rounding', () => {
+  it('rounds exact half values away from zero', () => {
+    expect(roundMoney(1.005)).toBe(1.01)
+    expect(roundMoney(-1.005)).toBe(-1.01)
+    expect(roundMoney(2.675)).toBe(2.68)
+    expect(roundMoney(-2.675)).toBe(-2.68)
+  })
+
+  it('calculates record pay and aggregates in integer cents', () => {
+    expect(
+      getRecordPay({ date: '2026-08-01', hours: 1.5, remark: '', rate: 10.25 }),
+    ).toBe(15.38)
+    const records = Array.from({ length: 1000 }, () => ({
+      date: '2026-08-01',
+      hours: 0.25,
+      remark: '',
+      rate: 33.33,
+    }))
+    const summedCents = records.reduce(
+      (sum, record) => sum + toScaledCents(getRecordPay(record)),
+      0,
+    )
+    expect(getMonthPay(records, '2026-08')).toBe(summedCents / 100)
+    expect(getMonthPay(records, '2026-08')).toBe(8330)
   })
 })
 

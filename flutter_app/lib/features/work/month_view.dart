@@ -34,8 +34,22 @@ class MonthView extends ConsumerStatefulWidget {
 }
 
 class _MonthViewState extends ConsumerState<MonthView> {
-  double _dragDx = 0;
+  int _calendarDirection = 1;
   bool _dayFlowOpen = false;
+
+  void _changeMonth(String next, {int? direction}) {
+    final current = ref.read(selectedMonthProvider);
+    if (next == current) return;
+    setState(() {
+      _calendarDirection = direction ?? (next.compareTo(current) < 0 ? -1 : 1);
+    });
+    ref.read(selectedMonthProvider.notifier).setMonth(next);
+  }
+
+  void _shiftMonth(int direction) {
+    final current = ref.read(selectedMonthProvider);
+    _changeMonth(shiftMonth(current, direction), direction: direction);
+  }
 
   Future<void> _openDay(String date) async {
     if (_dayFlowOpen) return;
@@ -151,9 +165,7 @@ class _MonthViewState extends ConsumerState<MonthView> {
                       // 下面是所选月的日历，两套时间语境会互相误导。
                       _PastMonthBanner(
                         month: month,
-                        onTap: () => ref
-                            .read(selectedMonthProvider.notifier)
-                            .setMonth(currentMonthKey()),
+                        onTap: () => _changeMonth(currentMonthKey()),
                       ),
                     IntrinsicHeight(
                       child: Row(
@@ -209,26 +221,16 @@ class _MonthViewState extends ConsumerState<MonthView> {
                         ),
                       ),
                     const SizedBox(height: Gaps.md),
-                    GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onHorizontalDragStart: (_) => _dragDx = 0,
-                      onHorizontalDragUpdate: (details) {
-                        _dragDx += details.delta.dx;
-                      },
-                      onHorizontalDragEnd: (_) {
-                        if (_dragDx.abs() < 50) return;
-                        final next = shiftMonth(month, _dragDx < 0 ? 1 : -1);
-                        ref.read(selectedMonthProvider.notifier).setMonth(next);
-                      },
-                      child: _CalendarCard(
-                        month: month,
-                        dates: dates,
-                        records: recordsByDate,
-                        entriesByDate: entriesByDate,
-                        today: today,
-                        onTapDate: _openDay,
-                        onOpenDetail: () => showMonthDetail(context, month),
-                      ),
+                    _SwipeableCalendar(
+                      month: month,
+                      dates: dates,
+                      records: recordsByDate,
+                      entriesByDate: entriesByDate,
+                      today: today,
+                      direction: _calendarDirection,
+                      onTapDate: _openDay,
+                      onOpenDetail: () => showMonthDetail(context, month),
+                      onShift: _shiftMonth,
                     ),
                     const SizedBox(height: Gaps.md),
                     _QuickActions(
@@ -252,15 +254,14 @@ class _MonthViewState extends ConsumerState<MonthView> {
             actions: [
               _MonthSwitch(
                 month: month,
-                onChanged: (value) =>
-                    ref.read(selectedMonthProvider.notifier).setMonth(value),
+                onChanged: _changeMonth,
                 onPick: () async {
                   final picked = await showMonthPicker(
                     context,
                     initialMonth: month,
                   );
                   if (picked != null && context.mounted) {
-                    ref.read(selectedMonthProvider.notifier).setMonth(picked);
+                    _changeMonth(picked);
                   }
                 },
               ),
@@ -937,6 +938,189 @@ class _MetricCard extends StatelessWidget {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+/// 跟手横滑 + 进出场滑动。日历本身保持不变，只有月份切换时把旧卡
+/// 向手势方向送出，新卡从另一侧进入；不足阈值则弹回原位。
+class _SwipeableCalendar extends StatefulWidget {
+  const _SwipeableCalendar({
+    required this.month,
+    required this.dates,
+    required this.records,
+    required this.entriesByDate,
+    required this.today,
+    required this.direction,
+    required this.onTapDate,
+    required this.onOpenDetail,
+    required this.onShift,
+  });
+
+  final String month;
+  final List<MonthDay> dates;
+  final Map<String, WorkDayRecord> records;
+  final Map<String, List<LedgerEntry>> entriesByDate;
+  final String today;
+  final int direction;
+  final ValueChanged<String> onTapDate;
+  final VoidCallback onOpenDetail;
+  final ValueChanged<int> onShift;
+
+  @override
+  State<_SwipeableCalendar> createState() => _SwipeableCalendarState();
+}
+
+class _SwipeableCalendarState extends State<_SwipeableCalendar>
+    with SingleTickerProviderStateMixin {
+  double _dragDx = 0;
+  bool _dragging = false;
+  _SwipeableCalendar? _outgoing;
+  int _slideDirection = 1;
+  late final AnimationController _slideController =
+      AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 260),
+      )..addStatusListener((status) {
+        if (status == AnimationStatus.completed && mounted) {
+          setState(() => _outgoing = null);
+        }
+      });
+
+  @override
+  void didUpdateWidget(covariant _SwipeableCalendar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.month == widget.month) return;
+    _outgoing = oldWidget;
+    _slideDirection = widget.direction;
+    final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    if (disable) {
+      _outgoing = null;
+      _slideController.value = 1;
+    } else {
+      _slideController.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _slideController.dispose();
+    super.dispose();
+  }
+
+  void _startDrag(DragStartDetails details) {
+    setState(() {
+      _dragging = true;
+      _dragDx = 0;
+    });
+  }
+
+  void _updateDrag(DragUpdateDetails details) {
+    if (!_dragging) return;
+    setState(() => _dragDx += details.delta.dx);
+  }
+
+  void _endDrag(DragEndDetails details) {
+    if (!_dragging) return;
+    final width = context.size?.width ?? MediaQuery.sizeOf(context).width;
+    final velocity = details.velocity.pixelsPerSecond.dx.clamp(-1000.0, 1000.0);
+    final projected = _dragDx + velocity * 0.10;
+    final threshold = width * 0.14 < 48 ? 48.0 : width * 0.14;
+    if (projected.abs() >= threshold) {
+      final direction = projected < 0 ? 1 : -1;
+      HapticFeedback.selectionClick();
+      setState(() {
+        _dragging = false;
+        _dragDx = 0;
+      });
+      widget.onShift(direction);
+      return;
+    }
+    setState(() {
+      _dragging = false;
+      _dragDx = 0;
+    });
+  }
+
+  void _cancelDrag() {
+    if (!_dragging) return;
+    setState(() {
+      _dragging = false;
+      _dragDx = 0;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    final currentCard = _CalendarCard(
+      month: widget.month,
+      dates: widget.dates,
+      records: widget.records,
+      entriesByDate: widget.entriesByDate,
+      today: widget.today,
+      onTapDate: widget.onTapDate,
+      onOpenDetail: widget.onOpenDetail,
+    );
+    final outgoing = _outgoing;
+    final content = outgoing == null
+        ? currentCard
+        : AnimatedBuilder(
+            animation: _slideController,
+            builder: (context, _) {
+              final progress = Curves.easeOutCubic.transform(
+                _slideController.value,
+              );
+              final travel = MediaQuery.sizeOf(context).width * 0.18;
+              return Stack(
+                alignment: Alignment.topCenter,
+                children: [
+                  Opacity(
+                    opacity: 1 - progress,
+                    child: Transform.translate(
+                      offset: Offset(_slideDirection * travel * progress, 0),
+                      child: _CalendarCard(
+                        month: outgoing.month,
+                        dates: outgoing.dates,
+                        records: outgoing.records,
+                        entriesByDate: outgoing.entriesByDate,
+                        today: outgoing.today,
+                        onTapDate: outgoing.onTapDate,
+                        onOpenDetail: outgoing.onOpenDetail,
+                      ),
+                    ),
+                  ),
+                  Opacity(
+                    opacity: 0.65 + 0.35 * progress,
+                    child: Transform.translate(
+                      offset: Offset(
+                        -_slideDirection * travel * (1 - progress),
+                        0,
+                      ),
+                      child: Transform.scale(
+                        scale: 0.985 + 0.015 * progress,
+                        child: currentCard,
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          );
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onHorizontalDragStart: disable ? null : _startDrag,
+      onHorizontalDragUpdate: disable ? null : _updateDrag,
+      onHorizontalDragEnd: disable ? null : _endDrag,
+      onHorizontalDragCancel: disable ? null : _cancelDrag,
+      child: AnimatedContainer(
+        duration: _dragging || disable
+            ? Duration.zero
+            : const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+        transform: Matrix4.translationValues(_dragDx * 0.55, 0, 0),
+        child: content,
       ),
     );
   }

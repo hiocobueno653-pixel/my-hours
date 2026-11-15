@@ -7,7 +7,8 @@ library;
 import 'constants.dart';
 import 'dates.dart' show pad2;
 import 'models.dart';
-import 'records.dart' show getMonthRecords, recordPay, roundMoney;
+import 'records.dart'
+    show getMonthRecords, recordPay, roundMoney, toScaledCents;
 
 String yearMonthKey(int year, int month) => '$year-${pad2(month)}';
 
@@ -37,7 +38,7 @@ List<MonthHoursPoint> getYearHoursTrend(
 ) {
   final monthKeys = getYearMonthKeys(year);
   final hours = <String, double>{for (final k in monthKeys) k: 0};
-  final pay = <String, double>{for (final k in monthKeys) k: 0};
+  final payCents = <String, int>{for (final k in monthKeys) k: 0};
   final workDays = <String, int>{for (final k in monthKeys) k: 0};
 
   final yearPrefix = '$year-';
@@ -46,7 +47,8 @@ List<MonthHoursPoint> getYearHoursTrend(
     final key = record.date.substring(0, 7);
     if (!hours.containsKey(key)) continue;
     hours[key] = hours[key]! + record.hours;
-    pay[key] = pay[key]! + recordPay(record, workProfiles);
+    payCents[key] =
+        payCents[key]! + toScaledCents(recordPay(record, workProfiles));
     if (record.hours > 0) workDays[key] = workDays[key]! + 1;
   }
 
@@ -55,7 +57,7 @@ List<MonthHoursPoint> getYearHoursTrend(
       MonthHoursPoint(
         yearMonth: key,
         hours: roundMoney(hours[key]!),
-        pay: roundMoney(pay[key]!),
+        pay: payCents[key]! / 100.0,
         workDays: workDays[key]!,
       ),
   ];
@@ -75,18 +77,18 @@ class MonthLedgerPoint {
 
 List<MonthLedgerPoint> getYearLedgerTrend(List<LedgerEntry> entries, int year) {
   final monthKeys = getYearMonthKeys(year);
-  final income = <String, double>{for (final k in monthKeys) k: 0};
-  final expense = <String, double>{for (final k in monthKeys) k: 0};
+  final incomeCents = <String, int>{for (final k in monthKeys) k: 0};
+  final expenseCents = <String, int>{for (final k in monthKeys) k: 0};
 
   final yearPrefix = '$year-';
   for (final entry in entries) {
     if (!entry.date.startsWith(yearPrefix)) continue;
     final key = entry.date.substring(0, 7);
-    if (!income.containsKey(key)) continue;
+    if (!incomeCents.containsKey(key)) continue;
     if (entry.type == LedgerType.income) {
-      income[key] = income[key]! + entry.amount;
+      incomeCents[key] = incomeCents[key]! + toScaledCents(entry.amount);
     } else {
-      expense[key] = expense[key]! + entry.amount;
+      expenseCents[key] = expenseCents[key]! + toScaledCents(entry.amount);
     }
   }
 
@@ -94,8 +96,8 @@ List<MonthLedgerPoint> getYearLedgerTrend(List<LedgerEntry> entries, int year) {
     for (final key in monthKeys)
       MonthLedgerPoint(
         yearMonth: key,
-        income: roundMoney(income[key]!),
-        expense: roundMoney(expense[key]!),
+        income: incomeCents[key]! / 100.0,
+        expense: expenseCents[key]! / 100.0,
       ),
   ];
 }
@@ -212,26 +214,26 @@ YearSummary getYearSummary(
 ) {
   final prefix = '$year-';
   var totalHours = 0.0;
-  var totalPay = 0.0;
-  var totalIncome = 0.0;
-  var totalExpense = 0.0;
+  var totalPayCents = 0;
+  var totalIncomeCents = 0;
+  var totalExpenseCents = 0;
   for (final record in records) {
     if (!record.date.startsWith(prefix)) continue;
     totalHours += record.hours;
-    totalPay += recordPay(record, workProfiles);
+    totalPayCents += toScaledCents(recordPay(record, workProfiles));
   }
   for (final entry in entries) {
     if (!entry.date.startsWith(prefix)) continue;
     if (entry.type == LedgerType.income) {
-      totalIncome += entry.amount;
+      totalIncomeCents += toScaledCents(entry.amount);
     } else {
-      totalExpense += entry.amount;
+      totalExpenseCents += toScaledCents(entry.amount);
     }
   }
   return YearSummary(
     totalHours: roundMoney(totalHours),
-    totalPay: roundMoney(totalPay),
-    totalIncome: roundMoney(totalIncome),
-    totalExpense: roundMoney(totalExpense),
+    totalPay: totalPayCents / 100.0,
+    totalIncome: totalIncomeCents / 100.0,
+    totalExpense: totalExpenseCents / 100.0,
   );
 }

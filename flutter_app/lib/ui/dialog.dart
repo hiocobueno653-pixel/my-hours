@@ -2,11 +2,11 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:fluid_glass/fluid_glass.dart';
 
 import '../core/motion.dart';
 import '../core/motion_origin.dart';
 import '../core/theme_tokens.dart';
-import 'widgets.dart';
 
 Future<bool?> showConfirmDialog(
   BuildContext context, {
@@ -30,7 +30,7 @@ Future<bool?> showConfirmDialog(
     ),
     pageBuilder: (dialogContext, animation, secondaryAnimation) {
       final isDark = colors.isDark;
-      final dialogOrigin = MotionOrigin.recent;
+      final dialogOrigin = MotionOrigin.consumeRecent();
       final panelTop = isDark
           ? Color.lerp(colors.card, Colors.white, 0.06)!
           : Color.lerp(Colors.white, colors.page, 0.04)!;
@@ -41,13 +41,24 @@ Future<bool?> showConfirmDialog(
           ? (isDark ? const Color(0xFF7F1D1D) : const Color(0xFFB91C1C))
           : colors.primary;
       final confirmForeground = danger ? Colors.white : colors.onPrimary;
+      final dialogShape = RoundedSuperellipseBorder(
+        borderRadius: BorderRadius.circular(32),
+        side: BorderSide(
+          color: Colors.white.withValues(alpha: isDark ? 0.16 : 0.72),
+          width: 1.4,
+        ),
+      );
+      final scrimOpacity = animation.drive(
+        CurveTween(curve: const Interval(0, 0.45, curve: Curves.easeOutCubic)),
+      );
       return Stack(
         children: [
           Positioned.fill(
             child: IgnorePointer(
               child: FadeTransition(
-                opacity: animation,
+                opacity: scrimOpacity,
                 child: ColoredBox(
+                  key: const ValueKey('dialog-scrim'),
                   color: Colors.black.withValues(alpha: isDark ? 0.46 : 0.24),
                 ),
               ),
@@ -94,15 +105,7 @@ Future<bool?> showConfirmDialog(
                           end: Alignment.bottomRight,
                           colors: [panelTop, panelBottom],
                         ),
-                        shape: RoundedSuperellipseBorder(
-                          borderRadius: BorderRadius.circular(32),
-                          side: BorderSide(
-                            color: Colors.white.withValues(
-                              alpha: isDark ? 0.16 : 0.72,
-                            ),
-                            width: 1.4,
-                          ),
-                        ),
+                        shape: dialogShape,
                         shadows: [
                           ...context.floatingShadows,
                           BoxShadow(
@@ -113,90 +116,98 @@ Future<bool?> showConfirmDialog(
                           ),
                         ],
                       ),
-                      child: Stack(
-                        children: [
-                          Positioned(
-                            top: -42,
-                            right: -30,
-                            child: IgnorePointer(
-                              child: Container(
-                                width: 150,
-                                height: 150,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  gradient: RadialGradient(
-                                    colors: [
-                                      Colors.white.withValues(
-                                        alpha: isDark ? 0.16 : 0.62,
-                                      ),
-                                      Colors.transparent,
-                                    ],
+                      child: ClipPath(
+                        clipper: ShapeBorderClipper(shape: dialogShape),
+                        child: Stack(
+                          children: [
+                            Positioned(
+                              top: -42,
+                              right: -30,
+                              child: IgnorePointer(
+                                child: Container(
+                                  width: 150,
+                                  height: 150,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    gradient: RadialGradient(
+                                      colors: [
+                                        Colors.white.withValues(
+                                          alpha: isDark ? 0.16 : 0.62,
+                                        ),
+                                        Colors.transparent,
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ),
                             ),
-                          ),
-                          SingleChildScrollView(
-                            padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  title,
-                                  textAlign: TextAlign.left,
-                                  style: TextStyle(
-                                    fontSize: 19,
-                                    height: 1.28,
-                                    fontWeight: FontWeight.w700,
-                                    letterSpacing: -0.01,
-                                    color: colors.text,
-                                  ),
-                                ),
-                                if (description != null) ...[
-                                  const SizedBox(height: 10),
+                            SingleChildScrollView(
+                              padding: const EdgeInsets.fromLTRB(
+                                24,
+                                24,
+                                24,
+                                20,
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
                                   Text(
-                                    description,
+                                    title,
                                     textAlign: TextAlign.left,
                                     style: TextStyle(
-                                      fontSize: 14.5,
-                                      height: 1.55,
-                                      color: colors.text2,
+                                      fontSize: 19,
+                                      height: 1.28,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: -0.01,
+                                      color: colors.text,
                                     ),
                                   ),
-                                ],
-                                const SizedBox(height: 22),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: _DialogButton(
-                                        label: cancelLabel,
-                                        background: colors.block.withValues(
-                                          alpha: isDark ? 0.68 : 0.74,
-                                        ),
-                                        foreground: colors.text2,
-                                        onTap: () =>
-                                            Navigator.of(dialogContext)
-                                                .pop(false),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: _DialogButton(
-                                        label: confirmLabel,
-                                        background: confirmBackground,
-                                        foreground: confirmForeground,
-                                        bold: true,
-                                        onTap: () =>
-                                            Navigator.of(dialogContext)
-                                                .pop(true),
+                                  if (description != null) ...[
+                                    const SizedBox(height: 10),
+                                    Text(
+                                      description,
+                                      textAlign: TextAlign.left,
+                                      style: TextStyle(
+                                        fontSize: 14.5,
+                                        height: 1.55,
+                                        color: colors.text2,
                                       ),
                                     ),
                                   ],
-                                ),
-                              ],
+                                  const SizedBox(height: 22),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: _DialogButton(
+                                          label: cancelLabel,
+                                          background: colors.block.withValues(
+                                            alpha: isDark ? 0.68 : 0.74,
+                                          ),
+                                          foreground: colors.text2,
+                                          onTap: () =>
+                                              Navigator.of(dialogContext)
+                                                  .pop(false),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: _DialogButton(
+                                          label: confirmLabel,
+                                          background: confirmBackground,
+                                          foreground: confirmForeground,
+                                          bold: true,
+                                          onTap: () =>
+                                              Navigator.of(dialogContext)
+                                                  .pop(true),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -231,34 +242,35 @@ class _DialogButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = context.colors.isDark;
+    final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     return Semantics(
       button: true,
       label: label,
       onTap: onTap,
       excludeSemantics: true,
-      child: Pressable(
-        onTap: onTap,
-        shape: Radii.pillShape,
-        pressedScale: 0.97,
-        child: Container(
-          height: 52,
-          alignment: Alignment.center,
-          decoration: ShapeDecoration(
-            color: background,
-            shape: RoundedSuperellipseBorder(
-              borderRadius: BorderRadius.circular(Radii.pill),
-              side: BorderSide(
-                color: Colors.white.withValues(alpha: isDark ? 0.10 : 0.32),
-                width: 0.8,
-              ),
-            ),
+      child: GlassQualityScope(
+        quality: GlassQuality.plain,
+        child: LiquidButton(
+          onPressed: onTap,
+          backdrop: nativeBackdrop,
+          isInteractive: !disable,
+          surfaceColor: background.withValues(
+            alpha: bold ? 0.92 : (isDark ? 0.58 : 0.72),
           ),
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: bold ? FontWeight.w600 : FontWeight.w500,
-              color: foreground,
+          height: 52,
+          padding: EdgeInsets.zero,
+          child: SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: Center(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: bold ? FontWeight.w600 : FontWeight.w500,
+                  color: foreground,
+                ),
+              ),
             ),
           ),
         ),

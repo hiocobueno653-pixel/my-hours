@@ -7,6 +7,16 @@ export const MAX_FIXED_PAY = 999999999.99
 const HOURS_RE = /^(?:\d{1,2}(?:\.\d{1,2})?|\.\d{1,2})$/
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 
+/** 元/工时转百分位定点整数，半值按远离零方向。 */
+export function toScaledCents(value: number): number {
+  const sign = value >= 0 ? 1 : -1
+  return sign * Math.round((Math.abs(value) + 1e-9) * 100)
+}
+
+export function roundMoney(value: number): number {
+  return toScaledCents(value) / 100
+}
+
 export type HoursInputResult =
   | { ok: true; hours: number }
   | { ok: false; error: string }
@@ -21,11 +31,11 @@ export function parseHoursInput(raw: string): HoursInputResult {
   if (!Number.isFinite(hours) || hours < 0 || hours > 24) {
     return { ok: false, error: '工时需在 0 到 24 之间' }
   }
-  return { ok: true, hours: Math.round(hours * 100) / 100 }
+  return { ok: true, hours: roundMoney(hours) }
 }
 
 export function formatHours(hours: number): string {
-  const rounded = Math.round(hours * 100) / 100
+  const rounded = roundMoney(hours)
   return String(rounded)
 }
 
@@ -35,7 +45,7 @@ export function normalizeRecord(raw: unknown): WorkDayRecord | null {
   if (typeof candidate.date !== 'string' || !DATE_RE.test(candidate.date)) return null
   const hours = Number(candidate.hours)
   if (!Number.isFinite(hours) || hours < 0 || hours > 24) return null
-  if (Math.abs(Math.round(hours * 100) / 100 - hours) > 1e-8) return null
+  if (Math.abs(roundMoney(hours) - hours) > 1e-8) return null
   const remark =
     typeof candidate.remark === 'string'
       ? candidate.remark.slice(0, MAX_REMARK_LENGTH)
@@ -50,7 +60,7 @@ export function normalizeRecord(raw: unknown): WorkDayRecord | null {
     Number.isFinite(rate) &&
     rate >= 0 &&
     rate <= MAX_HOURLY_RATE &&
-    Math.abs(Math.round(rate * 100) / 100 - rate) < 1e-8
+    Math.abs(roundMoney(rate) - rate) < 1e-8
   const settled = candidate.settled === true
   const fixedPay = Number(candidate.fixedPay)
   const hasFixedPay =
@@ -58,15 +68,15 @@ export function normalizeRecord(raw: unknown): WorkDayRecord | null {
     Number.isFinite(fixedPay) &&
     fixedPay >= 0 &&
     fixedPay <= MAX_FIXED_PAY &&
-    Math.abs(Math.round(fixedPay * 100) / 100 - fixedPay) < 1e-8
+    Math.abs(roundMoney(fixedPay) - fixedPay) < 1e-8
   const record: WorkDayRecord = {
     date: candidate.date,
-    hours: Math.round(hours * 100) / 100,
+    hours: roundMoney(hours),
     remark,
   }
   if (workId) record.workId = workId
-  if (hasRate) record.rate = Math.round(rate * 100) / 100
-  if (hasFixedPay) record.fixedPay = Math.round(fixedPay * 100) / 100
+  if (hasRate) record.rate = roundMoney(rate)
+  if (hasFixedPay) record.fixedPay = roundMoney(fixedPay)
   if (settled) record.settled = true
   return record
 }
@@ -135,9 +145,11 @@ function recordPay(
     Number.isFinite(record.fixedPay) &&
     record.fixedPay > 0
   ) {
-    return Math.round(record.fixedPay * 100) / 100
+    return roundMoney(record.fixedPay)
   }
-  return Math.round(record.hours * recordRate(record, workProfiles) * 100) / 100
+  const scaledHours = toScaledCents(record.hours)
+  const scaledRate = toScaledCents(recordRate(record, workProfiles))
+  return Math.round((scaledHours * scaledRate) / 100 + 1e-9) / 100
 }
 
 /** 是否使用了自定义固定日薪。 */
@@ -165,11 +177,11 @@ export function getMonthPay(
   workProfiles?: WorkProfile[],
 ): number {
   const monthRecords = getMonthRecords(records, yearMonth)
-  const total = monthRecords.reduce(
-    (sum, record) => sum + getRecordPay(record, workProfiles),
+  const totalCents = monthRecords.reduce(
+    (sum, record) => sum + toScaledCents(getRecordPay(record, workProfiles)),
     0,
   )
-  return Math.round(total * 100) / 100
+  return totalCents / 100
 }
 
 /** 待结算/已结算金额（按记录时薪快照计算；旧数据无快照时回退当前工作时薪） */
@@ -179,26 +191,26 @@ export function getSettlementSummary(
   workProfiles?: WorkProfile[],
 ): { total: number; settled: number; pending: number; settledCount: number; pendingCount: number } {
   const monthRecords = getMonthRecords(records, yearMonth)
-  let total = 0
-  let settled = 0
+  let totalCents = 0
+  let settledCents = 0
   let settledCount = 0
   let pendingCount = 0
   for (const record of monthRecords) {
     const pay = getRecordPay(record, workProfiles)
     if (pay <= 0) continue
-    total += pay
+    const cents = toScaledCents(pay)
+    totalCents += cents
     if (record.settled) {
-      settled += pay
+      settledCents += cents
       settledCount += 1
     } else {
       pendingCount += 1
     }
   }
-  const round = (value: number) => Math.round(value * 100) / 100
   return {
-    total: round(total),
-    settled: round(settled),
-    pending: round(total - settled),
+    total: totalCents / 100,
+    settled: settledCents / 100,
+    pending: (totalCents - settledCents) / 100,
     settledCount,
     pendingCount,
   }
@@ -210,12 +222,12 @@ export function getMonthSummary(
 ): MonthSummary {
   const monthRecords = getMonthRecords(records, yearMonth)
   const totalHours =
-    Math.round(
-      monthRecords.reduce((total, record) => total + record.hours, 0) * 100,
-    ) / 100
+    roundMoney(
+      monthRecords.reduce((total, record) => total + record.hours, 0),
+    )
   const workDays = monthRecords.filter((record) => record.hours > 0).length
   const averageHours =
-    workDays > 0 ? Math.round((totalHours / workDays) * 100) / 100 : 0
+    workDays > 0 ? roundMoney(totalHours / workDays) : 0
   return { totalHours, workDays, averageHours }
 }
 
@@ -229,7 +241,7 @@ export function getMonthDelta(
   const current = getMonthSummary(records, yearMonth).totalHours
   const previous = getMonthSummary(records, lastMonth).totalHours
   if (previous === 0) return null
-  const delta = Math.round((current - previous) * 100) / 100
+  const delta = roundMoney(current - previous)
   const percent =
     Math.round((delta / previous) * 1000) / 10
   return { delta, percent }
