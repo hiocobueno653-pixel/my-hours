@@ -58,13 +58,22 @@ android {
             // 下次装真 release 会 INSTALL_FAILED_UPDATE_INCOMPATIBLE，
             // 只能卸载重装（本地数据全丢）；而 apksigner 对 debug 证书同样
             // 返回 0，校验不报错，问题只会在用户身上爆发。
-            if (!hasReleaseKeystore) {
+            //
+            // 只在真的要出 release 包时抛：Gradle 在配置阶段会对所有
+            // buildType 求值，无条件 throw 会让 --debug 也构建不了，
+            // 而「本地试跑用 --debug」正是这里给出的替代方案。
+            val wantsRelease = gradle.startParameter.taskNames.any {
+                it.contains("release", ignoreCase = true)
+            }
+            if (!hasReleaseKeystore && wantsRelease) {
                 throw GradleException(
                     "缺少 flutter_app/android/keystore.properties 或 myhours-release.keystore：" +
-                        "release 包必须用固定签名。要本地试跑请用 --debug 构建。",
+                        "release 包必须用固定签名。本地试跑请用 --debug 构建。",
                 )
             }
-            signingConfig = signingConfigs.getByName("release")
+            if (hasReleaseKeystore) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             isMinifyEnabled = false
             isShrinkResources = false
         }
