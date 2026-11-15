@@ -1,4 +1,4 @@
-# React 1.2.0 ↔ Flutter 1.6.2 功能对照
+# React 1.2.0 ↔ Flutter 1.7.1 功能对照
 
 本轮以仓库里的 React 版（`src/`，冻结在 `react-1.2.0-baseline`）为功能基准，
 把用户可见的布局与交互补进 Flutter 版，同时保留 FlClash 蒸馏后的视觉语言。

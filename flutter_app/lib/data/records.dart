@@ -33,7 +33,7 @@ class HoursInputError extends HoursInputResult {
 }
 
 HoursInputResult parseHoursInput(String raw) {
-  final trimmed = raw.trim();
+  final trimmed = normalizeNumericInput(raw);
   if (trimmed.isEmpty) return const HoursInputError('请填写工时');
   if (!hoursPattern.hasMatch(trimmed)) {
     return const HoursInputError('工时最多两位小数');

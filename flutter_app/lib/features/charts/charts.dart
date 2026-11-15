@@ -7,6 +7,7 @@ library;
 
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -79,22 +80,26 @@ class BarPairChart extends StatelessWidget {
                     HapticFeedback.selectionClick();
                     onSelected!(index);
                   },
-            child: CustomPaint(
-              painter: _BarPairPainter(
-                labels: labels,
-                seriesA: seriesA,
-                seriesB: seriesB,
-                colorA: colorA,
-                colorB: colorB,
-                gridColor: colors.divider,
-                labelColor: colors.text3,
-                selectedIndex: selectedIndex,
-                highlightColor: colors.primary.withValues(
-                  alpha: colors.isDark ? 0.12 : 0.07,
+            child: RepaintBoundary(
+              child: CustomPaint(
+                isComplex: true,
+                willChange: false,
+                painter: _BarPairPainter(
+                  labels: labels,
+                  seriesA: seriesA,
+                  seriesB: seriesB,
+                  colorA: colorA,
+                  colorB: colorB,
+                  gridColor: colors.divider,
+                  labelColor: colors.text3,
+                  selectedIndex: selectedIndex,
+                  highlightColor: colors.primary.withValues(
+                    alpha: colors.isDark ? 0.12 : 0.07,
+                  ),
+                  selectedLabelColor: colors.primary,
                 ),
-                selectedLabelColor: colors.primary,
+                child: SizedBox(height: height, width: double.infinity),
               ),
-              child: SizedBox(height: height, width: double.infinity),
             ),
           );
         },
@@ -209,9 +214,9 @@ class _BarPairPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_BarPairPainter old) =>
-      old.seriesA != seriesA ||
-      old.seriesB != seriesB ||
-      old.labels != labels ||
+      !listEquals(old.seriesA, seriesA) ||
+      !listEquals(old.seriesB, seriesB) ||
+      !listEquals(old.labels, labels) ||
       old.colorA != colorA ||
       old.colorB != colorB ||
       old.selectedIndex != selectedIndex ||
@@ -264,32 +269,35 @@ class DonutChart extends StatelessWidget {
       child: SizedBox(
         width: size,
         height: size,
-        child: CustomPaint(
-          painter: _DonutPainter(
-            values: values,
-            colors: colors,
-            trackColor: tokens.inset,
-          ),
-          child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (centerValue != null)
-                  Text(
-                    centerValue!,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: tokens.text,
-                      letterSpacing: -0.02,
+        child: RepaintBoundary(
+          child: CustomPaint(
+            isComplex: true,
+            painter: _DonutPainter(
+              values: values,
+              colors: colors,
+              trackColor: tokens.inset,
+            ),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (centerValue != null)
+                    Text(
+                      centerValue!,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: tokens.text,
+                        letterSpacing: -0.02,
+                      ),
                     ),
-                  ),
-                if (centerLabel != null)
-                  Text(
-                    centerLabel!,
-                    style: TextStyle(fontSize: 10.5, color: tokens.text3),
-                  ),
-              ],
+                  if (centerLabel != null)
+                    Text(
+                      centerLabel!,
+                      style: TextStyle(fontSize: 10.5, color: tokens.text3),
+                    ),
+                ],
+              ),
             ),
           ),
         ),
@@ -340,7 +348,9 @@ class _DonutPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_DonutPainter old) =>
-      old.values != values || old.colors != colors;
+      !listEquals(old.values, values) ||
+      !listEquals(old.colors, colors) ||
+      old.trackColor != trackColor;
 }
 
 /// 进度条（预算/目标）。
@@ -429,15 +439,18 @@ class TrendChart extends StatelessWidget {
       label: _semanticText,
       child: SizedBox(
         height: height,
-        child: CustomPaint(
-          painter: _TrendPainter(
-            values: values,
-            labels: labels,
-            color: color,
-            gridColor: colors.divider,
-            labelColor: colors.text3,
+        child: RepaintBoundary(
+          child: CustomPaint(
+            isComplex: true,
+            painter: _TrendPainter(
+              values: values,
+              labels: labels,
+              color: color,
+              gridColor: colors.divider,
+              labelColor: colors.text3,
+            ),
+            child: const SizedBox.expand(),
           ),
-          child: const SizedBox.expand(),
         ),
       ),
     );
@@ -545,5 +558,9 @@ class _TrendPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_TrendPainter old) =>
-      old.values != values || old.labels != labels || old.color != color;
+      !listEquals(old.values, values) ||
+      !listEquals(old.labels, labels) ||
+      old.color != color ||
+      old.gridColor != gridColor ||
+      old.labelColor != labelColor;
 }

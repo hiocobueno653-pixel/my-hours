@@ -58,6 +58,13 @@ const List<String> defaultExpenseCategories = [
 /// 日期格式：`YYYY-MM-DD`。
 final RegExp datePattern = RegExp(r'^\d{4}-\d{2}-\d{2}$');
 
+/// 界面与导入共同支持的年份范围。
+///
+/// 日期轮盘、月份选择器、年度统计都只能到达这段范围；导入若接受范围外
+/// 的数据，会得到一批「入库了但界面永远看不到」的记录。
+const int minSupportedYear = 2000;
+const int maxSupportedYear = 2100;
+
 /// 工时输入：最多两位小数，允许 `.5` 形式。
 final RegExp hoursPattern = RegExp(r'^(?:\d{1,2}(?:\.\d{1,2})?|\.\d{1,2})$');
 
@@ -66,3 +73,22 @@ final RegExp ratePattern = RegExp(r'^(?:\d{1,5}(?:\.\d{1,2})?|\.\d{1,2})$');
 
 /// 金额输入：整数位最多 9 位。
 final RegExp amountPattern = RegExp(r'^(?:\d{1,9}(?:\.\d{1,2})?|\.\d{1,2})$');
+
+/// 数字输入的宽松清洗：只用于解析阶段，兼容中文逗号、英文逗号与空格。
+///
+/// 输入框自身会尽量把粘贴文本清洗成无分隔符格式；解析层再兜一层，
+/// 防止旧备份、第三方键盘或直接调用解析函数时把 `1,200` 拒掉。
+String normalizeNumericInput(String raw) =>
+    raw.trim().replaceAll(RegExp(r'[,\s，]'), '');
+
+/// 生成进程内不会因同一微秒重复调用而碰撞的实体 id。
+///
+/// 旧实现两次取 `DateTime.now().microsecondsSinceEpoch`，同一微秒内
+/// 连续创建两条记录会得到完全相同的 id，随后被去重逻辑静默覆盖。
+int _entityIdSerial = 0;
+
+String createEntityId(String prefix) {
+  final now = DateTime.now().microsecondsSinceEpoch;
+  _entityIdSerial = (_entityIdSerial + 1) & 0xFFFFFF;
+  return '$prefix-$now-${_entityIdSerial.toRadixString(36)}';
+}

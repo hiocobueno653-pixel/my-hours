@@ -38,5 +38,12 @@ void main() {
       expect(parseMonthKey('bad'), isNull);
       expect(parseMonthKey('2026-13'), isNull);
     });
+
+    test('界面支持的年份范围之外视为非法', () {
+      expect(isValidDateISO('1999-12-31'), isFalse);
+      expect(isValidDateISO('2101-01-01'), isFalse);
+      expect(parseMonthKey('1999-12'), isNull);
+      expect(parseMonthKey('2101-01'), isNull);
+    });
   });
 }

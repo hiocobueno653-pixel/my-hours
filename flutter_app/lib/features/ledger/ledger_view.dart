@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:fluid_glass/fluid_glass.dart';
 
 import '../../core/formatters.dart';
 import '../../core/motion.dart';
@@ -13,12 +14,14 @@ import '../../data/dates.dart';
 import '../../data/ledger.dart';
 import '../../data/models.dart';
 import '../../data/records.dart';
+import '../../data/wage_entries.dart';
 import '../../state/app_controller.dart';
 import '../../ui/sheet.dart';
 import '../../ui/widgets.dart';
 import '../../ui/date_wheel.dart';
 import '../../ui/dialog.dart';
 import '../../ui/export_sheet.dart';
+import '../../ui/glass_menu.dart';
 import '../../ui/month_picker.dart';
 import '../../ui/pinned_header.dart';
 import 'category_manager.dart';
@@ -35,13 +38,26 @@ class _LedgerViewState extends ConsumerState<LedgerView> {
   final TextEditingController _search = TextEditingController();
   LedgerEntry? _undoEntry;
   Timer? _undoTimer;
+  Timer? _searchTimer;
+  String _searchQuery = '';
   String _categoryFilter = '';
 
   @override
   void dispose() {
     _search.dispose();
     _undoTimer?.cancel();
+    _searchTimer?.cancel();
     super.dispose();
+  }
+
+  void _onSearchChanged(String value) {
+    _searchTimer?.cancel();
+    _searchTimer = Timer(const Duration(milliseconds: 120), () {
+      if (!mounted) return;
+      final next = value.trim();
+      if (next == _searchQuery) return;
+      setState(() => _searchQuery = next);
+    });
   }
 
   void _showUndo(LedgerEntry entry) {
@@ -57,8 +73,10 @@ class _LedgerViewState extends ConsumerState<LedgerView> {
   /// 它的金额来自结算那一刻的 `recordPay`，而 `syncWageEntries` 不会更新
   /// 既有条目的金额。允许直接改金额/分类，会让工资面板的"已结算"与账本
   /// 收入永久分叉；允许删除，则下次对账又悄悄把它建回来。
-  bool _isManagedEntry(LedgerEntry entry) =>
-      entry.id.startsWith(wageEntryIdPrefix);
+  bool _isManagedEntry(LedgerEntry entry) {
+    final date = entry.workDate ?? entry.date;
+    return isValidDateISO(date) && entry.id == getWageEntryId(date);
+  }
 
   void _hintManagedEntry() {
     HapticFeedback.selectionClick();
@@ -72,7 +90,22 @@ class _LedgerViewState extends ConsumerState<LedgerView> {
   }
 
   Future<void> _revokeSettlement(LedgerEntry entry) async {
-    final date = entry.workDate ?? entry.id.substring(wageEntryIdPrefix.length);
+    final date =
+        entry.workDate ??
+        (entry.id.startsWith(wageEntryIdPrefix)
+            ? entry.id.substring(wageEntryIdPrefix.length)
+            : '');
+    if (!isValidDateISO(date)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('这笔工资账目缺少有效日期，无法撤销结算'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return;
+    }
     final confirmed = await showConfirmDialog(
       context,
       title: '撤销 ${formatDateLabel(date)} 的结算？',
@@ -123,7 +156,6 @@ class _LedgerViewState extends ConsumerState<LedgerView> {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final state = ref.watch(appControllerProvider);
-    final readOnly = ref.watch(archiveReadOnlyProvider);
     final month = ref.watch(selectedMonthProvider);
     // 切月复位分类筛选：否则旧分类的 chip 会一直高亮，而新月份没有该分类
     // 账目时列表为空，容易被读成「本月数据丢了」。
@@ -135,17 +167,23 @@ class _LedgerViewState extends ConsumerState<LedgerView> {
     final summary = getLedgerMonthSummary(state.entries, month);
     final budget = ref.watch(budgetTargetsProvider).monthlyExpenseBudget;
     final overBudget = budget > 0 && summary.expense > budget;
-    final keyword = _search.text.trim();
+    final keyword = _searchQuery;
     final baseEntries = getLedgerMonthEntries(state.entries, month);
     final filteredByCategory = baseEntries.where((entry) {
       if (_categoryFilter.isEmpty) return true;
-      if (_categoryFilter == 'income') {
-        return entry.type == LedgerType.income;
+      if (_categoryFilter.startsWith('type:')) {
+        return entry.type ==
+            parseLedgerType(_categoryFilter.substring('type:'.length));
       }
-      if (_categoryFilter == 'expense') {
-        return entry.type == LedgerType.expense;
+      if (_categoryFilter.startsWith('cat:')) {
+        final rest = _categoryFilter.substring('cat:'.length);
+        final split = rest.indexOf(':');
+        if (split <= 0) return true;
+        final type = parseLedgerType(rest.substring(0, split));
+        final name = rest.substring(split + 1);
+        return entry.type == type && entry.category == name;
       }
-      return entry.category == _categoryFilter;
+      return true;
     });
     final monthEntries = filteredByCategory.where((entry) {
       if (keyword.isEmpty) return true;
@@ -159,15 +197,16 @@ class _LedgerViewState extends ConsumerState<LedgerView> {
     final seenCategories = <String>{};
     final categoryChips = <({String key, String label})>[];
     for (final entry in baseEntries) {
-      if (seenCategories.add(entry.category)) {
-        categoryChips.add((key: entry.category, label: entry.category));
+      final key = 'cat:${ledgerTypeValue(entry.type)}:${entry.category}';
+      if (seenCategories.add(key)) {
+        categoryChips.add((key: key, label: entry.category));
       }
     }
     final filterChips = <({String key, String label})>[
       (key: '', label: '全部'),
       if (!kHoursOnly) ...[
-        (key: 'income', label: '收入'),
-        (key: 'expense', label: '支出'),
+        (key: 'type:income', label: '收入'),
+        (key: 'type:expense', label: '支出'),
       ],
       ...categoryChips,
     ];
@@ -201,10 +240,6 @@ class _LedgerViewState extends ConsumerState<LedgerView> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (readOnly) ...[
-                      const ReadOnlyBanner(),
-                      const SizedBox(height: Gaps.md),
-                    ],
                     _BalanceCard(
                       month: month,
                       summary: summary,
@@ -313,7 +348,7 @@ class _LedgerViewState extends ConsumerState<LedgerView> {
                       ),
                       child: TextField(
                         controller: _search,
-                        onChanged: (_) => setState(() {}),
+                        onChanged: _onSearchChanged,
                         textInputAction: TextInputAction.search,
                         autocorrect: false,
                         style: TextStyle(fontSize: 14, color: colors.text),
@@ -342,7 +377,9 @@ class _LedgerViewState extends ConsumerState<LedgerView> {
                                   message: '清除搜索',
                                   child: Pressable(
                                     onTap: () {
+                                      _searchTimer?.cancel();
                                       _search.clear();
+                                      _searchQuery = '';
                                       FocusScope.of(context).unfocus();
                                       setState(() {});
                                     },
@@ -429,11 +466,31 @@ class _LedgerViewState extends ConsumerState<LedgerView> {
                 bright: true,
                 onTap: () => showLedgerEditor(context),
               ),
-              BarActionButton(
-                icon: Icons.sell_outlined,
-                tooltip: '分类管理',
-                bright: true,
-                onTap: () => showCategoryManager(context),
+              GlassMenuButton(
+                items: [
+                  LiquidMenuItem(
+                    label: '分类管理',
+                    icon: Icons.sell_outlined,
+                    onSelected: () => showCategoryManager(context),
+                  ),
+                  LiquidMenuItem(
+                    label: '回到本月',
+                    icon: Icons.today_rounded,
+                    onSelected: () => ref
+                        .read(selectedMonthProvider.notifier)
+                        .setMonth(currentMonthKey()),
+                  ),
+                  LiquidMenuItem(
+                    label: '清除筛选',
+                    icon: Icons.filter_alt_off_rounded,
+                    onSelected: () => setState(() {
+                      _searchTimer?.cancel();
+                      _categoryFilter = '';
+                      _search.clear();
+                      _searchQuery = '';
+                    }),
+                  ),
+                ],
               ),
               BarActionButton(
                 icon: Icons.download_rounded,
@@ -803,6 +860,11 @@ Future<void> showLedgerEditor(
   LedgerEntry? entry,
   String? presetDate,
 }) {
+  final container = ProviderScope.containerOf(context, listen: false);
+  if (container.read(archiveReadOnlyProvider)) {
+    showArchiveReadOnlyMessage(context);
+    return Future<void>.value();
+  }
   return showAppSheet<void>(
     context: context,
     dismissible: false,
@@ -850,7 +912,7 @@ class _LedgerEditorSheetState extends ConsumerState<LedgerEditorSheet> {
     _initialType = entry?.type ?? LedgerType.expense;
     _initialDate = entry?.date ?? widget.presetDate ?? todayISO();
     _initialCategory = entry?.category ?? defaultExpenseCategories.first;
-    _initialAmount = entry == null ? '' : formatAmount(entry.amount);
+    _initialAmount = entry == null ? '' : formatAmountInput(entry.amount);
     _initialRemark = entry?.remark ?? '';
     _type = _initialType;
     _date = _initialDate;
@@ -882,13 +944,31 @@ class _LedgerEditorSheetState extends ConsumerState<LedgerEditorSheet> {
       workDate: widget.entry?.workDate,
     );
     ref.read(appControllerProvider.notifier).saveLedgerEntry(entry);
+    final targetMonth = _date.substring(0, 7);
+    final selectedMonth = ref.read(selectedMonthProvider);
+    if (targetMonth != selectedMonth) {
+      ref.read(selectedMonthProvider.notifier).setMonth(targetMonth);
+      final messenger = ScaffoldMessenger.of(context);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('已保存到 ${formatMonthLabel(targetMonth)}'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      });
+    }
     HapticFeedback.mediumImpact();
     _submitted = true;
     Navigator.of(context).pop();
   }
 
   Future<void> _pickDate() async {
-    final picked = await showDateWheel(context, initialDate: _date);
+    final picked = await showDateWheel(
+      context,
+      initialDate: _date,
+      maxDate: todayISO(),
+    );
     if (picked != null) {
       setState(() {
         _date = picked;
@@ -933,7 +1013,7 @@ class _LedgerEditorSheetState extends ConsumerState<LedgerEditorSheet> {
           QuickChips(
             values: const [10, 20, 50, 100, 200, 500],
             onSelect: (value) {
-              _amount.text = formatAmount(value);
+              _amount.text = formatAmountInput(value);
             },
           ),
           if (_error != null) ...[

@@ -27,7 +27,7 @@ class AmountInputError extends AmountInputResult {
 }
 
 AmountInputResult parseAmountInput(String raw) {
-  final trimmed = raw.trim();
+  final trimmed = normalizeNumericInput(raw);
   if (trimmed.isEmpty) return const AmountInputError('请填写金额');
   if (!amountPattern.hasMatch(trimmed)) {
     return const AmountInputError('金额最多两位小数');
@@ -163,11 +163,7 @@ String formatMoney(double amount) {
 
 String createLedgerEntryId() => createId('entry');
 
-String createId(String prefix) {
-  final now = DateTime.now().microsecondsSinceEpoch;
-  final random = DateTime.now().microsecondsSinceEpoch % 100000000;
-  return '$prefix-$now-$random';
-}
+String createId(String prefix) => createEntityId(prefix);
 
 CustomLedgerCategory? normalizeLedgerCategory(Object? raw) {
   if (raw is! Map) return null;

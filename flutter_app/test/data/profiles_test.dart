@@ -15,6 +15,7 @@ void main() {
 
     test('接受两位小数', () {
       expect((parseRateInput('18.5') as RateInputOk).rate, 18.5);
+      expect((parseRateInput('1,200') as RateInputOk).rate, 1200);
     });
 
     test('拒绝非法与越界', () {

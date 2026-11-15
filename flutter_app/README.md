@@ -138,7 +138,7 @@ versionCode 递增 = 可覆盖升级，用户不必换包迁移。
 
 ## 已知限制
 
-- **APK 体积**：1.6.2 全 ABI release 约 59.0 MB；arm64 单 ABI 约 24.7 MB。
+- **APK 体积**：1.7.1 全 ABI release 约 60 MB；arm64 单 ABI 约 25 MB。
   Flutter 引擎本身占大头，无法回到旧版 WebView 的 4 MB。可用
   `--split-per-abi` + `--obfuscate --split-debug-info` 进一步压缩。
 - **首帧**：液态折射 shader 在 x86_64 模拟器上曾把冷启动拉到约 15 秒；1.3.6 起自动在 x86_64/非 ARM 使用 `GlassQuality.plain`，模拟器热身后约 2.6–3.4 秒（受负载波动影响）。arm64 真机的液态层未实测；低核数 ARM 由 FluidGlass 的设备分级自动降级。

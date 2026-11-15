@@ -178,6 +178,22 @@ void main() {
     expect(store.load().document!.records.single.remark, 'recovered');
   });
 
+  test('clear 会清除隔离态，之后可以重新写入', () {
+    store.save(sample(remark: 'first'));
+    store.save(sample(remark: 'second'));
+    store.mainFile.writeAsStringSync('{ broken');
+    store.backupFile.writeAsStringSync('{ also broken');
+    store.oldBackupFile.writeAsStringSync('{ third broken');
+    expect(store.load().status, LoadStatus.corrupted);
+    expect(store.isQuarantined, isTrue);
+
+    store.clear();
+
+    expect(store.isQuarantined, isFalse);
+    expect(store.save(sample(remark: 'after-clear')), isTrue);
+    expect(store.load().document!.records.single.remark, 'after-clear');
+  });
+
   test('preserveSnapshot 在覆盖前按时间戳留一份', () {
     store.save(sample(remark: 'before-import'));
     final saved = store.preserveSnapshot('20261114-120000');

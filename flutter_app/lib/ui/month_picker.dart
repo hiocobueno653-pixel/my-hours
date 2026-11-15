@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../core/formatters.dart';
 import '../core/motion.dart';
 import '../core/theme_tokens.dart';
+import '../data/constants.dart';
 import '../data/dates.dart';
 import 'sheet.dart';
 import 'widgets.dart';
@@ -32,8 +33,8 @@ class _MonthPickerSheetState extends State<_MonthPickerSheet> {
   /// 不设边界时连续点「下一年」会出现 5 位年份，`parseMonthKey` 失配后
   /// 日历直接空白、箭头静默回落到本月；3 位年份还会让 `month_view`
   /// 的 `substring(0, 4)` 抛 FormatException 打挂整页。
-  static const int _minYear = 2000;
-  static const int _maxYear = 2100;
+  static const int _minYear = minSupportedYear;
+  static const int _maxYear = maxSupportedYear;
 
   late int _year;
 
@@ -62,7 +63,7 @@ class _MonthPickerSheetState extends State<_MonthPickerSheet> {
       disableAnimations: MediaQuery.maybeDisableAnimationsOf(context) ?? false,
     );
     final years = [
-      for (var year = now.year - 5; year <= now.year + 1; year++) year,
+      for (var year = now.year - 2; year <= now.year + 2; year++) year,
     ];
 
     return SheetScaffold(
@@ -105,7 +106,7 @@ class _MonthPickerSheetState extends State<_MonthPickerSheet> {
             physics: const NeverScrollableScrollPhysics(),
             mainAxisSpacing: 8,
             crossAxisSpacing: 8,
-            childAspectRatio: 2.1,
+            childAspectRatio: 1.8,
             children: [
               for (var month = 1; month <= 12; month++)
                 Pressable(

@@ -23,7 +23,10 @@ class _HeaderGlass extends StatelessWidget {
     final quality =
         GlassQualityScope.maybeOf(context) ?? GlassDeviceTier.instance.quality;
     final plain = quality == GlassQuality.plain;
-    final bandCount = reduceEffects ? 3 : (plain ? 5 : 7);
+    // 每一档都是一次独立的 BackdropFilter 采样。4 档已经足够做出
+    // 「顶部清晰、向下化开」的渐进模糊；继续堆到 7 档会增加 GPU 采样，
+    // 在滚动时几乎看不出差别。
+    final bandCount = reduceEffects ? 2 : (plain ? 3 : 4);
     final maxSigma = reduceEffects ? 12.0 : (plain ? 15.0 : 20.0);
     final opaque = MediaQuery.of(context).highContrast;
     if (opaque) return ColoredBox(color: colors.page);

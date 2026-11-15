@@ -7,6 +7,7 @@ import '../../state/app_controller.dart';
 import '../../ui/pinned_header.dart';
 import '../../ui/widgets.dart';
 import '../../ui/dialog.dart';
+import 'theme_page.dart';
 
 /// 使用设置：深色模式、大字、动效、清空数据。
 class SettingsPage extends ConsumerStatefulWidget {
@@ -48,35 +49,18 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         GlassCard(
-                          padding: const EdgeInsets.all(Gaps.lg),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                '外观',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: colors.text2,
-                                ),
-                              ),
-                              const SizedBox(height: Gaps.md),
-                              Segmented<ThemeMode>(
-                                values: const [
-                                  ThemeMode.system,
-                                  ThemeMode.light,
-                                  ThemeMode.dark,
-                                ],
-                                selected: settings.themeMode,
-                                labelOf: (mode) => switch (mode) {
-                                  ThemeMode.system => '跟随系统',
-                                  ThemeMode.light => '浅色',
-                                  ThemeMode.dark => '深色',
-                                },
-                                onChanged: (mode) =>
-                                    settings.setThemeMode(mode),
-                              ),
-                            ],
+                          padding: const EdgeInsets.symmetric(
+                            vertical: Gaps.xs,
+                          ),
+                          child: ListRow(
+                            title: '主题与外观',
+                            subtitle: '主题模式、主题色、液态玻璃与文本缩放',
+                            leading: Icon(
+                              Icons.palette_outlined,
+                              color: colors.text2,
+                            ),
+                            showChevron: true,
+                            onTap: () => _openTheme(context),
                           ),
                         ),
                         const SizedBox(height: Gaps.md),
@@ -128,12 +112,18 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                               );
                               if (confirmed != true) return;
                               if (!context.mounted) return;
-                              ref
+                              final cleared = ref
                                   .read(appControllerProvider.notifier)
                                   .clearAll();
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('已清空全部数据')),
+                                  SnackBar(
+                                    content: Text(
+                                      cleared
+                                          ? '已清空全部数据'
+                                          : '本地文件已清空，但新存档写入失败，请重试',
+                                    ),
+                                  ),
                                 );
                               }
                             },
@@ -155,7 +145,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    '时页 TIMEPAGE · 1.6.2',
+                                    '时页 TIMEPAGE · 1.7.1',
                                     style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w600,
@@ -192,6 +182,20 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ],
         );
       },
+    );
+  }
+
+  void _openTheme(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (routeContext) => Scaffold(
+          backgroundColor: routeContext.colors.page,
+          body: SafeArea(
+            top: false,
+            child: ThemePage(onBack: () => Navigator.of(routeContext).pop()),
+          ),
+        ),
+      ),
     );
   }
 }

@@ -213,15 +213,11 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                                 ),
                               ),
                               const SizedBox(height: 20),
-                              FadeTransition(
-                                opacity: CurvedAnimation(
-                                  parent: _entryController,
-                                  curve: const Interval(
-                                    0.48,
-                                    0.94,
-                                    curve: Curves.easeOutCubic,
-                                  ),
-                                ),
+                              _StaggerReveal(
+                                controller: _entryController,
+                                begin: 0.48,
+                                end: 0.94,
+                                offset: 0,
                                 child: _PrivacyNote(muted: muted),
                               ),
                             ],
@@ -516,7 +512,7 @@ class _StartButton extends StatelessWidget {
               gradient: const LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: [Color(0xFF3B82F6), Color(0xFF1748B8)],
+                colors: [Color(0xFF2563EB), Color(0xFF1D4ED8)],
               ),
               border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
               boxShadow: const [
@@ -595,7 +591,7 @@ class _StartButton extends StatelessWidget {
   }
 }
 
-class _StaggerReveal extends StatelessWidget {
+class _StaggerReveal extends StatefulWidget {
   const _StaggerReveal({
     required this.controller,
     required this.begin,
@@ -611,21 +607,62 @@ class _StaggerReveal extends StatelessWidget {
   final Widget child;
 
   @override
-  Widget build(BuildContext context) {
-    final fade = CurvedAnimation(
-      parent: controller,
-      curve: Interval(begin, end, curve: Curves.easeOutCubic),
+  State<_StaggerReveal> createState() => _StaggerRevealState();
+}
+
+class _StaggerRevealState extends State<_StaggerReveal> {
+  late CurvedAnimation _fade;
+  late CurvedAnimation _slideCurve;
+  late Animation<Offset> _slide;
+
+  @override
+  void initState() {
+    super.initState();
+    _buildAnimations();
+  }
+
+  @override
+  void didUpdateWidget(covariant _StaggerReveal oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller ||
+        oldWidget.begin != widget.begin ||
+        oldWidget.end != widget.end ||
+        oldWidget.offset != widget.offset) {
+      _disposeAnimations();
+      _buildAnimations();
+    }
+  }
+
+  void _buildAnimations() {
+    final interval = Interval(
+      widget.begin,
+      widget.end,
+      curve: Curves.easeOutCubic,
     );
-    final slide = Tween<Offset>(begin: Offset(0, offset), end: Offset.zero)
-        .animate(
-          CurvedAnimation(
-            parent: controller,
-            curve: Interval(begin, end, curve: Curves.easeOutCubic),
-          ),
-        );
+    _fade = CurvedAnimation(parent: widget.controller, curve: interval);
+    _slideCurve = CurvedAnimation(parent: widget.controller, curve: interval);
+    _slide = Tween<Offset>(
+      begin: Offset(0, widget.offset),
+      end: Offset.zero,
+    ).animate(_slideCurve);
+  }
+
+  void _disposeAnimations() {
+    _fade.dispose();
+    _slideCurve.dispose();
+  }
+
+  @override
+  void dispose() {
+    _disposeAnimations();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return FadeTransition(
-      opacity: fade,
-      child: SlideTransition(position: slide, child: child),
+      opacity: _fade,
+      child: SlideTransition(position: _slide, child: widget.child),
     );
   }
 }

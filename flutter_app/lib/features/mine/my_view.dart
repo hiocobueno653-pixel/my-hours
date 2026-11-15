@@ -18,6 +18,7 @@ import '../work/wage_panel.dart';
 import 'backup_page.dart';
 import 'settings_page.dart';
 import 'stats_page.dart';
+import 'theme_page.dart';
 
 /// 我的页：数据带 + 功能入口。二级页走 Navigator（返回键与手势由路由负责）。
 class MyView extends ConsumerWidget {
@@ -306,6 +307,18 @@ class MyView extends ConsumerWidget {
                             onTap: () => _push(
                               context,
                               BackupPage(
+                                onBack: () => Navigator.of(context).pop(),
+                              ),
+                            ),
+                          ),
+                          Divider(height: 1, color: colors.divider),
+                          ListRow(
+                            title: '主题与外观',
+                            subtitle: '主题色、液态玻璃、底栏与文本缩放',
+                            showChevron: true,
+                            onTap: () => _push(
+                              context,
+                              ThemePage(
                                 onBack: () => Navigator.of(context).pop(),
                               ),
                             ),

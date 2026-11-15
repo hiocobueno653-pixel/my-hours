@@ -6,7 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/formatters.dart';
 import '../../core/motion.dart';
 import '../../core/theme_tokens.dart';
+import '../../data/constants.dart';
 import '../../data/dates.dart';
+import '../../data/models.dart';
 import '../../data/stats.dart';
 import '../../state/app_controller.dart';
 import '../../ui/pinned_header.dart';
@@ -24,10 +26,11 @@ class StatsPage extends ConsumerStatefulWidget {
 }
 
 class _StatsPageState extends ConsumerState<StatsPage> {
-  static const int _minYear = 2000;
-  static const int _maxYear = 2100;
+  static const int _minYear = minSupportedYear;
+  static const int _maxYear = maxSupportedYear;
 
   late int _year;
+  LedgerType _categoryType = LedgerType.expense;
 
   @override
   void initState() {
@@ -64,8 +67,14 @@ class _StatsPageState extends ConsumerState<StatsPage> {
     final selectedMonth = ref.watch(selectedMonthProvider);
     final categoryMonth =
         '$_year-${(parseMonthKey(selectedMonth)?.month ?? DateTime.now().month).toString().padLeft(2, '0')}';
-    final categories = getMonthCategoryTotals(state.entries, categoryMonth);
-    final maxCategory = categories.isEmpty ? 0.0 : categories.first.total;
+    final allCategories = getMonthCategoryTotals(state.entries, categoryMonth);
+    final categories = allCategories
+        .where((row) => row.type == _categoryType)
+        .toList();
+    final categoryTotal = categories.fold<double>(
+      0,
+      (sum, row) => sum + row.total,
+    );
 
     return Stack(
       children: [
@@ -244,18 +253,30 @@ class _StatsPageState extends ConsumerState<StatsPage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              '${formatMonthLabel(categoryMonth)} 分类占比',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: colors.text2,
-                              ),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    '${formatMonthLabel(categoryMonth)} '
+                                    '${_categoryType == LedgerType.expense ? '支出' : '收入'}分类',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: colors.text2,
+                                    ),
+                                  ),
+                                ),
+                                _CategoryTypeToggle(
+                                  value: _categoryType,
+                                  onChanged: (value) =>
+                                      setState(() => _categoryType = value),
+                                ),
+                              ],
                             ),
                             const SizedBox(height: Gaps.md),
                             if (categories.isEmpty)
                               Text(
-                                '本月还没有账目',
+                                '本月还没有${_categoryType == LedgerType.expense ? '支出' : '收入'}记录',
                                 style: TextStyle(
                                   fontSize: 12.5,
                                   color: colors.text3,
@@ -290,9 +311,15 @@ class _StatsPageState extends ConsumerState<StatsPage> {
                                             row.name,
                                         ],
                                         semanticLabel:
-                                            '${formatMonthLabel(categoryMonth)} 分类占比',
-                                        centerValue: formatAmount(maxCategory),
-                                        centerLabel: categories.first.name,
+                                            '${formatMonthLabel(categoryMonth)} '
+                                            '${_categoryType == LedgerType.expense ? '支出' : '收入'}分类占比',
+                                        centerValue: formatAmount(
+                                          categoryTotal,
+                                        ),
+                                        centerLabel:
+                                            _categoryType == LedgerType.expense
+                                            ? '总支出'
+                                            : '总收入',
                                       ),
                                       const SizedBox(width: Gaps.lg),
                                       Expanded(
@@ -375,6 +402,61 @@ class _StatsPageState extends ConsumerState<StatsPage> {
           child: PinnedSubHeader(title: '年度统计', onBack: widget.onBack),
         ),
       ],
+    );
+  }
+}
+
+class _CategoryTypeToggle extends StatelessWidget {
+  const _CategoryTypeToggle({required this.value, required this.onChanged});
+
+  final LedgerType value;
+  final ValueChanged<LedgerType> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    Widget item(LedgerType type, String label) {
+      final selected = value == type;
+      return Pressable(
+        onTap: () => onChanged(type),
+        shape: Radii.pillShape,
+        child: AnimatedContainer(
+          duration: motionDuration(
+            const Duration(milliseconds: 180),
+            disableAnimations: disable,
+          ),
+          curve: Curves2.out,
+          height: 32,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          alignment: Alignment.center,
+          decoration: ShapeDecoration(
+            color: selected ? colors.primary : Colors.transparent,
+            shape: Radii.pillShape,
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+              color: selected ? colors.onPrimary : colors.text2,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      height: 44,
+      padding: const EdgeInsets.all(4),
+      decoration: ShapeDecoration(color: colors.inset, shape: Radii.pillShape),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          item(LedgerType.expense, '支出'),
+          item(LedgerType.income, '收入'),
+        ],
+      ),
     );
   }
 }

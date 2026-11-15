@@ -1,8 +1,8 @@
 /// 应用状态与全部写操作。
 ///
 /// 与 `src/store/useAppStore.ts` 等价。三条不变量：
-/// 1. **先落盘再 set**：任何写操作都先 `store.save(...)`，成功与否都不改变内存状态
-///    的最终值（失败只记日志），保证 UI 不会显示未持久化的数据；
+/// 1. **写前先判可写、写后必留痕**：隔离态直接拒绝写操作；普通磁盘错误
+///    保留内存状态并显示全局失败条，避免 UI 假装保存成功；
 /// 2. **对账只在写操作内发生**：`syncWageEntries` / `syncWageEntryForDate` 是工资账目
 ///    的唯一来源，UI 不直接改工资账目；
 /// 3. **`HOURS_ONLY` 分支**：只记工时变体不生成、不对账工资账目（结算只是标记）。
@@ -98,13 +98,67 @@ final startupCorruptionProvider = Provider<bool>((ref) => false);
 /// 否则只会觉得数据莫名少了一天。
 final startupRecoveredProvider = Provider<bool>((ref) => false);
 
+@immutable
+class SaveFailure {
+  const SaveFailure({
+    required this.message,
+    required this.quarantined,
+    required this.at,
+  });
+
+  final String message;
+  final bool quarantined;
+  final DateTime at;
+}
+
+class SaveFailureController extends Notifier<SaveFailure?> {
+  @override
+  SaveFailure? build() => null;
+
+  void report({required bool quarantined, String? message}) {
+    final next = SaveFailure(
+      message: message ?? '本地存档写入失败，本次改动仅在内存中。',
+      quarantined: quarantined,
+      at: DateTime.now(),
+    );
+    if (state?.message == next.message &&
+        state?.quarantined == next.quarantined) {
+      return;
+    }
+    state = next;
+  }
+
+  void clear() {
+    if (state != null) state = null;
+  }
+}
+
+final saveFailureProvider =
+    NotifierProvider<SaveFailureController, SaveFailure?>(
+      SaveFailureController.new,
+    );
+
+/// `LocalStore` 的隔离态不是可监听对象；成功清空/导入后显式递增这个版本号，
+/// 让所有读取 `archiveReadOnlyProvider` 的页面重新获取真实状态。
+class StorageRevision extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void bump() => state = state + 1;
+}
+
+final storageRevisionProvider = NotifierProvider<StorageRevision, int>(
+  StorageRevision.new,
+);
+
 /// 存档处于隔离态（主文件与两代备份都不可读）时为 true。
 ///
 /// 此时存储层会拒绝一切普通写入（只有导入备份能写），UI 必须说明原因，
 /// 否则用户只会看到「点了保存，重开就没了」。
-final archiveReadOnlyProvider = Provider<bool>(
-  (ref) => ref.watch(storeProvider).isQuarantined,
-);
+final archiveReadOnlyProvider = Provider<bool>((ref) {
+  ref.watch(storageRevisionProvider);
+  return ref.watch(storeProvider).isQuarantined;
+});
 
 final appControllerProvider = NotifierProvider<AppController, AppState>(
   AppController.new,
@@ -112,16 +166,21 @@ final appControllerProvider = NotifierProvider<AppController, AppState>(
 
 class AppController extends Notifier<AppState> {
   late LocalStore _store;
+  bool _initialized = false;
+  SaveFailure? _pendingSaveFailure;
 
   @override
   AppState build() {
+    _initialized = false;
     _store = ref.read(storeProvider);
     final loaded = ref.read(startupLoadProvider);
     final document = loaded.document;
     if (document == null) {
-      return AppState.empty.copyWith(
+      final state = AppState.empty.copyWith(
         workProfiles: ensureDefaultWorkProfile(const []),
       );
+      _initialized = true;
+      return state;
     }
 
     var state = AppState.fromDocument(document);
@@ -137,24 +196,89 @@ class AppController extends Notifier<AppState> {
         _persist(state);
       }
     }
+    _initialized = true;
+    _flushPendingSaveFailure();
     return state;
   }
 
   /// 落盘。返回是否成功。
   ///
-  /// 失败不阻断内存状态推进（否则一次磁盘错误会让界面反复回滚），
-  /// 但必须留痕：之前丢弃 `save` 的返回值，写盘失败时 UI 仍提示成功。
+  /// 普通磁盘错误不阻断内存状态推进（否则一次磁盘错误会让界面反复回滚），
+  /// 但会把失败写进 [saveFailureProvider]，由根布局常驻提示并允许重试。
+  /// 隔离态则在写入口就被 [_writeBlocked] 拦下，避免 UI 显示一份永远
+  /// 不可能落盘的数据。
   bool _persist(AppState next, {bool overrideQuarantine = false}) {
     final ok = _store.save(
       next.toDocument(),
       overrideQuarantine: overrideQuarantine,
     );
     if (!ok) {
+      final quarantined = _store.isQuarantined;
+      _reportSaveFailure(
+        quarantined: quarantined,
+        message: quarantined
+            ? '存档损坏，当前为只读。请先导入一份备份。'
+            : '保存失败，本次改动仅在内存中。请检查存储空间后重试。',
+      );
       debugPrint('[my-hours] 本地存储写入失败；本次改动仅在内存中生效');
     } else {
+      if (_initialized) ref.read(saveFailureProvider.notifier).clear();
       // 每天最多留一份；空数据由存储层跳过。
       _store.createDailySnapshot();
     }
+    return ok;
+  }
+
+  void _reportSaveFailure({
+    required bool quarantined,
+    required String message,
+  }) {
+    final failure = SaveFailure(
+      message: message,
+      quarantined: quarantined,
+      at: DateTime.now(),
+    );
+    if (!_initialized) {
+      _pendingSaveFailure = failure;
+      return;
+    }
+    ref
+        .read(saveFailureProvider.notifier)
+        .report(quarantined: failure.quarantined, message: failure.message);
+  }
+
+  void _flushPendingSaveFailure() {
+    final pending = _pendingSaveFailure;
+    if (pending == null) return;
+    _pendingSaveFailure = null;
+    Future.microtask(() {
+      if (!ref.mounted) return;
+      ref
+          .read(saveFailureProvider.notifier)
+          .report(quarantined: pending.quarantined, message: pending.message);
+    });
+  }
+
+  bool get canWrite => !_store.isQuarantined;
+
+  /// 隔离态下不执行任何普通写操作。返回 true 表示本次调用已被拦截。
+  bool _writeBlocked() {
+    if (canWrite) return false;
+    _reportSaveFailure(
+      quarantined: true,
+      message: '存档损坏，当前为只读。请到「我的 → 数据与备份」导入备份。',
+    );
+    return true;
+  }
+
+  /// 用户从常驻失败条点击「重试」时，把当前内存状态再落盘一次。
+  bool retrySave() {
+    if (_store.isQuarantined) {
+      _writeBlocked();
+      return false;
+    }
+    final ok = _persist(state);
+    if (ok) ref.read(saveFailureProvider.notifier).clear();
     return ok;
   }
 
@@ -169,6 +293,7 @@ class AppController extends Notifier<AppState> {
     double? fixedPay,
     bool settled = false,
   }) {
+    if (_writeBlocked()) return;
     var record = WorkDayRecord(
       date: date,
       hours: roundMoney(hours),
@@ -220,6 +345,7 @@ class AppController extends Notifier<AppState> {
 
   /// 删除某天记录，返回被删除的系统工资账目（供撤销恢复）。
   LedgerEntry? deleteDay(String date) {
+    if (_writeBlocked()) return null;
     final nextRecords = [
       for (final record in state.records)
         if (record.date != date) record,
@@ -264,6 +390,7 @@ class AppController extends Notifier<AppState> {
   /// 「已结算但 0 元」这种与工资面板口径矛盾的脏状态（面板按 `pay <= 0`
   /// 过滤，撤销也覆盖不到它）。反向取消始终允许，用来清历史脏标记。
   bool setRecordSettled(String date, bool settled) {
+    if (_writeBlocked()) return false;
     final target = getRecordByDate(state.records, date);
     if (target == null) return false;
     if (settled && recordPay(target, state.workProfiles) <= 0) return false;
@@ -298,6 +425,7 @@ class AppController extends Notifier<AppState> {
   /// 残留的历史 `settled` 标记——否则这类记录永远既不在待结算里，
   /// 也无法被批量撤销命中。
   void settleMonth(String yearMonth, bool settled) {
+    if (_writeBlocked()) return;
     final prefix = '$yearMonth-';
     final nextRecords = dedupeRecords([
       for (final record in state.records)
@@ -322,6 +450,7 @@ class AppController extends Notifier<AppState> {
   // ---- 记账 ----
 
   void saveLedgerEntry(LedgerEntry entry) {
+    if (_writeBlocked()) return;
     final nextEntries = dedupeLedgerEntries([
       for (final item in state.entries)
         if (item.id != entry.id) item,
@@ -334,6 +463,7 @@ class AppController extends Notifier<AppState> {
 
   /// 删除一条账目，返回被删除的条目（供撤销）。
   LedgerEntry? deleteLedgerEntry(String id) {
+    if (_writeBlocked()) return null;
     LedgerEntry? removed;
     for (final entry in state.entries) {
       if (entry.id == id) {
@@ -354,6 +484,7 @@ class AppController extends Notifier<AppState> {
   // ---- 分类 ----
 
   bool addCustomCategory(LedgerType type, String name) {
+    if (_writeBlocked()) return false;
     final trimmed = name.trim();
     final normalized = trimmed.length <= maxCategoryNameLength
         ? trimmed
@@ -380,6 +511,7 @@ class AppController extends Notifier<AppState> {
   }
 
   bool deleteCustomCategory(String id) {
+    if (_writeBlocked()) return false;
     CustomLedgerCategory? target;
     for (final category in state.customCategories) {
       if (category.id == id) {
@@ -410,13 +542,16 @@ class AppController extends Notifier<AppState> {
   /// 「之后改时薪不影响历史工资」由此成立）。未结算记录不固化，
   /// 它们还没付钱，理应跟随新时薪重算。
   bool saveWorkProfile(WorkProfile profile) {
+    if (_writeBlocked()) return false;
     final trimmed = profile.name.trim();
     final normalizedName = trimmed.length <= maxWorkNameLength
         ? trimmed
         : trimmed.substring(0, maxWorkNameLength);
     if (normalizedName.isEmpty) return false;
+    final normalizedKey = normalizedName.toLowerCase();
     final duplicate = state.workProfiles.any(
-      (item) => item.id != profile.id && item.name == normalizedName,
+      (item) =>
+          item.id != profile.id && item.name.toLowerCase() == normalizedKey,
     );
     if (duplicate) return false;
 
@@ -456,6 +591,7 @@ class AppController extends Notifier<AppState> {
   }
 
   void deleteWorkProfile(String id) {
+    if (_writeBlocked()) return;
     if (id == defaultWorkId) return;
     final previousRate = getWorkById(state.workProfiles, id)?.hourlyRate ?? 0;
     // 关联记录归回默认工作；同时把旧价固化到「已结算且无快照」的记录上，
@@ -487,19 +623,22 @@ class AppController extends Notifier<AppState> {
   // ---- 预算 / 全局 ----
 
   void saveBudgetTargets(BudgetTargets targets) {
+    if (_writeBlocked()) return;
     final normalized = normalizeBudgetTargets(targets.toJson());
     final next = state.copyWith(budgetTargets: normalized);
     _persist(next);
     state = next;
   }
 
-  void clearAll() {
+  bool clearAll() {
     _store.clear();
+    ref.read(storageRevisionProvider.notifier).bump();
     final next = AppState.empty.copyWith(
       workProfiles: ensureDefaultWorkProfile(const []),
     );
-    _persist(next);
+    final ok = _persist(next);
     state = next;
+    return ok;
   }
 
   /// 导入备份（调用方已通过 `parseBackupText` 严格校验），返回是否落盘成功。
@@ -512,6 +651,7 @@ class AppController extends Notifier<AppState> {
     final next = resolveImportedState(data);
     final ok = _persist(next, overrideQuarantine: true);
     state = next;
+    ref.read(storageRevisionProvider.notifier).bump();
     return ok;
   }
 }

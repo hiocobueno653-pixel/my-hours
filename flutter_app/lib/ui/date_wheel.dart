@@ -7,6 +7,7 @@ library;
 import 'package:flutter/cupertino.dart';
 
 import '../core/theme_tokens.dart';
+import '../data/constants.dart';
 import '../data/dates.dart';
 import 'sheet.dart';
 import 'widgets.dart';
@@ -15,26 +16,28 @@ import 'widgets.dart';
 Future<String?> showDateWheel(
   BuildContext context, {
   required String initialDate,
+  String? maxDate,
 }) {
   return showAppSheet<String>(
     context: context,
-    builder: (_) => _DateWheelSheet(initialDate: initialDate),
+    builder: (_) => _DateWheelSheet(initialDate: initialDate, maxDate: maxDate),
   );
 }
 
 class _DateWheelSheet extends StatefulWidget {
-  const _DateWheelSheet({required this.initialDate});
+  const _DateWheelSheet({required this.initialDate, this.maxDate});
 
   final String initialDate;
+  final String? maxDate;
 
   @override
   State<_DateWheelSheet> createState() => _DateWheelSheetState();
 }
 
 class _DateWheelSheetState extends State<_DateWheelSheet> {
-  static const _minYear = 2000;
-  static const _maxYear = 2100;
+  static const _minYear = minSupportedYear;
 
+  late final int _maxYear;
   late int _year;
   late int _month;
   late int _day;
@@ -45,6 +48,13 @@ class _DateWheelSheetState extends State<_DateWheelSheet> {
   @override
   void initState() {
     super.initState();
+    final maxParts = widget.maxDate?.split('-');
+    _maxYear = maxParts != null && maxParts.length == 3
+        ? (int.tryParse(maxParts[0]) ?? maxSupportedYear).clamp(
+            _minYear,
+            maxSupportedYear,
+          )
+        : maxSupportedYear;
     final parts = widget.initialDate.split('-').map(int.parse).toList();
     _year = parts[0].clamp(_minYear, _maxYear);
     _month = parts[1].clamp(1, 12);
@@ -72,6 +82,19 @@ class _DateWheelSheetState extends State<_DateWheelSheet> {
       if (!mounted || !_dayCtrl.hasClients) return;
       _dayCtrl.jumpToItem(target - 1);
     });
+  }
+
+  String get _selectedDate =>
+      '${_year.toString().padLeft(4, '0')}-'
+      '${_month.toString().padLeft(2, '0')}-'
+      '${_day.toString().padLeft(2, '0')}';
+
+  void _confirm() {
+    final maxDate = widget.maxDate;
+    final value = maxDate != null && _selectedDate.compareTo(maxDate) > 0
+        ? maxDate
+        : _selectedDate;
+    Navigator.of(context).pop(value);
   }
 
   @override
@@ -120,7 +143,7 @@ class _DateWheelSheetState extends State<_DateWheelSheet> {
 
     return SheetScaffold(
       title: '选择日期',
-      maxHeightFactor: 0.55,
+      maxHeightFactor: 0.72,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -170,11 +193,7 @@ class _DateWheelSheetState extends State<_DateWheelSheet> {
                 child: PrimaryButton(
                   label: '确定',
                   expand: true,
-                  onPressed: () => Navigator.of(context).pop(
-                    '${_year.toString().padLeft(4, '0')}-'
-                    '${_month.toString().padLeft(2, '0')}-'
-                    '${_day.toString().padLeft(2, '0')}',
-                  ),
+                  onPressed: _confirm,
                 ),
               ),
             ],

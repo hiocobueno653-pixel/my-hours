@@ -37,12 +37,12 @@ class _BudgetPanelSheetState extends ConsumerState<BudgetPanelSheet> {
     final targets = ref.read(budgetTargetsProvider);
     _budget = TextEditingController(
       text: targets.monthlyExpenseBudget > 0
-          ? formatAmount(targets.monthlyExpenseBudget)
+          ? formatAmountInput(targets.monthlyExpenseBudget)
           : '',
     );
     _goal = TextEditingController(
       text: targets.monthlyIncomeGoal > 0
-          ? formatAmount(targets.monthlyIncomeGoal)
+          ? formatAmountInput(targets.monthlyIncomeGoal)
           : '',
     );
   }
@@ -55,6 +55,10 @@ class _BudgetPanelSheetState extends ConsumerState<BudgetPanelSheet> {
   }
 
   void _save() {
+    if (ref.read(archiveReadOnlyProvider)) {
+      setState(() => _error = '存档当前为只读，请先导入备份恢复');
+      return;
+    }
     final budget = parseBudgetInput(_budget.text);
     final goal = parseBudgetInput(_goal.text);
     if (budget is! BudgetInputOk) {

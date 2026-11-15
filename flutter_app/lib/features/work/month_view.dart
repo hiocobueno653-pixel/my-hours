@@ -7,6 +7,7 @@ import '../../core/theme_tokens.dart';
 import '../../data/constants.dart';
 import '../../data/dates.dart';
 import '../../data/models.dart';
+import '../../data/profiles.dart';
 import '../../data/records.dart';
 import '../../state/app_controller.dart';
 import '../charts/charts.dart';
@@ -59,7 +60,6 @@ class _MonthViewState extends ConsumerState<MonthView> {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final state = ref.watch(appControllerProvider);
-    final readOnly = ref.watch(archiveReadOnlyProvider);
     final month = ref.watch(selectedMonthProvider);
     final today = todayISO();
     final todayRecord = getRecordByDate(state.records, today);
@@ -128,10 +128,6 @@ class _MonthViewState extends ConsumerState<MonthView> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (readOnly) ...[
-                      const ReadOnlyBanner(),
-                      const SizedBox(height: Gaps.md),
-                    ],
                     if (month == currentMonthKey()) ...[
                       TodayCard(
                         date: today,
@@ -1345,6 +1341,11 @@ Future<void> showDayEditor(
   String date, {
   WorkDayRecord? record,
 }) {
+  final container = ProviderScope.containerOf(context, listen: false);
+  if (container.read(archiveReadOnlyProvider)) {
+    showArchiveReadOnlyMessage(context);
+    return Future<void>.value();
+  }
   return showAppSheet<void>(
     context: context,
     dismissible: false,
@@ -1413,7 +1414,7 @@ class _DayEditorSheetState extends ConsumerState<DayEditorSheet> {
     _initialRemark = record?.remark ?? '';
     _initialFixedPay = record?.fixedPay == null
         ? ''
-        : formatAmount(record!.fixedPay!);
+        : formatAmountInput(record!.fixedPay!);
     _initialWorkId = record?.workId;
     _initialSettled = record?.settled ?? false;
     _hours.text = _initialHours;
@@ -1439,7 +1440,7 @@ class _DayEditorSheetState extends ConsumerState<DayEditorSheet> {
 
   double get _previewPay {
     final state = ref.read(appControllerProvider);
-    final fixed = double.tryParse(_fixedPay.text.trim());
+    final fixed = double.tryParse(normalizeNumericInput(_fixedPay.text));
     final record = WorkDayRecord(
       date: _date,
       hours: _previewHours,
@@ -1461,7 +1462,9 @@ class _DayEditorSheetState extends ConsumerState<DayEditorSheet> {
     }
     final profile = workProfiles.firstWhere(
       (item) => item.id == selectedWorkId,
-      orElse: () => workProfiles.first,
+      orElse: () => workProfiles.isEmpty
+          ? createDefaultWorkProfile()
+          : workProfiles.first,
     );
     return profile.hourlyRate > 0 ? profile.hourlyRate : null;
   }
@@ -1499,7 +1502,7 @@ class _DayEditorSheetState extends ConsumerState<DayEditorSheet> {
       setState(() => _error = '不能记录未来日期');
       return;
     }
-    final fixedText = _fixedPay.text.trim();
+    final fixedText = normalizeNumericInput(_fixedPay.text);
     double? fixedPay;
     if (fixedText.isNotEmpty) {
       final value = double.tryParse(fixedText);

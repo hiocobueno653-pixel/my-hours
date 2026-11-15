@@ -136,6 +136,10 @@ class LocalStore {
   String? _loadSource;
   String? get loadSource => _loadSource;
 
+  /// 上一次成功写入的内容指纹。正常保存路径只对传入文档编码一次，
+  /// 不再为了判断「内容没变」反复读取主文件。
+  String? _lastSavedFingerprint;
+
   /// 存档处于隔离态：主文件与两代备份都不可读，禁止写入。
   bool get isQuarantined => _loadSource == quarantine;
 
@@ -166,6 +170,14 @@ class LocalStore {
   /// 空数据不生成快照；快照不参与启动回退，只能在备份页显式恢复。
   String? createDailySnapshot({DateTime? now, int keep = 7}) {
     if (isQuarantined) return null;
+    final folder = Directory(_snapshotsPath);
+    folder.createSync(recursive: true);
+    final target = File(
+      '${folder.path}/auto-${_dayStamp(now ?? DateTime.now())}.json',
+    );
+    // 今天的快照已经存在时直接返回：不要为了判断而先解析整个主文档。
+    if (target.existsSync()) return target.path;
+
     final main = File(_mainPath);
     if (!main.existsSync()) return null;
     final document = _tryParse(main);
@@ -176,21 +188,14 @@ class LocalStore {
       return null;
     }
 
-    final folder = Directory(_snapshotsPath);
-    folder.createSync(recursive: true);
-    final target = File(
-      '${folder.path}/auto-${_dayStamp(now ?? DateTime.now())}.json',
-    );
-    if (!target.existsSync()) {
-      final tmp = File('${target.path}.tmp');
-      try {
-        if (tmp.existsSync()) tmp.deleteSync();
-        main.copySync(tmp.path);
-        if (target.existsSync()) target.deleteSync();
-        tmp.renameSync(target.path);
-      } on FileSystemException {
-        return null;
-      }
+    final tmp = File('${target.path}.tmp');
+    try {
+      if (tmp.existsSync()) tmp.deleteSync();
+      main.copySync(tmp.path);
+      if (target.existsSync()) target.deleteSync();
+      tmp.renameSync(target.path);
+    } on FileSystemException {
+      return null;
     }
     _pruneAutoSnapshots(keep);
     return target.path;
@@ -379,7 +384,10 @@ class LocalStore {
       final unchanged =
           _loadSource == 'main' &&
           fingerprint != null &&
-          fingerprint == _contentFingerprint(_readJsonMap(File(_mainPath)));
+          (fingerprint == _lastSavedFingerprint ||
+              (_lastSavedFingerprint == null &&
+                  fingerprint ==
+                      _contentFingerprint(_readJsonMap(File(_mainPath)))));
       if (unchanged) return true;
 
       final text = const JsonEncoder.withIndent(null).convert(outgoing);
@@ -416,14 +424,17 @@ class LocalStore {
         tmp.renameSync(_mainPath);
       } on FileSystemException {
         _loadSource = null;
+        _lastSavedFingerprint = null;
         return false;
       }
       // 本次写入成功后 main 就是最新可信副本，后续轮转恢复正常。
       _loadSource = 'main';
+      _lastSavedFingerprint = fingerprint;
       return true;
     } on Object {
       // 写入失败：主文件状态未知，下次保存不再把它当作可信源。
       _loadSource = null;
+      _lastSavedFingerprint = null;
       return false;
     }
   }
@@ -485,6 +496,8 @@ class LocalStore {
     } on FileSystemException {
       // 现场副本清理失败不阻断主文档清理
     }
+    _loadSource = null;
+    _lastSavedFingerprint = null;
   }
 }
 

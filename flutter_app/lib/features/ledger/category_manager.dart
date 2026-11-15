@@ -38,6 +38,10 @@ class _CategoryManagerSheetState extends ConsumerState<CategoryManagerSheet> {
   }
 
   void _add() {
+    if (ref.read(archiveReadOnlyProvider)) {
+      setState(() => _message = '存档当前为只读，请先导入备份恢复');
+      return;
+    }
     final ok = ref
         .read(appControllerProvider.notifier)
         .addCustomCategory(_type, _name.text);
@@ -179,6 +183,10 @@ class _CategoryManagerSheetState extends ConsumerState<CategoryManagerSheet> {
   }
 
   Future<void> _delete(CustomLedgerCategory category) async {
+    if (ref.read(archiveReadOnlyProvider)) {
+      setState(() => _message = '存档当前为只读，请先导入备份恢复');
+      return;
+    }
     final confirmed = await showConfirmDialog(
       context,
       title: '删除「${category.name}」？',

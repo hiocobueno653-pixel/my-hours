@@ -13,6 +13,7 @@ import 'package:fluid_glass/fluid_glass.dart';
 
 import '../core/formatters.dart';
 import '../core/motion.dart';
+import '../core/motion_origin.dart';
 import '../core/theme_tokens.dart';
 
 /// 内容卡：卡片色填充 + 轻投影，不用描边区分层级。
@@ -99,7 +100,10 @@ class _PressableState extends State<Pressable> {
             ? null
             : (_) => setState(() => _pressed = true),
         onTapCancel: () => setState(() => _pressed = false),
-        onTapUp: (_) => setState(() => _pressed = false),
+        onTapUp: (details) {
+          MotionOrigin.record(details.globalPosition);
+          setState(() => _pressed = false);
+        },
         onTap: widget.onTap == null
             ? null
             : () {
@@ -532,18 +536,27 @@ class UndoBar extends StatelessWidget {
           Pressable(
             onTap: onUndo,
             shape: Radii.pillShape,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-              decoration: ShapeDecoration(
-                color: colors.primaryContainer,
-                shape: Radii.pillShape,
-              ),
-              child: Text(
-                '撤销',
-                style: TextStyle(
-                  color: colors.onPrimaryContainer,
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w600,
+            child: SizedBox(
+              width: 64,
+              height: 48,
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 7,
+                  ),
+                  decoration: ShapeDecoration(
+                    color: colors.primaryContainer,
+                    shape: Radii.pillShape,
+                  ),
+                  child: Text(
+                    '撤销',
+                    style: TextStyle(
+                      color: colors.onPrimaryContainer,
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -809,6 +822,9 @@ class ReadOnlyBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    final textColor = colors.isDark
+        ? const Color(0xFFFFDAD6)
+        : const Color(0xFF991B1B);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -819,23 +835,33 @@ class ReadOnlyBanner extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.shield_outlined, size: 18, color: colors.expense),
+          Icon(Icons.shield_outlined, size: 18, color: textColor),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               '存档损坏，当前为只读：改动不会写入磁盘。'
               '请到「我的 → 数据与备份」导入一份备份恢复。',
-              style: TextStyle(
-                fontSize: 12,
-                height: 1.45,
-                color: colors.expense,
-              ),
+              style: TextStyle(fontSize: 12, height: 1.45, color: textColor),
             ),
           ),
         ],
       ),
     );
   }
+}
+
+/// 隔离态下用户仍可能点开写入口；统一给出可操作提示，而不是静默失败。
+void showArchiveReadOnlyMessage(BuildContext context) {
+  final messenger = ScaffoldMessenger.maybeOf(context);
+  messenger
+    ?..hideCurrentSnackBar()
+    ..showSnackBar(
+      const SnackBar(
+        content: Text('存档损坏，当前为只读。请先到「我的 → 数据与备份」导入备份。'),
+        behavior: SnackBarBehavior.floating,
+        duration: Duration(seconds: 4),
+      ),
+    );
 }
 
 class EmptyState extends StatelessWidget {
@@ -958,11 +984,42 @@ class _NumberFieldState extends State<NumberField> {
                     inputFormatters: [
                       if (widget.allowDecimal)
                         TextInputFormatter.withFunction((oldValue, newValue) {
-                          final text = newValue.text;
-                          if (text.isEmpty) return newValue;
-                          return RegExp(r'^\d*\.?\d{0,2}$').hasMatch(text)
-                              ? newValue
-                              : oldValue;
+                          final raw = newValue.text;
+                          final text = raw.replaceAll(RegExp(r'[,\s，]'), '');
+                          if (text.isEmpty) {
+                            return newValue.copyWith(
+                              text: '',
+                              selection: const TextSelection.collapsed(
+                                offset: 0,
+                              ),
+                            );
+                          }
+                          // 多个小数点仍然视为非法输入，保持原值；
+                          // 逗号/空格则是粘贴格式，清洗后继续校验。
+                          if ('.'.allMatches(text).length > 1) return oldValue;
+                          final match = RegExp(r'^(\d*)(?:\.(\d*))?$')
+                              .firstMatch(text);
+                          if (match == null) return oldValue;
+                          final integerPart = match.group(1) ?? '';
+                          final decimalPart = match.group(2);
+                          final cappedInteger = integerPart.length > 9
+                              ? integerPart.substring(0, 9)
+                              : integerPart;
+                          final cappedDecimal = decimalPart == null
+                              ? null
+                              : (decimalPart.length > 2
+                                    ? decimalPart.substring(0, 2)
+                                    : decimalPart);
+                          final cleaned = cappedDecimal == null
+                              ? cappedInteger
+                              : '$cappedInteger.$cappedDecimal';
+                          if (cleaned == raw) return newValue;
+                          return newValue.copyWith(
+                            text: cleaned,
+                            selection: TextSelection.collapsed(
+                              offset: cleaned.length,
+                            ),
+                          );
                         })
                       else
                         FilteringTextInputFormatter.digitsOnly,

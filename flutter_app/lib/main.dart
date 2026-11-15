@@ -9,16 +9,16 @@ import 'package:path_provider/path_provider.dart';
 
 import 'app.dart';
 import 'core/motion.dart';
+import 'core/motion_origin.dart';
 import 'core/settings.dart';
 import 'core/text_scaling.dart';
 import 'core/theme_tokens.dart';
 import 'data/persistence.dart';
 import 'features/onboarding/welcome_screen.dart';
-import 'features/onboarding/loading_screen.dart';
 import 'state/app_controller.dart';
 import 'ui/dialog.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
   SystemChrome.setSystemUIOverlayStyle(
@@ -29,7 +29,11 @@ void main() {
       systemNavigationBarContrastEnforced: false,
     ),
   );
-  runApp(const _BootstrapApp());
+  try {
+    runApp(_buildApp(await _loadBootData()));
+  } on Object {
+    runApp(const _BootFailureApp());
+  }
 }
 
 class _BootData {
@@ -44,113 +48,77 @@ class _BootData {
   final LoadResult startupLoad;
 }
 
-class _BootstrapApp extends StatefulWidget {
-  const _BootstrapApp();
+Future<_BootData> _loadBootData() async {
+  final directoryFuture = getApplicationSupportDirectory();
+  final settingsFuture = AppSettings.load();
+  final directory = await directoryFuture;
+  final settings = await settingsFuture;
+  final store = LocalStore(directory);
+  final startupLoad = store.load();
+  if (startupLoad.status == LoadStatus.ok) {
+    // 打开应用时先留一份「启动现场」，即使当天还没点保存也能回到这里。
+    store.createDailySnapshot();
+  }
 
-  @override
-  State<_BootstrapApp> createState() => _BootstrapAppState();
+  return _BootData(store: store, settings: settings, startupLoad: startupLoad);
 }
 
-class _BootstrapAppState extends State<_BootstrapApp> {
-  late Future<_BootData> _bootFuture;
-  var _loadingMinimumElapsed = false;
+Widget _buildApp(_BootData data) {
+  return ProviderScope(
+    overrides: [
+      storeProvider.overrideWithValue(data.store),
+      startupLoadProvider.overrideWithValue(data.startupLoad),
+      settingsProvider.overrideWithValue(data.settings),
+      startupCorruptionProvider.overrideWithValue(
+        data.startupLoad.status == LoadStatus.corrupted,
+      ),
+      startupRecoveredProvider.overrideWithValue(
+        recoveredFromBackup(data.startupLoad),
+      ),
+    ],
+    child: MyHoursApp(settings: data.settings),
+  );
+}
+
+class _BootFailureApp extends StatefulWidget {
+  const _BootFailureApp();
 
   @override
-  void initState() {
-    super.initState();
-    _bootFuture = _load();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      // 加载页已经显示后再解码品牌图，避免切到欢迎页时字标短暂空白。
-      for (final asset in const [
-        'assets/brand/wordmark.png',
-        'assets/brand/wordmark_dark.png',
-        'assets/brand/app_icon.png',
-      ]) {
-        unawaited(precacheImage(AssetImage(asset), context));
-      }
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      Future<void>.delayed(const Duration(milliseconds: 2000), () {
-        if (mounted) setState(() => _loadingMinimumElapsed = true);
-      });
-    });
-  }
+  State<_BootFailureApp> createState() => _BootFailureAppState();
+}
 
-  Future<_BootData> _load() async {
-    final directoryFuture = getApplicationSupportDirectory();
-    final settingsFuture = AppSettings.load();
-    final directory = await directoryFuture;
-    final settings = await settingsFuture;
-    final store = LocalStore(directory);
-    final startupLoad = store.load();
-    if (startupLoad.status == LoadStatus.ok) {
-      // 打开应用时先留一份「启动现场」，即使当天还没点保存也能回到这里。
-      store.createDailySnapshot();
+class _BootFailureAppState extends State<_BootFailureApp> {
+  bool _retrying = false;
+
+  Future<void> _retry() async {
+    if (_retrying) return;
+    setState(() => _retrying = true);
+    try {
+      final data = await _loadBootData();
+      runApp(_buildApp(data));
+    } on Object {
+      if (mounted) setState(() => _retrying = false);
     }
-
-    return _BootData(
-      store: store,
-      settings: settings,
-      startupLoad: startupLoad,
-    );
   }
 
-  void _retry() {
-    setState(() => _bootFuture = _load());
-  }
-
-  Widget _loadingApp() {
+  @override
+  Widget build(BuildContext context) {
     return MaterialApp(
       title: '时页',
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(AppColors.light, AppTokens.lightTokens),
       darkTheme: buildAppTheme(AppColors.dark, AppTokens.darkTokens),
       themeMode: ThemeMode.system,
-      home: const TimepageLoadingScreen(),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<_BootData>(
-      future: _bootFuture,
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return MaterialApp(
-            title: '时页',
-            debugShowCheckedModeBanner: false,
-            theme: buildAppTheme(AppColors.light, AppTokens.lightTokens),
-            darkTheme: buildAppTheme(AppColors.dark, AppTokens.darkTokens),
-            themeMode: ThemeMode.system,
-            home: _BootErrorScreen(onRetry: _retry),
-          );
-        }
-        final data = snapshot.data;
-        if (data == null || !_loadingMinimumElapsed) return _loadingApp();
-        return ProviderScope(
-          overrides: [
-            storeProvider.overrideWithValue(data.store),
-            startupLoadProvider.overrideWithValue(data.startupLoad),
-            settingsProvider.overrideWithValue(data.settings),
-            startupCorruptionProvider.overrideWithValue(
-              data.startupLoad.status == LoadStatus.corrupted,
-            ),
-            startupRecoveredProvider.overrideWithValue(
-              recoveredFromBackup(data.startupLoad),
-            ),
-          ],
-          child: MyHoursApp(settings: data.settings),
-        );
-      },
+      home: _BootErrorScreen(onRetry: _retry, retrying: _retrying),
     );
   }
 }
 
 class _BootErrorScreen extends StatelessWidget {
-  const _BootErrorScreen({required this.onRetry});
+  const _BootErrorScreen({required this.onRetry, this.retrying = false});
 
   final VoidCallback onRetry;
+  final bool retrying;
 
   @override
   Widget build(BuildContext context) {
@@ -180,7 +148,7 @@ class _BootErrorScreen extends StatelessWidget {
               ),
               const SizedBox(height: 20),
               FilledButton(
-                onPressed: onRetry,
+                onPressed: retrying ? null : onRetry,
                 style: FilledButton.styleFrom(
                   backgroundColor: colors.primary,
                   foregroundColor: colors.onPrimary,
@@ -189,7 +157,7 @@ class _BootErrorScreen extends StatelessWidget {
                     vertical: 12,
                   ),
                 ),
-                child: const Text('重试'),
+                child: Text(retrying ? '正在重试…' : '重试'),
               ),
             ],
           ),
@@ -209,11 +177,30 @@ class MyHoursApp extends StatelessWidget {
     return AnimatedBuilder(
       animation: settings,
       builder: (context, _) {
+        final lightColors = AppColors.light.withAccent(
+          settings.accentColor,
+          isDark: false,
+          style: settings.colorStyle,
+        );
+        final darkColors =
+            (settings.pureBlack ? AppColors.darkPureBlack : AppColors.dark)
+                .withAccent(
+                  settings.accentColor,
+                  isDark: true,
+                  style: settings.colorStyle,
+                  pureBlack: settings.pureBlack,
+                );
         return MaterialApp(
           title: kHoursOnly ? '时页·工时' : '时页',
           debugShowCheckedModeBanner: false,
-          theme: buildAppTheme(AppColors.light, AppTokens.lightTokens),
-          darkTheme: buildAppTheme(AppColors.dark, AppTokens.darkTokens),
+          theme: buildAppTheme(
+            lightColors,
+            AppTokens.lightTokens.copyWith(colors: lightColors),
+          ),
+          darkTheme: buildAppTheme(
+            darkColors,
+            AppTokens.darkTokens.copyWith(colors: darkColors),
+          ),
           themeMode: settings.themeMode,
           // 主题切换是状态变化，不是空间动画；不要整页渐变 200ms。
           themeAnimationDuration: Duration.zero,
@@ -230,6 +217,7 @@ class MyHoursApp extends StatelessWidget {
             final colors = context.colors;
             final reduceEffects =
                 media.disableAnimations || settings.reduceMotion;
+            final glassPreference = settings.glassPreference;
             final appContent = MediaQuery(
               data: media.copyWith(
                 textScaler: AppTextScaler(
@@ -242,6 +230,11 @@ class MyHoursApp extends StatelessWidget {
               ),
               child: child ?? const SizedBox.shrink(),
             );
+            final gestureAwareContent = Listener(
+              behavior: HitTestBehavior.translucent,
+              onPointerDown: (event) => MotionOrigin.record(event.position),
+              child: appContent,
+            );
             // 状态栏图标颜色必须跟随主题，否则深色模式会出现"黑底黑字"。
             return LiquidGlassTheme(
               colors:
@@ -251,8 +244,8 @@ class MyHoursApp extends StatelessWidget {
                     accent: colors.primary,
                     content: colors.text,
                     container: colors.isDark
-                        ? colors.card.withValues(alpha: 0.38)
-                        : Colors.white.withValues(alpha: 0.34),
+                        ? colors.card.withValues(alpha: 0.46)
+                        : Colors.white.withValues(alpha: 0.62),
                     track: colors.inset,
                   ),
               child: AnnotatedRegion<SystemUiOverlayStyle>(
@@ -271,12 +264,18 @@ class MyHoursApp extends StatelessWidget {
                       : Brightness.dark,
                   systemNavigationBarContrastEnforced: false,
                 ),
-                child: reduceEffects
+                child:
+                    reduceEffects || glassPreference == AppGlassPreference.none
                     ? GlassQualityScope(
                         quality: GlassQuality.plain,
-                        child: appContent,
+                        child: gestureAwareContent,
                       )
-                    : appContent,
+                    : glassPreference == AppGlassPreference.extreme
+                    ? GlassQualityScope(
+                        quality: GlassQuality.liquid,
+                        child: gestureAwareContent,
+                      )
+                    : gestureAwareContent,
               ),
             );
           },
@@ -334,6 +333,9 @@ class _AppLaunchGate extends ConsumerWidget {
                   hoursOnly: hoursOnly,
                   largeText: settings.largeText,
                   onLargeTextChanged: settings.setLargeText,
+                  dockStyle: settings.dockStyle,
+                  tabTransition: settings.tabTransition,
+                  glassPreference: settings.glassPreference,
                 )
               : WelcomeScreen(
                   key: const ValueKey('welcome'),

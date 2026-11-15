@@ -48,7 +48,12 @@ YearMonth? parseMonthKey(String key) {
   if (match == null) return null;
   final year = int.parse(match.group(1)!);
   final month = int.parse(match.group(2)!);
-  if (year < 1 || month < 1 || month > 12) return null;
+  if (year < minSupportedYear ||
+      year > maxSupportedYear ||
+      month < 1 ||
+      month > 12) {
+    return null;
+  }
   return YearMonth(year, month);
 }
 
@@ -121,6 +126,7 @@ bool isValidDateISO(String value) {
   final year = int.parse(parts[0]);
   final month = int.parse(parts[1]);
   final day = int.parse(parts[2]);
+  if (year < minSupportedYear || year > maxSupportedYear) return false;
   if (month < 1 || month > 12) return false;
   return day >= 1 && day <= daysInMonth(year, month);
 }

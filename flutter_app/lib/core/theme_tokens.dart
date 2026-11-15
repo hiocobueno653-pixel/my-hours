@@ -8,6 +8,9 @@ library;
 
 import 'package:flutter/material.dart';
 
+/// 主题色风格。主题页只改变主色及其派生色，不改变语义色。
+enum AppColorStyle { vivid, atmospheric, soft, monochrome }
+
 /// 一套颜色。字段名保留旧版别名，避免页面层大范围改名。
 class AppColors {
   const AppColors({
@@ -66,6 +69,105 @@ class AppColors {
   Color get accentStrong => primary;
   Color get accentSoft => primaryContainer;
 
+  AppColors copyWith({
+    Color? page,
+    Color? card,
+    Color? block,
+    Color? inset,
+    Color? text,
+    Color? text2,
+    Color? text3,
+    Color? divider,
+    Color? outline,
+    Color? primary,
+    Color? onPrimary,
+    Color? primaryContainer,
+    Color? onPrimaryContainer,
+    Color? income,
+    Color? incomeSoft,
+    Color? expense,
+    Color? expenseSoft,
+    Color? warning,
+    Color? warningSoft,
+    List<Color>? chart,
+    bool? isDark,
+  }) {
+    return AppColors(
+      page: page ?? this.page,
+      card: card ?? this.card,
+      block: block ?? this.block,
+      inset: inset ?? this.inset,
+      text: text ?? this.text,
+      text2: text2 ?? this.text2,
+      text3: text3 ?? this.text3,
+      divider: divider ?? this.divider,
+      outline: outline ?? this.outline,
+      primary: primary ?? this.primary,
+      onPrimary: onPrimary ?? this.onPrimary,
+      primaryContainer: primaryContainer ?? this.primaryContainer,
+      onPrimaryContainer: onPrimaryContainer ?? this.onPrimaryContainer,
+      income: income ?? this.income,
+      incomeSoft: incomeSoft ?? this.incomeSoft,
+      expense: expense ?? this.expense,
+      expenseSoft: expenseSoft ?? this.expenseSoft,
+      warning: warning ?? this.warning,
+      warningSoft: warningSoft ?? this.warningSoft,
+      chart: chart ?? this.chart,
+      isDark: isDark ?? this.isDark,
+    );
+  }
+
+  /// 从主题页的强调色派生一整套主色，保留已有的语义色。
+  AppColors withAccent(
+    Color seed, {
+    required bool isDark,
+    AppColorStyle style = AppColorStyle.vivid,
+    bool pureBlack = false,
+  }) {
+    final base = isDark
+        ? (pureBlack ? AppColors.darkPureBlack : AppColors.dark)
+        : AppColors.light;
+    var adjusted = switch (style) {
+      AppColorStyle.vivid => seed,
+      AppColorStyle.atmospheric => Color.lerp(
+        seed,
+        isDark ? const Color(0xFF0B1120) : const Color(0xFFF3F5F9),
+        isDark ? 0.16 : 0.12,
+      )!,
+      AppColorStyle.soft => Color.lerp(
+        seed,
+        isDark ? const Color(0xFF151D2E) : Colors.white,
+        isDark ? 0.20 : 0.26,
+      )!,
+      AppColorStyle.monochrome => HSLColor.fromColor(
+        seed,
+      ).withSaturation(0).toColor(),
+    };
+    if (isDark) {
+      adjusted = Color.lerp(adjusted, Colors.white, 0.24)!;
+    }
+    final container = isDark
+        ? Color.lerp(adjusted, base.inset, 0.72)!
+        : Color.lerp(adjusted, Colors.white, 0.84)!;
+    final onContainer = isDark
+        ? Color.lerp(adjusted, Colors.white, 0.72)!
+        : Color.lerp(adjusted, Colors.black, 0.38)!;
+    final onPrimary = adjusted.computeLuminance() > 0.45
+        ? const Color(0xFF071222)
+        : Colors.white;
+    return base.copyWith(
+      primary: adjusted,
+      onPrimary: onPrimary,
+      primaryContainer: container,
+      onPrimaryContainer: onContainer,
+      chart: [
+        adjusted,
+        Color.lerp(adjusted, Colors.white, isDark ? 0.30 : 0.28)!,
+        ...base.chart.sublist(2),
+      ],
+    );
+  }
+
   static const AppColors light = AppColors(
     page: Color(0xFFF3F5F9),
     card: Color(0xFFFFFFFF),
@@ -108,7 +210,39 @@ class AppColors {
     divider: Color(0x24F8FAFC),
     outline: Color(0xFF94A3B8),
     primary: Color(0xFF6D9EFF),
-    onPrimary: Color(0xFFFFFFFF),
+    // 浅蓝主色上用深色文字，避免白字只有约 2.6:1 的对比度。
+    onPrimary: Color(0xFF071222),
+    primaryContainer: Color(0xFF1E3A8A),
+    onPrimaryContainer: Color(0xFFDBEAFE),
+    income: Color(0xFF34D399),
+    incomeSoft: Color(0xFF064E3B),
+    expense: Color(0xFFF87171),
+    expenseSoft: Color(0xFF7F1D1D),
+    warning: Color(0xFFFBBF24),
+    warningSoft: Color(0xFF78350F),
+    chart: [
+      Color(0xFF6D9EFF),
+      Color(0xFF93C5FD),
+      Color(0xFF34D399),
+      Color(0xFFF87171),
+      Color(0xFFFBBF24),
+      Color(0xFF94A3B8),
+    ],
+    isDark: true,
+  );
+
+  static const AppColors darkPureBlack = AppColors(
+    page: Color(0xFF000000),
+    card: Color(0xFF0B0B0F),
+    block: Color(0xFF15151B),
+    inset: Color(0xFF22222A),
+    text: Color(0xFFF7F7FA),
+    text2: Color(0xFFC4C4CF),
+    text3: Color(0xFF8D8D9B),
+    divider: Color(0x24FFFFFF),
+    outline: Color(0xFF9A9AA8),
+    primary: Color(0xFF6D9EFF),
+    onPrimary: Color(0xFF071222),
     primaryContainer: Color(0xFF1E3A8A),
     onPrimaryContainer: Color(0xFFDBEAFE),
     income: Color(0xFF34D399),
@@ -275,8 +409,12 @@ extension AppTokensX on BuildContext {
 /// 顶到键盘之上，否则列表底部会一直藏在键盘后面。
 double pageBottomInset(BuildContext context) {
   final keyboard = MediaQuery.viewInsetsOf(context).bottom;
-  if (keyboard > 0) return keyboard + 24;
   final system = MediaQuery.paddingOf(context).bottom;
+  if (keyboard > 0) {
+    final keyboardInset = keyboard + 24;
+    final safeInset = system + 24;
+    return keyboardInset > safeInset ? keyboardInset : safeInset;
+  }
   return system + (MediaQuery.sizeOf(context).width >= 720 ? 24 : 104);
 }
 

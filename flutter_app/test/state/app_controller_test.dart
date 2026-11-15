@@ -183,6 +183,32 @@ void main() {
     expect(store.load().status, LoadStatus.ok);
   });
 
+  test('隔离态下普通写操作被拦截，导入恢复后解除只读', () {
+    final store = container.read(storeProvider);
+    store.mainFile.writeAsStringSync('{ broken');
+    store.backupFile.writeAsStringSync('{ broken too');
+    store.oldBackupFile.writeAsStringSync('{ still broken');
+    expect(store.load().status, LoadStatus.corrupted);
+    expect(store.isQuarantined, isTrue);
+
+    ctrl().saveDay('2026-08-14', 8, '只读测试');
+
+    expect(st().records, isEmpty);
+    expect(container.read(saveFailureProvider)?.quarantined, isTrue);
+    expect(container.read(archiveReadOnlyProvider), isTrue);
+
+    expect(
+      ctrl().replaceAll(
+        backup(records: const [WorkDayRecord(date: '2026-08-14', hours: 8)]),
+      ),
+      isTrue,
+    );
+    expect(st().records, hasLength(1));
+    expect(container.read(archiveReadOnlyProvider), isFalse);
+    expect(container.read(saveFailureProvider), isNull);
+    expect(store.load().status, LoadStatus.ok);
+  });
+
   test('保存工时时清掉旧版「同时记收入」，避免账本双计', skip: kHoursOnly ? '只记工时变体不维护账本' : false, () {
     ctrl().replaceAll(
       backup(

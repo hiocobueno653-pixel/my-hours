@@ -7,10 +7,7 @@
 ///   反过来触发 `onPopInvokedWithResult`，形成永远关不掉的递归。
 library;
 
-import 'dart:ui' show ImageFilter;
-
 import 'package:flutter/material.dart';
-import 'package:fluid_glass/fluid_glass.dart';
 
 import '../core/motion.dart';
 import '../core/theme_tokens.dart';
@@ -24,9 +21,6 @@ Future<T?> showAppSheet<T>({
   bool dismissible = true,
 }) {
   final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
-  final quality =
-      GlassQualityScope.maybeOf(context) ?? GlassDeviceTier.instance.quality;
-  final blur = disable || quality == GlassQuality.plain ? 11.0 : 20.0;
   return showGeneralDialog<T>(
     context: context,
     barrierDismissible: false,
@@ -48,12 +42,9 @@ Future<T?> showAppSheet<T>({
                       Navigator.of(sheetContext).pop();
                     }
                   : null,
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
-                child: ColoredBox(
-                  color: Colors.black.withValues(
-                    alpha: dismissible ? 0.18 : 0.24,
-                  ),
+              child: ColoredBox(
+                color: Colors.black.withValues(
+                  alpha: dismissible ? 0.22 : 0.30,
                 ),
               ),
             ),
@@ -298,8 +289,8 @@ class _SheetScaffoldState extends State<SheetScaffold> {
                               onTap: _requestClose,
                               tooltip: '关闭',
                               iconSize: 19,
-                              size: 36,
-                              radius: 18,
+                              size: 44,
+                              radius: 22,
                             ),
                           ],
                         ),

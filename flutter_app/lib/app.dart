@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fluid_glass/fluid_glass.dart';
 
 import 'core/motion.dart';
+import 'core/settings.dart';
 import 'core/theme_tokens.dart';
 import 'features/ledger/ledger_view.dart';
 import 'features/mine/my_view.dart';
@@ -38,11 +39,17 @@ class AppShell extends StatefulWidget {
     required this.hoursOnly,
     required this.largeText,
     required this.onLargeTextChanged,
+    this.dockStyle = AppDockStyle.floating,
+    this.tabTransition = AppTabTransition.slide,
+    this.glassPreference = AppGlassPreference.standard,
   });
 
   final bool hoursOnly;
   final bool largeText;
   final ValueChanged<bool> onLargeTextChanged;
+  final AppDockStyle dockStyle;
+  final AppTabTransition tabTransition;
+  final AppGlassPreference glassPreference;
 
   @override
   State<AppShell> createState() => _AppShellState();
@@ -55,6 +62,7 @@ class _AppShellState extends State<AppShell> {
   Timer? _exitTimer;
   bool _ledgerOpening = false;
   final LayerBackdrop _backdrop = LayerBackdrop(preferPictureReplay: true);
+  final Set<AppTab> _builtTabs = {AppTab.work};
   final Map<AppTab, ScrollController> _tabScrolls = {
     for (final tab in AppTab.values) tab: ScrollController(),
   };
@@ -77,7 +85,10 @@ class _AppShellState extends State<AppShell> {
     if (tab == _tab) return;
     FocusManager.instance.primaryFocus?.unfocus();
     HapticFeedback.selectionClick();
-    setState(() => _tab = tab);
+    setState(() {
+      _tab = tab;
+      _builtTabs.add(tab);
+    });
   }
 
   void _reselectTab() {
@@ -100,7 +111,10 @@ class _AppShellState extends State<AppShell> {
       context,
       listen: false,
     ).read(selectedMonthProvider.notifier).setMonth(targetMonth);
-    setState(() => _tab = AppTab.ledger);
+    setState(() {
+      _tab = AppTab.ledger;
+      _builtTabs.add(AppTab.ledger);
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) {
         _ledgerOpening = false;
@@ -178,10 +192,17 @@ class _AppShellState extends State<AppShell> {
           builder: (context, constraints) {
             final showSidebar = constraints.maxWidth >= 720;
             final showLabels = constraints.maxWidth >= 900;
-            final liquidDock = _liquidDockSupported && !disable && !showSidebar;
+            final liquidDock =
+                widget.glassPreference != AppGlassPreference.none &&
+                (_liquidDockSupported ||
+                    widget.glassPreference == AppGlassPreference.extreme) &&
+                !disable &&
+                !showSidebar;
             final tabView = _FadeTabView(
               tabs: _tabs,
               active: _tab,
+              builtTabs: _builtTabs,
+              slide: widget.tabTransition == AppTabTransition.slide,
               builder: _pageFor,
             );
 
@@ -210,10 +231,26 @@ class _AppShellState extends State<AppShell> {
                       tabs: _tabs,
                       active: _tab,
                       backdrop: _backdrop,
+                      floating: widget.dockStyle == AppDockStyle.floating,
                       onSelect: _selectTab,
                       onReselect: _reselectTab,
                     ),
                   ),
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: showSidebar
+                      ? 16
+                      : (widget.dockStyle == AppDockStyle.floating
+                                ? math.max(
+                                    20.0,
+                                    MediaQuery.paddingOf(context).bottom + 8,
+                                  )
+                                : MediaQuery.paddingOf(context).bottom) +
+                            _AppDock._height +
+                            10,
+                  child: const _SaveStatusBanner(),
+                ),
                 Positioned(
                   top: 0,
                   left: 0,
@@ -295,11 +332,15 @@ class _FadeTabView extends StatelessWidget {
   const _FadeTabView({
     required this.tabs,
     required this.active,
+    required this.builtTabs,
+    required this.slide,
     required this.builder,
   });
 
   final List<AppTab> tabs;
   final AppTab active;
+  final Set<AppTab> builtTabs;
+  final bool slide;
   final Widget Function(AppTab tab) builder;
 
   @override
@@ -310,42 +351,43 @@ class _FadeTabView extends StatelessWidget {
       child: Stack(
         children: [
           for (final tab in tabs)
-            Positioned.fill(
-              child: IgnorePointer(
-                ignoring: tab != active,
-                child: ExcludeSemantics(
-                  excluding: tab != active,
-                  child: ExcludeFocus(
+            if (builtTabs.contains(tab))
+              Positioned.fill(
+                child: IgnorePointer(
+                  ignoring: tab != active,
+                  child: ExcludeSemantics(
                     excluding: tab != active,
-                    child: AnimatedSlide(
-                      offset: tab == active
-                          ? Offset.zero
-                          : Offset(
-                              (tabs.indexOf(tab) - activeIndex).sign * 0.014,
-                              0,
-                            ),
-                      duration: motionDuration(
-                        Timings.short,
-                        disableAnimations: disable,
-                      ),
-                      curve: Curves2.emphasizedDecelerate,
-                      child: AnimatedOpacity(
-                        opacity: tab == active ? 1 : 0,
+                    child: ExcludeFocus(
+                      excluding: tab != active,
+                      child: AnimatedSlide(
+                        offset: !slide || tab == active
+                            ? Offset.zero
+                            : Offset(
+                                (tabs.indexOf(tab) - activeIndex).sign * 0.014,
+                                0,
+                              ),
                         duration: motionDuration(
                           Timings.short,
                           disableAnimations: disable,
                         ),
-                        curve: Curves2.standard,
-                        child: TickerMode(
-                          enabled: tab == active,
-                          child: RepaintBoundary(child: builder(tab)),
+                        curve: Curves2.emphasizedDecelerate,
+                        child: AnimatedOpacity(
+                          opacity: tab == active ? 1 : 0,
+                          duration: motionDuration(
+                            Timings.short,
+                            disableAnimations: disable,
+                          ),
+                          curve: Curves2.standard,
+                          child: TickerMode(
+                            enabled: tab == active,
+                            child: RepaintBoundary(child: builder(tab)),
+                          ),
                         ),
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
         ],
       ),
     );
@@ -361,6 +403,7 @@ class _AppDock extends StatelessWidget {
     required this.tabs,
     required this.active,
     required this.backdrop,
+    required this.floating,
     required this.onSelect,
     required this.onReselect,
   });
@@ -368,6 +411,7 @@ class _AppDock extends StatelessWidget {
   final List<AppTab> tabs;
   final AppTab active;
   final Backdrop backdrop;
+  final bool floating;
   final ValueChanged<AppTab> onSelect;
   final VoidCallback onReselect;
 
@@ -390,7 +434,8 @@ class _AppDock extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
-    final bottom = math.max(20.0, MediaQuery.paddingOf(context).bottom + 8);
+    final safeBottom = MediaQuery.paddingOf(context).bottom;
+    final bottom = floating ? math.max(20.0, safeBottom + 8) : safeBottom;
     final index = tabs.indexOf(active);
     final bar = LiquidBottomTabs(
       selectedTabIndex: index,
@@ -410,10 +455,15 @@ class _AppDock extends StatelessWidget {
     );
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(20, 0, 20, bottom),
+      padding: EdgeInsets.fromLTRB(
+        floating ? 20 : 0,
+        0,
+        floating ? 20 : 0,
+        bottom,
+      ),
       child: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: _maxWidth),
+          constraints: BoxConstraints(maxWidth: floating ? _maxWidth : 720),
           child: LiquidGlassTheme(
             colors:
                 LiquidGlassColors.forBrightness(
@@ -459,6 +509,87 @@ class _DockTabContent extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// 写盘失败/隔离态的全局常驻提示。
+///
+/// 原先 `_persist` 失败只写日志，用户会看到界面已经变了、重启却丢了。
+/// 这里把状态放到 Dock 上方，不遮住顶栏；磁盘错误提供「重试」，隔离态
+/// 则明确指向备份恢复入口。
+class _SaveStatusBanner extends ConsumerWidget {
+  const _SaveStatusBanner();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final failure = ref.watch(saveFailureProvider);
+    final readOnly = ref.watch(archiveReadOnlyProvider);
+    if (failure == null && !readOnly) {
+      return const SizedBox.shrink();
+    }
+    final quarantined = readOnly || (failure?.quarantined ?? false);
+    final colors = context.colors;
+    final message = quarantined
+        ? '存档损坏，当前为只读。请到「我的 → 数据与备份」导入备份。'
+        : (failure?.message ?? '保存失败，本次改动仅在内存中。');
+
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 560),
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: Gaps.lg),
+          padding: const EdgeInsets.fromLTRB(14, 8, 8, 8),
+          decoration: ShapeDecoration(
+            color: colors.expenseSoft,
+            shape: Radii.shape(Radii.md),
+            shadows: context.floatingShadows,
+          ),
+          child: Semantics(
+            liveRegion: true,
+            container: true,
+            child: Row(
+              children: [
+                Icon(
+                  quarantined ? Icons.shield_outlined : Icons.cloud_off_rounded,
+                  size: 18,
+                  color: colors.expense,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    message,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      height: 1.4,
+                      fontWeight: FontWeight.w500,
+                      color: colors.text,
+                    ),
+                  ),
+                ),
+                if (!quarantined) ...[
+                  const SizedBox(width: 6),
+                  SizedBox(
+                    height: 44,
+                    child: TextButton(
+                      onPressed: () =>
+                          ref.read(appControllerProvider.notifier).retrySave(),
+                      style: TextButton.styleFrom(
+                        foregroundColor: colors.text,
+                        backgroundColor: colors.card.withValues(alpha: 0.72),
+                        minimumSize: const Size(48, 44),
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        shape: const StadiumBorder(),
+                      ),
+                      child: const Text('重试'),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

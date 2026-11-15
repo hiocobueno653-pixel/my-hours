@@ -240,6 +240,10 @@ class _WorkManagerSheetState extends ConsumerState<WorkManagerSheet> {
   }
 
   void _add() {
+    if (ref.read(archiveReadOnlyProvider)) {
+      _toast('存档当前为只读，请先导入备份恢复');
+      return;
+    }
     final name = _name.text.trim();
     if (name.isEmpty) return;
     final parsed = parseRateInput(_rate.text);
@@ -280,6 +284,10 @@ class _WorkManagerSheetState extends ConsumerState<WorkManagerSheet> {
   }
 
   void _saveEdit(WorkProfile profile) {
+    if (ref.read(archiveReadOnlyProvider)) {
+      _toast('存档当前为只读，请先导入备份恢复');
+      return;
+    }
     final name = _editName.text.trim();
     if (name.isEmpty) {
       _toast('工作名称不能为空');
@@ -302,6 +310,10 @@ class _WorkManagerSheetState extends ConsumerState<WorkManagerSheet> {
   }
 
   Future<void> _deleteProfile(WorkProfile profile) async {
+    if (ref.read(archiveReadOnlyProvider)) {
+      _toast('存档当前为只读，请先导入备份恢复');
+      return;
+    }
     final confirmed = await showConfirmDialog(
       context,
       title: '删除「${profile.name}」？',

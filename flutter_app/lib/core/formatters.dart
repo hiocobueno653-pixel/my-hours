@@ -8,6 +8,7 @@ import 'package:flutter/painting.dart';
 
 /// 金额：千分位 + 最多两位小数，去掉无意义的 `.0`。
 String formatAmount(double value, {bool withSymbol = false}) {
+  if (!value.isFinite) return withSymbol ? '¥—' : '—';
   final rounded = (value * 100).round() / 100;
   final negative = rounded < 0;
   final abs = rounded.abs();
@@ -26,6 +27,18 @@ String formatAmount(double value, {bool withSymbol = false}) {
   }
   if (negative) text = '-$text';
   return withSymbol ? '¥$text' : text;
+}
+
+/// 编辑框预填：不带千分位，避免把 `1,200` 写进会被整段正则拒绝的输入框。
+///
+/// 展示层用 [formatAmount]，输入层用这个函数；两者职责不同。
+String formatAmountInput(double value) {
+  if (!value.isFinite) return '';
+  final rounded = (value * 100).round() / 100;
+  if (rounded == rounded.roundToDouble()) {
+    return rounded.toInt().toString();
+  }
+  return rounded.toString();
 }
 
 /// 工时：最多两位小数，去掉尾零。

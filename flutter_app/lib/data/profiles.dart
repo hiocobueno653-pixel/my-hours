@@ -26,7 +26,7 @@ class RateInputError extends RateInputResult {
 double _round2(double value) => (value * 100).round() / 100;
 
 RateInputResult parseRateInput(String raw) {
-  final trimmed = raw.trim();
+  final trimmed = normalizeNumericInput(raw);
   if (trimmed.isEmpty) return const RateInputOk(0);
   if (!ratePattern.hasMatch(trimmed)) {
     return const RateInputError('时薪最多两位小数');
@@ -45,8 +45,7 @@ String formatRate(double rate) {
 }
 
 String createWorkProfileId() {
-  final now = DateTime.now().microsecondsSinceEpoch;
-  return 'work-$now-${now % 100000}';
+  return createEntityId('work');
 }
 
 WorkProfile createDefaultWorkProfile({double rate = 0}) => WorkProfile(
@@ -164,7 +163,7 @@ BudgetTargets normalizeBudgetTargets(Object? raw) {
 }
 
 BudgetInputResult parseBudgetInput(String raw) {
-  final trimmed = raw.trim();
+  final trimmed = normalizeNumericInput(raw);
   if (trimmed.isEmpty) return const BudgetInputOk(0);
   if (!amountPattern.hasMatch(trimmed)) {
     return const BudgetInputError('金额最多两位小数');

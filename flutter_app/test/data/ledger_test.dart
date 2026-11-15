@@ -37,6 +37,12 @@ void main() {
       final ok = parseAmountInput('128.50');
       expect((ok as AmountInputOk).amount, 128.5);
 
+      final grouped = parseAmountInput('1,234.56');
+      expect((grouped as AmountInputOk).amount, 1234.56);
+
+      final fullWidthGrouped = parseAmountInput(' 1，200 ');
+      expect((fullWidthGrouped as AmountInputOk).amount, 1200);
+
       expect((parseAmountInput('') as AmountInputError).message, '请填写金额');
       expect(
         (parseAmountInput('1.999') as AmountInputError).message,
@@ -71,6 +77,11 @@ void main() {
       ]);
       expect(deduped.length, 1);
       expect(deduped[0].amount, 999);
+    });
+
+    test('连续创建账目 id 不因同一微秒碰撞', () {
+      final ids = {for (var i = 0; i < 1000; i++) createLedgerEntryId()};
+      expect(ids, hasLength(1000));
     });
 
     test('按月过滤并倒序', () {

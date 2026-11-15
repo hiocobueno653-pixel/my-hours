@@ -36,6 +36,7 @@ android/app/src/hours/assets/
 
 # 临时输出
 test-output.txt
+.codex-attachments/
 
 # 工具运行时目录
 .playwright-mcp/
