@@ -370,7 +370,7 @@ class _BackupPageState extends ConsumerState<BackupPage> {
                                             Text(
                                               '本机安全副本 · ${_snapshotSize(_snapshots[index])}',
                                               style: TextStyle(
-                                                fontSize: 10.5,
+                                                fontSize: TypeScale.micro,
                                                 color: colors.text3,
                                               ),
                                             ),

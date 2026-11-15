@@ -549,7 +549,7 @@ class _YearMetric extends StatelessWidget {
                   padding: const EdgeInsets.only(left: 2, bottom: 1),
                   child: Text(
                     unit,
-                    style: TextStyle(fontSize: 10.5, color: colors.text2),
+                    style: TextStyle(fontSize: TypeScale.micro, color: colors.text2),
                   ),
                 ),
               ],

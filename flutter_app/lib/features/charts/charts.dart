@@ -201,7 +201,7 @@ class _BarPairPainter extends CustomPainter {
         text: TextSpan(
           text: labels[i],
           style: TextStyle(
-            fontSize: 9.5,
+            fontSize: TypeScale.micro,
             color: i == selectedIndex ? selectedLabelColor : labelColor,
             fontWeight: i == selectedIndex ? FontWeight.w600 : FontWeight.w400,
           ),
@@ -294,7 +294,7 @@ class DonutChart extends StatelessWidget {
                   if (centerLabel != null)
                     Text(
                       centerLabel!,
-                      style: TextStyle(fontSize: 10.5, color: tokens.text3),
+                      style: TextStyle(fontSize: TypeScale.micro, color: tokens.text3),
                     ),
                 ],
               ),
@@ -547,7 +547,7 @@ class _TrendPainter extends CustomPainter {
       final tp = TextPainter(
         text: TextSpan(
           text: labels[i],
-          style: TextStyle(fontSize: 9, color: labelColor),
+          style: TextStyle(fontSize: TypeScale.micro, color: labelColor),
         ),
         textDirection: TextDirection.ltr,
       )..layout();

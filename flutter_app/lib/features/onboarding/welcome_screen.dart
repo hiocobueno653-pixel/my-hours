@@ -343,7 +343,7 @@ class _BentoPreview extends StatelessWidget {
                   '示例',
                   style: TextStyle(
                     color: colors.text3,
-                    fontSize: 10,
+                    fontSize: TypeScale.micro,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -423,7 +423,7 @@ class _PreviewMetric extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: foreground.withValues(alpha: 0.72),
-              fontSize: 10.5,
+              fontSize: TypeScale.micro,
               fontWeight: FontWeight.w600,
             ),
           ),

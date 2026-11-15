@@ -5,6 +5,7 @@
 /// 不引入 prism_ui 或其它 GPL 组件。
 library;
 
+import 'dart:async';
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
@@ -16,7 +17,7 @@ import '../core/motion.dart';
 import '../core/motion_origin.dart';
 import '../core/theme_tokens.dart';
 
-/// 内容卡：卡片色填充 + 轻投影，不用描边区分层级。
+/// 内容卡：卡片色填充 + 三层柔和投影 + 1px 细描边。
 class GlassCard extends StatelessWidget {
   const GlassCard({
     super.key,
@@ -25,6 +26,7 @@ class GlassCard extends StatelessWidget {
     this.radius = Radii.card,
     this.onTap,
     this.margin,
+    this.bordered = true,
   });
 
   final Widget child;
@@ -33,9 +35,15 @@ class GlassCard extends StatelessWidget {
   final VoidCallback? onTap;
   final EdgeInsetsGeometry? margin;
 
+  /// 是否绘制 1px 细描边。嵌套卡（卡片里的次级面）关掉，避免描边套描边。
+  final bool bordered;
+
   @override
   Widget build(BuildContext context) {
-    final shape = Radii.shape(radius);
+    final base = Radii.shape(radius);
+    final shape = bordered
+        ? base.copyWith(side: BorderSide(color: context.colors.cardBorder))
+        : base;
     final content = Container(
       padding: padding,
       decoration: ShapeDecoration(
@@ -852,6 +860,91 @@ class AnimatedMonthLabel extends StatelessWidget {
         textAlign: textAlign,
         style: style,
       ),
+    );
+  }
+}
+
+/// 入场动效：从下方轻推入位 + 淡入。
+///
+/// 只用于页面首次成形时的「主视觉区块」——错峰 0 / 70 / 140ms 让三层信息
+/// 依次落定，而不是整页一起出现。滚动、切 Tab 回来都不重播（由 State 保活
+/// 保证），所以它不是装饰性循环动画。系统「移除动画」时直接给终态。
+class RevealOnMount extends StatefulWidget {
+  const RevealOnMount({
+    super.key,
+    required this.child,
+    this.delay = Duration.zero,
+    this.duration = const Duration(milliseconds: 380),
+    this.offset = 12,
+  });
+
+  final Widget child;
+  final Duration delay;
+  final Duration duration;
+
+  /// 起始纵向偏移（逻辑像素）。
+  final double offset;
+
+  @override
+  State<RevealOnMount> createState() => _RevealOnMountState();
+}
+
+class _RevealOnMountState extends State<RevealOnMount>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: widget.duration,
+  );
+  late final CurvedAnimation _curve = CurvedAnimation(
+    parent: _controller,
+    curve: Curves2.out,
+  );
+  Timer? _startTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    final disable = WidgetsBinding
+        .instance
+        .platformDispatcher
+        .accessibilityFeatures
+        .disableAnimations;
+    if (disable) {
+      _controller.value = 1;
+      return;
+    }
+    if (widget.delay == Duration.zero) {
+      _controller.forward();
+      return;
+    }
+    _startTimer = Timer(widget.delay, () {
+      if (mounted) _controller.forward();
+    });
+  }
+
+  @override
+  void dispose() {
+    _startTimer?.cancel();
+    _curve.dispose();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _curve,
+      builder: (context, child) {
+        final t = _curve.value;
+        return Opacity(
+          opacity: t,
+          child: Transform.translate(
+            offset: Offset(0, widget.offset * (1 - t)),
+            child: child,
+          ),
+        );
+      },
+      child: widget.child,
     );
   }
 }

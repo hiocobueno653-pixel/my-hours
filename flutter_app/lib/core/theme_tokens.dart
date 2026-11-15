@@ -69,6 +69,11 @@ class AppColors {
   Color get accentStrong => primary;
   Color get accentSoft => primaryContainer;
 
+  /// 卡片极细描边。浅色用 6% 的冷墨色、深色用 7% 白：纯靠投影区分卡片和
+  /// 页面底色时，白卡在冷灰底上边缘是「糊」的，加这一层才有实体边界。
+  Color get cardBorder =>
+      isDark ? const Color(0x12FFFFFF) : const Color(0x0F0F172A);
+
   AppColors copyWith({
     Color? page,
     Color? card,
@@ -335,6 +340,37 @@ abstract final class Radii {
   static RoundedSuperellipseBorder get pillShape => shape(pill);
 }
 
+/// 微排版刻度。
+///
+/// 卡片里曾经出现过 8.5 / 9 / 9.5 / 10 / 10.5 / 11.5 六种「按像素挤出来」的
+/// 字号：每处单独看都合理，放在一起就没有节奏，而且 8.5pt 在手机上已经低于
+/// 可读下限。这里只保留五档，卡片内的角标、单位、说明统一从这里取。
+abstract final class TypeScale {
+  /// 角标 / 图例 / 单位。低于这个值的正文不要出现。
+  static const double micro = 11;
+
+  /// 次级说明（卡片底部的元信息）。
+  static const double caption = 12;
+
+  /// 标签、胶囊按钮。
+  static const double label = 13;
+
+  /// 卡片标题。
+  static const double title = 15;
+
+  /// 正文强调 / 双栏指标金额。
+  static const double body = 17;
+
+  /// 区块标题。
+  static const double section = 20;
+
+  /// 中型指标数字。
+  static const double metric = 24;
+
+  /// 首屏主数字。
+  static const double display = 32;
+}
+
 /// 间距（4pt 刻度）。
 abstract final class Gaps {
   static const double xs = 4;
@@ -370,13 +406,21 @@ class AppTokens extends ThemeExtension<AppTokens> {
   static const AppTokens lightTokens = AppTokens(
     colors: AppColors.light,
     shadows: [
-      BoxShadow(color: Color(0x0D000000), blurRadius: 2, offset: Offset(0, 1)),
-      BoxShadow(color: Color(0x0A000000), blurRadius: 8, offset: Offset(0, 2)),
+      // 贴边：定义轮廓，几乎不扩散
+      BoxShadow(color: Color(0x0A0F172A), blurRadius: 1.5, offset: Offset(0, 1)),
+      // 主体：卡片离底面的高度
       BoxShadow(
-        color: Color(0x17000000),
-        blurRadius: 28,
-        spreadRadius: -6,
-        offset: Offset(0, 12),
+        color: Color(0x0D0F172A),
+        blurRadius: 10,
+        spreadRadius: -2,
+        offset: Offset(0, 4),
+      ),
+      // 环境：大面积柔光，只做氛围不参与塑形
+      BoxShadow(
+        color: Color(0x12101828),
+        blurRadius: 30,
+        spreadRadius: -10,
+        offset: Offset(0, 14),
       ),
     ],
     floatingShadows: [
@@ -392,12 +436,12 @@ class AppTokens extends ThemeExtension<AppTokens> {
   static const AppTokens darkTokens = AppTokens(
     colors: AppColors.dark,
     shadows: [
-      BoxShadow(color: Color(0x80000000), blurRadius: 3, offset: Offset(0, 1)),
+      BoxShadow(color: Color(0x66000000), blurRadius: 2, offset: Offset(0, 1)),
       BoxShadow(
-        color: Color(0x8C000000),
-        blurRadius: 24,
-        spreadRadius: -6,
-        offset: Offset(0, 10),
+        color: Color(0x99000000),
+        blurRadius: 28,
+        spreadRadius: -8,
+        offset: Offset(0, 12),
       ),
     ],
     floatingShadows: [

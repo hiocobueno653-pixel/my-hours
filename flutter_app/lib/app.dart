@@ -806,7 +806,7 @@ class _DockTabContent extends StatelessWidget {
         Text(
           _AppDock._labels[tab]!,
           style: TextStyle(
-            fontSize: 10.5,
+            fontSize: TypeScale.micro,
             height: 1.35,
             fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
             color: selected ? colors.primary : colors.text2,
@@ -992,7 +992,7 @@ class _AppSidebar extends StatelessWidget {
                               Text(
                                 'TIMEPAGE',
                                 style: TextStyle(
-                                  fontSize: 9,
+                                  fontSize: TypeScale.micro,
                                   height: 1.1,
                                   fontWeight: FontWeight.w700,
                                   letterSpacing: 1.5,
@@ -1005,7 +1005,7 @@ class _AppSidebar extends StatelessWidget {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
-                                  fontSize: 10.5,
+                                  fontSize: TypeScale.micro,
                                   height: 1.2,
                                   color: colors.text2,
                                 ),

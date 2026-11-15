@@ -81,19 +81,24 @@ class WorkBentoHeader extends StatelessWidget {
           settlement: settlement,
           onTap: onOpenWage,
         );
+        // 三层信息错峰落定：今日卡 → 月工时 → 月工资，70ms 一档。
+        Widget reveal(int index, Widget child) => RevealOnMount(
+          delay: Duration(milliseconds: 70 * index),
+          child: child,
+        );
         if (compact) {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              today,
+              reveal(0, today),
               const SizedBox(height: Gaps.sm),
               IntrinsicHeight(
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Expanded(child: hours),
+                    Expanded(child: reveal(1, hours)),
                     const SizedBox(width: Gaps.sm),
-                    Expanded(child: salary),
+                    Expanded(child: reveal(2, salary)),
                   ],
                 ),
               ),
@@ -104,16 +109,16 @@ class WorkBentoHeader extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Expanded(flex: 11, child: today),
+              Expanded(flex: 11, child: reveal(0, today)),
               const SizedBox(width: Gaps.sm),
               Expanded(
                 flex: 9,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Expanded(child: hours),
+                    Expanded(child: reveal(1, hours)),
                     const SizedBox(height: Gaps.sm),
-                    Expanded(child: salary),
+                    Expanded(child: reveal(2, salary)),
                   ],
                 ),
               ),
@@ -177,7 +182,7 @@ class _TodayBentoCard extends StatelessWidget {
     return GlassCard(
       key: const ValueKey('today-bento-card'),
       onTap: onOpenToday,
-      padding: const EdgeInsets.fromLTRB(12, 11, 12, 10),
+      padding: const EdgeInsets.fromLTRB(14, 13, 14, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -189,9 +194,10 @@ class _TodayBentoCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: colors.text3,
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w500,
+                    color: colors.text2,
+                    fontSize: TypeScale.caption,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.1,
                   ),
                 ),
               ),
@@ -214,43 +220,48 @@ class _TodayBentoCard extends StatelessWidget {
           const SizedBox(height: 5),
           Row(
             children: [
+              // 状态点与状态文字合成一颗胶囊。原来「点 + 字 + 右侧日期胶囊」
+              // 三件事挤一行，而日期和顶部的「今天 · 周六」是重复信息。
               Container(
-                width: 5,
-                height: 5,
-                decoration: BoxDecoration(
-                  color: statusColor,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 5),
-              Flexible(
-                child: Text(
-                  statusText,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: statusColor,
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                padding: const EdgeInsets.fromLTRB(7, 2.5, 8, 2.5),
                 decoration: ShapeDecoration(
                   color: statusBackground,
                   shape: Radii.pillShape,
                 ),
-                child: Text(
-                  formatDateLabel(date),
-                  style: TextStyle(
-                    color: statusColor,
-                    fontSize: 9.5,
-                    fontWeight: FontWeight.w600,
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 5,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: statusColor,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      statusText,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: statusColor,
+                        fontSize: TypeScale.micro,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
               ),
+              const Spacer(),
+              if (settled)
+                Text(
+                  '工资已入账',
+                  style: TextStyle(
+                    fontSize: TypeScale.micro,
+                    color: colors.text3,
+                  ),
+                ),
             ],
           ),
           const SizedBox(height: 7),
@@ -268,8 +279,8 @@ class _TodayBentoCard extends StatelessWidget {
                         Text(
                           '—',
                           style: TextStyle(
-                            color: colors.text2,
-                            fontSize: 31,
+                            color: colors.text3,
+                            fontSize: TypeScale.display,
                             height: 1,
                             fontWeight: FontWeight.w300,
                           ),
@@ -281,17 +292,20 @@ class _TodayBentoCard extends StatelessWidget {
                               formatHoursValue(value.toDouble()),
                           style: TextStyle(
                             color: colors.primary,
-                            fontSize: 31,
+                            fontSize: TypeScale.display,
                             height: 1,
                             fontWeight: FontWeight.w700,
-                            letterSpacing: -0.04,
+                            letterSpacing: -0.035,
                           ),
                         ),
                       Padding(
                         padding: const EdgeInsets.only(left: 3, bottom: 3),
                         child: Text(
                           '小时',
-                          style: TextStyle(fontSize: 10.5, color: colors.text3),
+                          style: TextStyle(
+                            fontSize: TypeScale.micro,
+                            color: colors.text3,
+                          ),
                         ),
                       ),
                     ],
@@ -310,7 +324,7 @@ class _TodayBentoCard extends StatelessWidget {
                         formatter: (value) => formatAmount(value.toDouble()),
                         style: TextStyle(
                           color: colors.income,
-                          fontSize: 15,
+                          fontSize: TypeScale.title,
                           fontWeight: FontWeight.w700,
                           letterSpacing: -0.02,
                         ),
@@ -318,7 +332,10 @@ class _TodayBentoCard extends StatelessWidget {
                     ),
                     Text(
                       '今日工资',
-                      style: TextStyle(fontSize: 9, color: colors.text3),
+                      style: TextStyle(
+                        fontSize: TypeScale.micro,
+                        color: colors.text3,
+                      ),
                     ),
                   ],
                 ),
@@ -365,14 +382,17 @@ class _TodayBentoCard extends StatelessWidget {
                     entryCount == 0 ? '今天还没有账目' : '今天 $entryCount 笔账目',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 9.5, color: colors.text3),
+                    style: TextStyle(
+                      fontSize: TypeScale.micro,
+                      color: colors.text3,
+                    ),
                   ),
                 ),
                 if (income > 0)
                   Text(
                     '+${formatAmount(income)}',
                     style: TextStyle(
-                      fontSize: 9.5,
+                      fontSize: TypeScale.micro,
                       fontWeight: FontWeight.w600,
                       color: colors.income,
                       fontFeatures: tabularFigures,
@@ -384,7 +404,7 @@ class _TodayBentoCard extends StatelessWidget {
                   Text(
                     '-${formatAmount(expense)}',
                     style: TextStyle(
-                      fontSize: 9.5,
+                      fontSize: TypeScale.micro,
                       fontWeight: FontWeight.w600,
                       color: colors.expense,
                       fontFeatures: tabularFigures,
@@ -422,7 +442,7 @@ class _QuickHoursChip extends StatelessWidget {
           shape: Radii.pillShape,
           pressedScale: 0.96,
           child: Container(
-            height: 28,
+            height: 30,
             alignment: Alignment.center,
             decoration: ShapeDecoration(
               color: colors.inset,
@@ -434,7 +454,7 @@ class _QuickHoursChip extends StatelessWidget {
               overflow: TextOverflow.fade,
               style: TextStyle(
                 color: colors.text2,
-                fontSize: 10,
+                fontSize: TypeScale.label,
                 fontWeight: FontWeight.w600,
                 fontFeatures: tabularFigures,
               ),
@@ -469,7 +489,7 @@ class _MonthHoursBentoCard extends StatelessWidget {
         : (summary.workDays / workdays).clamp(0.0, 1.0);
     return GlassCard(
       onTap: onTap,
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      padding: const EdgeInsets.fromLTRB(14, 13, 14, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -479,7 +499,7 @@ class _MonthHoursBentoCard extends StatelessWidget {
                 '本月工时',
                 style: TextStyle(
                   color: colors.text2,
-                  fontSize: 10.5,
+                  fontSize: TypeScale.micro,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -499,7 +519,7 @@ class _MonthHoursBentoCard extends StatelessWidget {
                   formatter: (value) => formatHoursValue(value.toDouble()),
                   style: TextStyle(
                     color: colors.primary,
-                    fontSize: 22,
+                    fontSize: TypeScale.metric,
                     height: 1,
                     fontWeight: FontWeight.w700,
                     letterSpacing: -0.03,
@@ -509,7 +529,7 @@ class _MonthHoursBentoCard extends StatelessWidget {
                   padding: const EdgeInsets.only(left: 2, bottom: 2),
                   child: Text(
                     'h',
-                    style: TextStyle(fontSize: 10, color: colors.text3),
+                    style: TextStyle(fontSize: TypeScale.micro, color: colors.text3),
                   ),
                 ),
               ],
@@ -522,7 +542,7 @@ class _MonthHoursBentoCard extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: colors.text2,
-              fontSize: 9.5,
+              fontSize: TypeScale.micro,
               fontFeatures: tabularFigures,
             ),
           ),
@@ -536,7 +556,7 @@ class _MonthHoursBentoCard extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: deltaColor ?? colors.text3,
-                fontSize: 8.5,
+                fontSize: TypeScale.micro,
                 fontWeight: FontWeight.w500,
                 fontFeatures: tabularFigures,
               ),
@@ -566,7 +586,7 @@ class _MonthSalaryBentoCard extends StatelessWidget {
     final colors = context.colors;
     return GlassCard(
       onTap: onTap,
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      padding: const EdgeInsets.fromLTRB(14, 13, 14, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -576,7 +596,7 @@ class _MonthSalaryBentoCard extends StatelessWidget {
                 kHoursOnly ? '本月出勤' : '本月工资',
                 style: TextStyle(
                   color: colors.text2,
-                  fontSize: 10.5,
+                  fontSize: TypeScale.micro,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -598,7 +618,7 @@ class _MonthSalaryBentoCard extends StatelessWidget {
                       : formatAmount(value.toDouble()),
                   style: TextStyle(
                     color: kHoursOnly ? colors.income : colors.warning,
-                    fontSize: 20,
+                    fontSize: TypeScale.metric,
                     height: 1,
                     fontWeight: FontWeight.w700,
                     letterSpacing: -0.03,
@@ -608,7 +628,7 @@ class _MonthSalaryBentoCard extends StatelessWidget {
                   padding: const EdgeInsets.only(left: 2, bottom: 2),
                   child: Text(
                     kHoursOnly ? '天' : '元',
-                    style: TextStyle(fontSize: 9.5, color: colors.text3),
+                    style: TextStyle(fontSize: TypeScale.micro, color: colors.text3),
                   ),
                 ),
               ],
@@ -623,7 +643,7 @@ class _MonthSalaryBentoCard extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: colors.text2,
-              fontSize: 9.5,
+              fontSize: TypeScale.micro,
               fontFeatures: tabularFigures,
             ),
           ),

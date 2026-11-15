@@ -71,6 +71,18 @@ $env:FLUTTER_STORAGE_BASE_URL='https://storage.flutter-io.cn'
 同 applicationId + 同签名 + versionCode 递增 = 可覆盖升级，用户不必换包迁移。
 缺文件时 release 构建直接失败，不回落到 debug 签名；本地试跑请用 `--debug`。
 
+### 视觉评审截图
+
+`test/_shots_test.dart` 把真实页面（记工 / 记账 / 我的，亮色与暗色）渲染成
+PNG，用系统字体、带一份示例数据。默认跳过，不参与 CI：
+
+```powershell
+$env:CAPTURE_SHOTS='1'
+& 'E:	oolslutterinlutter.bat' test test/_shots_test.dart
+```
+
+产物在 `flutter_app/shots/`（已忽略入库），用于人工比对排版、配色与层级。
+
 ## 数据与迁移
 
 - 存储：应用私有目录下的 `my-hours.json`，原子写 + `.bak`/`.bak.1` 三代轮转。

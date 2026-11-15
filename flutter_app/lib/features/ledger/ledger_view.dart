@@ -646,7 +646,14 @@ class _BalanceCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: Gaps.sm),
-          Text('结余', style: TextStyle(fontSize: 11.5, color: colors.text3)),
+          Text(
+            month == currentMonthKey() ? '本月结余' : '当月结余',
+            style: TextStyle(
+              fontSize: TypeScale.caption,
+              fontWeight: FontWeight.w500,
+              color: colors.text3,
+            ),
+          ),
           const SizedBox(height: 4),
           FittedBox(
             fit: BoxFit.scaleDown,
@@ -654,28 +661,36 @@ class _BalanceCard extends StatelessWidget {
             child: Text(
               formatAmount(summary.balance),
               style: TextStyle(
-                fontSize: 34,
-                height: 1,
+                fontSize: TypeScale.display,
+                height: 1.05,
                 fontWeight: FontWeight.w700,
-                letterSpacing: -0.04,
+                letterSpacing: -0.03,
                 color: summary.balance >= 0 ? colors.text : colors.expense,
                 fontFeatures: tabularFigures,
               ),
             ),
           ),
           const SizedBox(height: Gaps.lg),
+          // 收入 / 支出等宽双栏，中间一条 1px 细线做分隔：
+          // 原来两个指标左对齐挤在一起，金额位数一变就对不齐。
           Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              _SideMetric(
-                label: '收入',
-                value: summary.income,
-                color: colors.income,
+              Expanded(
+                child: _SideMetric(
+                  label: '收入',
+                  value: summary.income,
+                  color: colors.income,
+                ),
               ),
-              const SizedBox(width: Gaps.xl),
-              _SideMetric(
-                label: '支出',
-                value: summary.expense,
-                color: colors.expense,
+              Container(width: 1, height: 32, color: colors.cardBorder),
+              const SizedBox(width: Gaps.lg),
+              Expanded(
+                child: _SideMetric(
+                  label: '支出',
+                  value: summary.expense,
+                  color: colors.expense,
+                ),
               ),
             ],
           ),
@@ -715,13 +730,22 @@ class _SideMetric extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: TextStyle(fontSize: 11.5, color: colors.text2)),
-        const SizedBox(height: 2),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: TypeScale.micro,
+            fontWeight: FontWeight.w500,
+            color: colors.text3,
+          ),
+        ),
+        const SizedBox(height: 3),
         Text(
           formatAmount(value),
           style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
+            fontSize: TypeScale.body,
+            height: 1.1,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.02,
             color: color,
             fontFeatures: tabularFigures,
           ),

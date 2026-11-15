@@ -20,3 +20,6 @@ android/keystore.properties
 # IDE
 .idea/
 .vscode/
+
+# 本地视觉评审截图（test/_shots_test.dart 产出，不入库）
+shots/

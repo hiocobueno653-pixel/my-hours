@@ -73,7 +73,7 @@ class TimepageLoadingScreen extends StatelessWidget {
                         color: colors.primary.withValues(
                           alpha: dark ? 0.82 : 0.78,
                         ),
-                        fontSize: 10.5,
+                        fontSize: TypeScale.micro,
                         fontWeight: FontWeight.w700,
                         letterSpacing: 1.2,
                       ),

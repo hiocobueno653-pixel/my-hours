@@ -575,7 +575,7 @@ class TodayCard extends StatelessWidget {
                         child: Text(
                           '已结算',
                           style: TextStyle(
-                            fontSize: 10.5,
+                            fontSize: TypeScale.micro,
                             fontWeight: FontWeight.w600,
                             color: colors.warning,
                           ),
@@ -594,7 +594,7 @@ class TodayCard extends StatelessWidget {
                         child: Text(
                           '待记录',
                           style: TextStyle(
-                            fontSize: 10.5,
+                            fontSize: TypeScale.micro,
                             fontWeight: FontWeight.w600,
                             color: colors.text3,
                           ),
@@ -654,7 +654,7 @@ class TodayCard extends StatelessWidget {
                         ),
                         Text(
                           '今日工资',
-                          style: TextStyle(fontSize: 10.5, color: colors.text3),
+                          style: TextStyle(fontSize: TypeScale.micro, color: colors.text3),
                         ),
                       ],
                     ),
@@ -1036,32 +1036,13 @@ class _CalendarCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final isCurrentMonth = month == currentMonthKey();
     final textScale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.3);
     // MonthDay.weekday 是 0(周日)…6(周六)，日历第一列是周一。
     final leadingBlanks = dates.isEmpty ? 0 : (dates.first.weekday + 6) % 7;
     return GlassCard(
-      padding: const EdgeInsets.fromLTRB(Gaps.md, Gaps.md, Gaps.md, Gaps.lg),
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
       child: Column(
         children: [
-          Row(
-            children: [
-              Text(
-                isCurrentMonth ? '本月日历' : '每日记录',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: colors.text,
-                ),
-              ),
-              const Spacer(),
-              Text(
-                '${dates.length}天 · 点击日期记录',
-                style: TextStyle(fontSize: 11, color: colors.text2),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
           Row(
             children: [
               for (final label in const ['一', '二', '三', '四', '五', '六', '日'])
@@ -1069,7 +1050,12 @@ class _CalendarCard extends StatelessWidget {
                   child: Center(
                     child: Text(
                       label,
-                      style: TextStyle(fontSize: 10.5, color: colors.text3),
+                      style: TextStyle(
+                        fontSize: TypeScale.micro,
+                        fontWeight: FontWeight.w500,
+                        letterSpacing: 0.6,
+                        color: colors.text3,
+                      ),
                     ),
                   ),
                 ),
@@ -1084,8 +1070,8 @@ class _CalendarCard extends StatelessWidget {
             itemCount: leadingBlanks + dates.length,
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 7,
-              mainAxisSpacing: 6,
-              crossAxisSpacing: 2,
+              mainAxisSpacing: 4,
+              crossAxisSpacing: 3,
               // 固定行高而不是按宽度算正方形：窄屏/键盘弹出时 7 列宽度
               // 只有约 44dp，正方形会把日期内容挤爆；50dp 能容纳
               // 日期 + 工时 + 状态点，同时保留足够的纵向触控面积。
@@ -1105,13 +1091,13 @@ class _CalendarCard extends StatelessWidget {
               );
             },
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           Divider(
             height: 1,
             thickness: 1,
-            color: colors.isDark ? colors.divider : const Color(0xFFF1F5F9),
+            color: colors.cardBorder,
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           Row(
             children: [
               _CalendarLegendDot(color: colors.income, label: '收入'),
@@ -1131,7 +1117,7 @@ class _CalendarCard extends StatelessWidget {
                   child: Text(
                     '明细',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: TypeScale.label,
                       fontWeight: FontWeight.w600,
                       color: colors.primary,
                     ),
@@ -1164,7 +1150,7 @@ class _CalendarLegendDot extends StatelessWidget {
           decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
         const SizedBox(width: 4),
-        Text(label, style: TextStyle(fontSize: 10.5, color: colors.text2)),
+        Text(label, style: TextStyle(fontSize: TypeScale.micro, color: colors.text2)),
       ],
     );
   }
@@ -1231,18 +1217,6 @@ class _CalendarCell extends StatelessWidget {
         : isOvertime
         ? colors.warning
         : colors.primary;
-    final statusDot = isSettled
-        ? colors.warning
-        : hasRecord && hours > 0
-        ? colors.primary
-        : null;
-    final detailLine = record == null
-        ? ''
-        : (record!.remark.isNotEmpty
-              ? record!.remark
-              : (record!.fixedPay ?? 0) > 0
-              ? '日薪'
-              : '');
     final selectedGradient = colors.isDark
         ? LinearGradient(
             begin: Alignment.topCenter,
@@ -1305,37 +1279,23 @@ class _CalendarCell extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        '${day.day}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: isToday
-                              ? FontWeight.w700
-                              : FontWeight.w500,
-                          color: dayColor,
-                          fontFeatures: tabularFigures,
-                        ),
-                      ),
-                    ),
-                    if (statusDot != null)
-                      Container(
-                        width: 4,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: statusDot,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                  ],
+                // 日期独占一行、居中：原来左侧日期 + 右侧状态点把
+                // 一格宽度切成两半，数字总是被挤在左边缘。
+                Text(
+                  '${day.day}',
+                  style: TextStyle(
+                    fontSize: 13,
+                    height: 1.1,
+                    fontWeight: isToday ? FontWeight.w700 : FontWeight.w500,
+                    color: dayColor,
+                    fontFeatures: tabularFigures,
+                  ),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 3),
                 AnimatedContainer(
                   duration: const Duration(milliseconds: 180),
                   curve: Curves.easeOutCubic,
-                  height: 18,
+                  height: 20,
                   width: double.infinity,
                   alignment: Alignment.center,
                   decoration: hasRecord
@@ -1350,7 +1310,7 @@ class _CalendarCell extends StatelessWidget {
                           child: Text(
                             isRest ? '休' : formatHoursValue(hours),
                             style: TextStyle(
-                              fontSize: 9.5,
+                              fontSize: TypeScale.micro,
                               fontWeight: FontWeight.w600,
                               color: hoursColor,
                               fontFeatures: tabularFigures,
@@ -1359,26 +1319,14 @@ class _CalendarCell extends StatelessWidget {
                         )
                       : null,
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 3),
                 SizedBox(
-                  height: 11,
+                  height: 6,
                   child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       if (income > 0) _CalendarCellDot(color: colors.income),
                       if (expense > 0) _CalendarCellDot(color: colors.expense),
-                      if (income > 0 || expense > 0) const SizedBox(width: 3),
-                      Expanded(
-                        child: Text(
-                          detailLine,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 8,
-                            height: 1,
-                            color: colors.text3,
-                          ),
-                        ),
-                      ),
                     ],
                   ),
                 ),
@@ -2079,7 +2027,7 @@ class _DetailMetric extends StatelessWidget {
                 padding: const EdgeInsets.only(left: 3, bottom: 2),
                 child: Text(
                   unit,
-                  style: TextStyle(fontSize: 10.5, color: colors.text3),
+                  style: TextStyle(fontSize: TypeScale.micro, color: colors.text3),
                 ),
               ),
             ],

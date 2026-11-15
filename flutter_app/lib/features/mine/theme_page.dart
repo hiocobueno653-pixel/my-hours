@@ -424,7 +424,7 @@ class _ThemePreview extends StatelessWidget {
                           child: Text(
                             '2026年11月',
                             style: TextStyle(
-                              fontSize: 9,
+                              fontSize: TypeScale.micro,
                               fontWeight: FontWeight.w600,
                               color: colors.text2,
                             ),
