@@ -286,12 +286,13 @@ void main() {
     expect(result.document!.budgetTargets.monthlyIncomeGoal, 3000);
   });
 
-  test('本机文档中的非法记录不会被静默读入', () {
+  test('本机文档中的非法记录被逐条跳过并上报数量', () {
     store.mainFile.writeAsStringSync(
       jsonEncode({
         'app': 'my-hours',
         'version': 4,
         'records': [
+          {'date': '2026-11-01', 'hours': 8},
           {'date': 'not-a-date', 'hours': 8},
         ],
         'entries': <Object?>[],
@@ -301,6 +302,10 @@ void main() {
       }),
     );
 
-    expect(store.load().status, LoadStatus.corrupted);
+    final result = store.load();
+    expect(result.status, LoadStatus.ok);
+    expect(result.document!.records, hasLength(1));
+    expect(result.document!.records.single.date, '2026-11-01');
+    expect(result.droppedItems, 1);
   });
 }

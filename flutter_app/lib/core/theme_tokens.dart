@@ -152,10 +152,47 @@ class AppColors {
     final onContainer = isDark
         ? Color.lerp(adjusted, Colors.white, 0.72)!
         : Color.lerp(adjusted, Colors.black, 0.38)!;
-    final onPrimary = adjusted.computeLuminance() > 0.45
-        ? const Color(0xFF071222)
-        : Colors.white;
+    const darkInk = Color(0xFF071222);
+    final darkInkContrast = _contrastRatio(adjusted, darkInk);
+    final whiteContrast = _contrastRatio(adjusted, Colors.white);
+    final onPrimary = darkInkContrast >= whiteContrast ? darkInk : Colors.white;
+    var page = base.page;
+    var card = base.card;
+    var block = base.block;
+    var inset = base.inset;
+    if (!(isDark && pureBlack)) {
+      switch (style) {
+        case AppColorStyle.vivid:
+          break;
+        case AppColorStyle.atmospheric:
+          page = Color.lerp(base.page, adjusted, isDark ? 0.08 : 0.035)!;
+          card = Color.lerp(base.card, adjusted, isDark ? 0.07 : 0.02)!;
+          block = Color.lerp(base.block, adjusted, isDark ? 0.10 : 0.05)!;
+          inset = Color.lerp(base.inset, adjusted, isDark ? 0.12 : 0.07)!;
+          break;
+        case AppColorStyle.soft:
+          page = Color.lerp(
+            base.page,
+            isDark ? Colors.white : Colors.white,
+            isDark ? 0.035 : 0.24,
+          )!;
+          card = Color.lerp(base.card, Colors.white, isDark ? 0.06 : 0.08)!;
+          block = Color.lerp(base.block, Colors.white, isDark ? 0.08 : 0.18)!;
+          inset = Color.lerp(base.inset, Colors.white, isDark ? 0.10 : 0.12)!;
+          break;
+        case AppColorStyle.monochrome:
+          page = isDark ? const Color(0xFF07080A) : const Color(0xFFF1F2F4);
+          card = isDark ? const Color(0xFF121318) : const Color(0xFFFFFFFF);
+          block = isDark ? const Color(0xFF1C1E24) : const Color(0xFFE9EBEF);
+          inset = isDark ? const Color(0xFF282B33) : const Color(0xFFDDE1E7);
+          break;
+      }
+    }
     return base.copyWith(
+      page: page,
+      card: card,
+      block: block,
+      inset: inset,
       primary: adjusted,
       onPrimary: onPrimary,
       primaryContainer: container,
@@ -261,6 +298,14 @@ class AppColors {
     ],
     isDark: true,
   );
+}
+
+double _contrastRatio(Color a, Color b) {
+  final la = a.computeLuminance();
+  final lb = b.computeLuminance();
+  final lighter = la > lb ? la : lb;
+  final darker = la > lb ? lb : la;
+  return (lighter + 0.05) / (darker + 0.05);
 }
 
 /// 圆角。所有容器与胶囊都走超椭圆，不用普通圆角矩形。

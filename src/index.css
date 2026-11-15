@@ -6712,3 +6712,421 @@ input[type="number"] {
 [data-theme='dark'] .app-shell .search-box {
   border-color: rgb(255 255 255 / 8%);
 }
+
+/* ---------- 1+2 Bento 首页 / 日历三层视觉 ---------- */
+.work-bento {
+  display: grid;
+  grid-template-columns: minmax(0, 1.12fr) minmax(0, 0.88fr);
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.work-bento-today,
+.bento-mini-card {
+  background: var(--surface);
+  border: 1px solid rgb(255 255 255 / 88%);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-sm), var(--highlight-card);
+}
+
+.work-bento-today {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 13px 13px 11px;
+}
+
+.bento-today-head,
+.bento-today-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--text-2);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.bento-today-head > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bento-ledger-link {
+  width: 28px;
+  height: 28px;
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: var(--surface-muted);
+  color: var(--text-2);
+  transition: transform var(--dur-press) var(--ease-out), background-color var(--dur-short) var(--ease-out);
+}
+
+.bento-ledger-link:active {
+  transform: scale(0.92);
+  background: var(--accent-soft);
+}
+
+.bento-today-status > i {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--accent);
+}
+
+.bento-today-status > i.recorded { background: var(--accent); }
+.bento-today-status > i.settled { background: #d97706; }
+.bento-today-status > i.empty { background: var(--text-3); }
+
+.bento-edit-button {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 26px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-size: 10.5px;
+  font-weight: 750;
+  transition: transform var(--dur-press) var(--ease-out), background-color var(--dur-short) var(--ease-out);
+}
+
+.bento-edit-button:active {
+  transform: scale(0.95);
+  background: color-mix(in srgb, var(--accent-soft) 76%, var(--accent) 24%);
+}
+
+.bento-hours-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  min-width: 0;
+}
+
+.bento-hours-row > strong {
+  color: var(--accent);
+  font-size: 30px;
+  line-height: 1;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.04em;
+}
+
+.bento-hours-row > small {
+  padding-bottom: 3px;
+  color: var(--text-3);
+  font-size: 10px;
+}
+
+.bento-pay {
+  margin-left: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  min-width: 0;
+}
+
+.bento-pay span {
+  color: var(--text-3);
+  font-size: 9px;
+}
+
+.bento-pay strong {
+  color: var(--income);
+  font-size: 14px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.bento-quick-row {
+  display: flex;
+  gap: 5px;
+}
+
+.bento-quick-row button {
+  flex: 1;
+  min-width: 0;
+  height: 27px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--surface-muted);
+  color: var(--text-2);
+  font-size: 10px;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  transition: transform var(--dur-press) var(--ease-out), background-color var(--dur-short) var(--ease-out);
+}
+
+.bento-quick-row button:active:not(:disabled) {
+  transform: scale(0.95);
+  background: var(--accent-soft);
+}
+
+.bento-quick-row button:disabled {
+  opacity: 0.45;
+}
+
+.bento-today-note {
+  min-height: 10px;
+  margin: 0;
+  overflow: hidden;
+  color: var(--text-3);
+  font-size: 9.5px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.work-bento-today .today-entry-list {
+  margin-top: 2px;
+}
+
+.work-bento-today .today-entry-row {
+  min-height: 30px;
+  padding-block: 4px;
+}
+
+.work-bento-side {
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  gap: 10px;
+  min-width: 0;
+}
+
+.bento-mini-card {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 10px 12px;
+  text-align: left;
+  color: var(--text);
+  transition: transform var(--dur-press) var(--ease-out), border-color var(--dur-short) var(--ease-out);
+}
+
+.bento-mini-card:active {
+  transform: scale(0.975);
+}
+
+.bento-mini-card > span {
+  color: var(--text-2);
+  font-size: 10.5px;
+  font-weight: 650;
+}
+
+.bento-mini-card > strong {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--accent);
+  font-size: 21px;
+  line-height: 1;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bento-mini-card > strong small {
+  margin-left: 1px;
+  color: var(--text-3);
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.bento-mini-card.salary > strong {
+  color: #b45309;
+}
+
+.bento-mini-card > p {
+  max-width: 100%;
+  margin: 0;
+  overflow: hidden;
+  color: var(--text-2);
+  font-size: 9.5px;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bento-mini-card > em {
+  color: var(--income);
+  font-size: 8.5px;
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+}
+
+.bento-mini-card > em.down {
+  color: var(--expense);
+}
+
+.bento-progress {
+  display: block;
+  width: 100%;
+  height: 3px;
+  margin-top: auto;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-muted);
+}
+
+.bento-progress::after {
+  content: '';
+  display: block;
+  width: var(--bento-progress, 0%);
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+
+/* 日历：行距收 6px，未记录只留 3px 淡点，工时按状态着色 */
+.month-view .month-calendar {
+  border-radius: var(--radius-card);
+  padding: 14px 14px 12px;
+}
+
+.month-view .calendar-grid {
+  gap: 6px 4px;
+}
+
+.month-view .calendar-day {
+  min-height: 56px;
+  padding: 4px 2px;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  background: var(--surface-soft);
+}
+
+.month-view .calendar-day.has-record {
+  background: var(--surface);
+  border-color: color-mix(in srgb, var(--border) 58%, transparent);
+}
+
+.month-view .calendar-day.today {
+  background: linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%);
+  border: 1.5px solid #fff;
+  box-shadow:
+    0 4px 10px rgb(37 99 235 / 12%),
+    inset 0 1px 2px #fff;
+}
+
+.month-view .calendar-day.today .day-number {
+  color: var(--accent-strong);
+  background: transparent;
+}
+
+.month-view .calendar-day.today .calendar-hours {
+  color: var(--accent-strong);
+}
+
+.month-calendar .calendar-hours.recorded {
+  color: var(--income);
+}
+
+.month-calendar .calendar-hours.warn {
+  color: #b45309;
+}
+
+.month-calendar .calendar-hours.muted {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 11px;
+}
+
+.calendar-empty-dot {
+  display: block;
+  width: 3px;
+  height: 3px;
+  border-radius: 999px;
+  background: #cbd5e1;
+}
+
+.calendar-settled-mark {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: #d97706;
+}
+
+.month-calendar .calendar-dot.settled-dot {
+  background: #d97706;
+}
+
+.month-calendar .calendar-legend {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 68%, transparent);
+}
+
+[data-theme='dark'] .work-bento-today,
+[data-theme='dark'] .bento-mini-card {
+  border-color: rgb(255 255 255 / 8%);
+  box-shadow: none;
+}
+
+[data-theme='dark'] .bento-mini-card.salary > strong {
+  color: #fbbf24;
+}
+
+[data-theme='dark'] .month-view .calendar-day.has-record {
+  background: color-mix(in srgb, var(--surface) 82%, #fff 4%);
+  border-color: rgb(255 255 255 / 8%);
+}
+
+[data-theme='dark'] .month-view .calendar-day.today {
+  background: linear-gradient(180deg, #17233c 0%, #24375d 100%);
+  border-color: rgb(255 255 255 / 18%);
+  box-shadow:
+    0 6px 14px rgb(0 0 0 / 28%),
+    inset 0 1px 2px rgb(255 255 255 / 10%);
+}
+
+[data-theme='dark'] .calendar-empty-dot {
+  background: rgb(255 255 255 / 22%);
+}
+
+[data-theme='dark'] .month-calendar .calendar-hours.recorded {
+  color: var(--income);
+}
+
+[data-theme='dark'] .month-calendar .calendar-hours.warn,
+[data-theme='dark'] .calendar-settled-mark {
+  color: #fbbf24;
+  background: #fbbf24;
+}
+
+.large-text .work-bento {
+  grid-template-columns: 1fr;
+}
+
+.large-text .work-bento-side {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: none;
+}
+
+@media (max-width: 380px) {
+  .work-bento {
+    grid-template-columns: 1fr;
+  }
+
+  .work-bento-side {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: none;
+  }
+}

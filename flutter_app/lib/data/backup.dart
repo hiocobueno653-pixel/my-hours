@@ -1,8 +1,9 @@
 /// 备份（v1–v4）与 CSV 导出。
 ///
 /// 与 `src/data/backup.ts` 等价。两条不可妥协的规则：
-/// 1. 导入必须**严格阻断**：任一记录/账目/分类/工作归一化失败即整份拒绝，
-///    不做「跳过坏条目继续导入」——那会让用户以为迁移成功而实际少了一半数据。
+/// 1. 导入对单条坏数据容错、对外层结构严格：外层标识/版本/JSON 语法损坏时
+///    整份拒绝；列表中的坏条目跳过并计数。若整份备份没有任何有效条目，
+///    仍然拒绝，避免用「全坏文件」覆盖现有数据。
 /// 2. CSV 必须保留**公式注入防护**（OWASP）：以 `= + @ TAB CR` 或 `-` 开头的
 ///    单元格前置单引号，否则用户备注里的 `=cmd` 会在 Excel 里被当公式执行。
 library;
@@ -88,10 +89,12 @@ ParsedBackupData parseBackupText(String text, {int? byteLength}) {
     throw const BackupParseException('备份包含的账目过多');
   }
   final normalizedRecords = <WorkDayRecord>[];
+  var droppedItems = 0;
   for (final item in recordsRaw) {
     final record = normalizeRecord(item);
     if (record == null) {
-      throw const BackupParseException('备份文件包含无效工时记录');
+      droppedItems++;
+      continue;
     }
     normalizedRecords.add(record);
   }
@@ -103,9 +106,7 @@ ParsedBackupData parseBackupText(String text, {int? byteLength}) {
     throw const BackupParseException('备份文件账目数据格式不正确');
   }
   final normalizedEntries = normalizeLedgerEntries(entriesRaw);
-  if (normalizedEntries.length != entriesRaw.length) {
-    throw const BackupParseException('备份文件包含无效账目');
-  }
+  droppedItems += entriesRaw.length - normalizedEntries.length;
 
   var customCategories = <CustomLedgerCategory>[];
   if (version >= 3) {
@@ -114,9 +115,7 @@ ParsedBackupData parseBackupText(String text, {int? byteLength}) {
       throw const BackupParseException('备份文件缺少自定义分类');
     }
     final normalized = normalizeLedgerCategories(categoriesRaw);
-    if (normalized.length != categoriesRaw.length) {
-      throw const BackupParseException('备份文件包含无效自定义分类');
-    }
+    droppedItems += categoriesRaw.length - normalized.length;
     customCategories = dedupeLedgerCategories(normalized);
   }
 
@@ -127,22 +126,38 @@ ParsedBackupData parseBackupText(String text, {int? byteLength}) {
       throw const BackupParseException('备份文件缺少工作设置');
     }
     final normalized = normalizeWorkProfiles(profilesRaw);
-    if (normalized.length != profilesRaw.length) {
-      throw const BackupParseException('备份文件包含无效工作设置');
-    }
+    droppedItems += profilesRaw.length - normalized.length;
     workProfiles = ensureDefaultWorkProfile(dedupeWorkProfiles(normalized));
   } else {
     // v1–v3 备份默认只有一份默认工作
     workProfiles = ensureDefaultWorkProfile(const []);
   }
 
-  return ParsedBackupData(
+  final result = ParsedBackupData(
     records: dedupeRecords(normalizedRecords),
     entries: dedupeLedgerEntries(normalizedEntries),
     customCategories: customCategories,
     workProfiles: workProfiles,
     budgetTargets: normalizeBudgetTargets(parsed['budgetTargets']),
+    droppedItems: droppedItems,
   );
+  final rawItemCount =
+      recordsRaw.length +
+      entriesRaw.length +
+      (version >= 3 && parsed['customCategories'] is List
+          ? (parsed['customCategories'] as List).length
+          : 0) +
+      (version >= 4 && parsed['workProfiles'] is List
+          ? (parsed['workProfiles'] as List).length
+          : 0);
+  if (rawItemCount > 0 &&
+      result.records.isEmpty &&
+      result.entries.isEmpty &&
+      result.customCategories.isEmpty &&
+      result.workProfiles.length <= 1) {
+    throw const BackupParseException('备份中没有可导入的有效数据');
+  }
+  return result;
 }
 
 Object? _decodeJson(String text) => jsonDecode(text);

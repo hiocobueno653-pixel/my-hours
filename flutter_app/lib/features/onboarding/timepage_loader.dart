@@ -11,10 +11,16 @@ const _wordmarkAspect = 1400 / 303;
 /// 参考视频：先完整停留，再用一条柔和的蓝色笔锋从左向右擦除字标，
 /// 末尾只留下一个笔点；擦除完成后字标重新聚合并循环。
 class TimepageLoader extends StatefulWidget {
-  const TimepageLoader({super.key, this.width = 232, this.color});
+  const TimepageLoader({
+    super.key,
+    this.width = 232,
+    this.color,
+    this.useDarkAsset,
+  });
 
   final double width;
   final Color? color;
+  final bool? useDarkAsset;
 
   @override
   State<TimepageLoader> createState() => _TimepageLoaderState();
@@ -37,7 +43,7 @@ class _TimepageLoaderState extends State<TimepageLoader>
     if (reduce) {
       _controller
         ..stop()
-        ..value = 0;
+        ..value = 0.95;
     } else if (!_controller.isAnimating) {
       _controller.repeat();
     }
@@ -51,7 +57,8 @@ class _TimepageLoaderState extends State<TimepageLoader>
 
   @override
   Widget build(BuildContext context) {
-    final dark = Theme.of(context).brightness == Brightness.dark;
+    final dark =
+        widget.useDarkAsset ?? Theme.of(context).brightness == Brightness.dark;
     final tint = widget.color;
     final asset = dark ? _wordmarkDarkAsset : _wordmarkAsset;
     final color =

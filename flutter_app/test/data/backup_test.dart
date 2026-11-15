@@ -158,30 +158,30 @@ void main() {
           isA<BackupParseException>().having(
             (e) => e.message,
             'message',
-            contains('包含无效工时记录'),
+            contains('没有可导入的有效数据'),
           ),
         ),
       );
-      expect(
-        () => parseBackupText(
-          jsonEncode({
-            'app': 'my-hours',
-            'version': 3,
-            'records': [for (final r in records) r.toJson()],
-            'entries': <Object?>[],
-            'customCategories': <Object?>[
-              {'id': '', 'type': 'expense', 'name': '房租'},
-            ],
-          }),
-        ),
-        throwsA(
-          isA<BackupParseException>().having(
-            (e) => e.message,
-            'message',
-            contains('无效自定义分类'),
-          ),
-        ),
+    });
+
+    test('单条坏记录被跳过，其余有效数据继续导入', () {
+      final parsed = parseBackupText(
+        jsonEncode({
+          'app': 'my-hours',
+          'version': 3,
+          'records': [
+            records.first.toJson(),
+            {'date': 'bad', 'hours': 8, 'remark': ''},
+          ],
+          'entries': <Object?>[],
+          'customCategories': <Object?>[
+            {'id': '', 'type': 'expense', 'name': '房租'},
+          ],
+        }),
       );
+      expect(parsed.records, hasLength(1));
+      expect(parsed.customCategories, isEmpty);
+      expect(parsed.droppedItems, 2);
     });
   });
 

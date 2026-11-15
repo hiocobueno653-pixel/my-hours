@@ -39,6 +39,11 @@ Future<T?> showAppSheet<T>({
         curve: Curves2.out,
         reverseCurve: Curves2.inCurve,
       );
+      final panelFade = CurvedAnimation(
+        parent: animation,
+        curve: const Interval(0, 0.72, curve: Curves.easeOutCubic),
+        reverseCurve: Curves.easeInCubic,
+      );
       return Stack(
         children: [
           Positioned.fill(
@@ -64,7 +69,7 @@ Future<T?> showAppSheet<T>({
           Align(
             alignment: Alignment.bottomCenter,
             child: FadeTransition(
-              opacity: curved,
+              opacity: panelFade,
               child: SlideTransition(
                 position: Tween<Offset>(
                   begin: const Offset(0, 0.08),

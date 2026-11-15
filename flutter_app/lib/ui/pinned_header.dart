@@ -4,7 +4,6 @@
 /// 轮廓，向下逐渐降低透明度，让内容从模糊里化开，而不是露出一个白色圆角块。
 library;
 
-import 'dart:math' as math;
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
@@ -23,11 +22,7 @@ class _HeaderGlass extends StatelessWidget {
     final quality =
         GlassQualityScope.maybeOf(context) ?? GlassDeviceTier.instance.quality;
     final plain = quality == GlassQuality.plain;
-    // 每一档都是一次独立的 BackdropFilter 采样。4 档已经足够做出
-    // 「顶部清晰、向下化开」的渐进模糊；继续堆到 7 档会增加 GPU 采样，
-    // 在滚动时几乎看不出差别。
-    final bandCount = reduceEffects ? 2 : (plain ? 3 : 4);
-    final maxSigma = reduceEffects ? 12.0 : (plain ? 15.0 : 20.0);
+    final sigma = reduceEffects ? 12.0 : (plain ? 15.0 : 20.0);
     final opaque = MediaQuery.of(context).highContrast;
     if (opaque) return ColoredBox(color: colors.page);
 
@@ -46,54 +41,38 @@ class _HeaderGlass extends StatelessWidget {
           stops: [0, 0.80, 1],
         ).createShader(bounds),
         blendMode: BlendMode.dstIn,
-        child: BackdropGroup(
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              Positioned.fill(
-                child: Column(
-                  children: List.generate(bandCount, (index) {
-                    final progress = index / (bandCount - 1);
-                    final sigma = maxSigma * math.pow(1 - progress, 1.05);
-                    return Expanded(
-                      child: RepaintBoundary(
-                        child: ClipRect(
-                          child: sigma < 0.15
-                              ? const SizedBox.expand()
-                              : BackdropFilter.grouped(
-                                  filter: ImageFilter.blur(
-                                    sigmaX: sigma.toDouble(),
-                                    sigmaY: sigma.toDouble(),
-                                  ),
-                                  child: const SizedBox.expand(),
-                                ),
-                        ),
-                      ),
-                    );
-                  }),
-                ),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // 单层原生模糊：分组多次采样在滚动时会缓存上一帧背景，
+            // 顶栏下方出现旧文字残影；一层模糊 + 纵向染色羽化更稳、
+            // 也更省电。
+            Positioned.fill(
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
+                child: const SizedBox.expand(),
               ),
-              Positioned.fill(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        veil.withValues(alpha: colors.isDark ? 0.985 : 0.995),
-                        veil.withValues(alpha: colors.isDark ? 0.975 : 0.99),
-                        veil.withValues(alpha: colors.isDark ? 0.90 : 0.97),
-                        veil.withValues(alpha: colors.isDark ? 0.52 : 0.78),
-                        veil.withValues(alpha: colors.isDark ? 0.18 : 0.32),
-                        veil.withValues(alpha: 0),
-                      ],
-                      stops: const [0, 0.38, 0.70, 0.88, 0.97, 1],
-                    ),
+            ),
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      veil,
+                      veil,
+                      veil,
+                      veil.withValues(alpha: colors.isDark ? 0.78 : 0.86),
+                      veil.withValues(alpha: colors.isDark ? 0.34 : 0.42),
+                      veil.withValues(alpha: 0),
+                    ],
+                    stops: const [0, 0.45, 0.78, 0.88, 0.97, 1],
                   ),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

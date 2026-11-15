@@ -22,9 +22,9 @@ void main() {
 
     expect(find.text('记录时间，记下生活。'), findsOneWidget);
     expect(find.text('把工时、工资与每一笔收支，留在属于你的时间页。'), findsOneWidget);
-    expect(find.text('日历记工'), findsOneWidget);
-    expect(find.text('工资自动核算'), findsOneWidget);
-    expect(find.text('收支与结算'), findsOneWidget);
+    expect(find.text('本周预览'), findsOneWidget);
+    expect(find.text('本地离线'), findsOneWidget);
+    expect(find.text('日工时预设'), findsOneWidget);
     expect(find.text('开始使用'), findsOneWidget);
     expect(tester.takeException(), isNull);
 

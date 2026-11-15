@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:fluid_glass/fluid_glass.dart';
 import 'package:my_hours/app.dart';
 import 'package:my_hours/core/theme_tokens.dart';
 import 'package:my_hours/data/persistence.dart';
@@ -39,11 +38,12 @@ void main() {
       ),
     );
     await tester.pump();
+    await tester.pumpAndSettle();
 
     final scaffold = tester.widget<Scaffold>(find.byType(Scaffold).first);
     expect(scaffold.resizeToAvoidBottomInset, isFalse);
 
-    final dock = find.byType(LiquidBottomTabs);
+    final dock = find.byKey(const ValueKey('app-dock'));
     expect(dock, findsOneWidget);
     final before = tester.getBottomLeft(dock).dy;
 

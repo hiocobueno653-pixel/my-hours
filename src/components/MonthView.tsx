@@ -16,6 +16,7 @@ import {
   getMonthDelta,
   getMonthSummary,
   getRecordByDate,
+  getRecordPay,
   getSettlementSummary,
 } from '../data/records'
 import { getMonthActivities, type DayActivity } from '../data/activity'
@@ -187,6 +188,21 @@ export function MonthView({
     }
   }
 
+  const quickSaveToday = (deltaOrSet: number) => {
+    if (todayRecord?.settled) return
+    const nextHours =
+      !todayRecord ? deltaOrSet : deltaOrSet === 8 ? 8 : todayRecord.hours + deltaOrSet
+    const hours = Math.max(0, Math.min(24, Math.round(nextHours * 100) / 100))
+    useAppStore.getState().saveDay(today, hours, todayRecord?.remark ?? '', {
+      workId: todayRecord?.workId,
+      rate: todayRecord?.rate,
+      fixedPay: todayRecord?.fixedPay,
+      settled: false,
+    })
+    haptic()
+    setSavedMessage('已更新今日工时')
+  }
+
 
   return (
     <div className={`month-view page-enter${HOURS_ONLY ? ' hours-only' : ''}`}>
@@ -248,135 +264,126 @@ export function MonthView({
         </div>
       </header>
 
-      <section className="work-overview" aria-label="月总计">
-        <div className="work-overview-primary">
-          <span>本月总工时</span>
-          <div className="work-overview-number">
-            <strong>{formatHours(summary.totalHours)}</strong>
-            <small>小时</small>
+      {isCurrentMonth ? (
+        <section className="work-bento" aria-label="本月概览">
+          <div className="work-bento-today" role="region" aria-label="今天">
+            <div className="bento-today-head">
+              <span>今天 · 周{weekdayName(new Date(`${today}T00:00:00`).getDay())}</span>
+              {onOpenLedger ? (
+                <button
+                  type="button"
+                  className="bento-ledger-link"
+                  onClick={() => onOpenLedger(today)}
+                  aria-label="今天记一笔账"
+                >
+                  <WalletCards size={15} />
+                </button>
+              ) : null}
+            </div>
+            <div className="bento-today-status">
+              <i className={todayRecord?.settled ? 'settled' : todayRecord ? 'recorded' : 'empty'} />
+              <span>{todayRecord?.settled ? '已结算' : todayRecord ? (todayRecord.hours > 0 ? '已记录' : '休息') : '待记录'}</span>
+              <button
+                type="button"
+                className="bento-edit-button"
+                onClick={() => setEditingDate(today)}
+                aria-label={todayRecord ? '修改记录' : '记工时'}
+              >
+                <PenLine size={15} />
+                {todayRecord ? '修改' : '记工时'}
+              </button>
+            </div>
+            <div className="bento-hours-row">
+              <strong>{todayRecord ? formatHours(todayRecord.hours) : '—'}</strong>
+              <small>小时</small>
+              {HOURS_ONLY ? null : (
+                <div className="bento-pay">
+                  <span>今日工资</span>
+                  <strong>¥{formatMoney(todayRecord ? getRecordPay(todayRecord, workProfiles) : 0)}</strong>
+                </div>
+              )}
+            </div>
+            <div className="bento-quick-row">
+              <button type="button" onClick={() => quickSaveToday(0.5)} disabled={todayRecord?.settled}>＋0.5h</button>
+              <button type="button" onClick={() => quickSaveToday(1)} disabled={todayRecord?.settled}>＋1h</button>
+              <button type="button" onClick={() => quickSaveToday(8)} disabled={todayRecord?.settled}>8h</button>
+            </div>
+            <p className="bento-today-note">{todayRecord?.remark || formatDateLabel(today)}</p>
+            {todayIncome > 0 || todayExpense > 0 ? (
+              <div className="today-entry-list">
+                {todayEntries.map((entry) => (
+                  <button
+                    type="button"
+                    key={entry.id}
+                    className={`today-entry-row ${entry.type}`}
+                    onClick={() => setEditingDate(today)}
+                    aria-label={`今天 ${entry.category} ${entry.type === 'income' ? '收入' : '支出'} ¥${formatMoney(entry.amount)}`}
+                  >
+                    <span className="today-entry-category">{entry.category}</span>
+                    <span className={`today-entry-amount ${entry.type}`}>
+                      {entry.type === 'income' ? '+' : '-'}¥{formatMoney(entry.amount)}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : null}
           </div>
-          {monthDelta ? (
-            <span className={`hero-delta${monthDelta.delta >= 0 ? ' up' : ' down'}`}>
-              {monthDelta.delta >= 0 ? '↑' : '↓'} 比上月 {monthDelta.delta >= 0 ? '+' : ''}{formatHours(monthDelta.delta)} 小时（{monthDelta.delta >= 0 ? '+' : ''}{monthDelta.percent}%）
-            </span>
-          ) : null}
-        </div>
-        <div className="work-overview-details hours-only-layout">
-          {HOURS_ONLY ? null : (
-          <div className="work-overview-pay">
-            <span>待结算</span>
-            <strong>¥{formatMoney(settlement.pending)}</strong>
-            {settlement.total > 0 ? (
-              <small>已结算 ¥{formatMoney(settlement.settled)}</small>
-            ) : summary.workDays > 0 ? (
-              <small className="setup-wage-hint">未设时薪 · 去我的页设置</small>
-            ) : (
-              <small>未设时薪</small>
+          <div className="work-bento-side">
+            <button type="button" className="bento-mini-card" onClick={() => setDetailOpen(true)}>
+              <span>本月工时</span>
+              <strong>{formatHours(summary.totalHours)}<small>h</small></strong>
+              <p>{summary.workDays}天 · 日均 {formatHours(summary.averageHours)}</p>
+              <i className="bento-progress" style={{ '--bento-progress': `${Math.min(100, Math.round((summary.workDays / Math.max(1, new Date(Number(yearMonth.slice(0, 4)), Number(yearMonth.slice(5, 7)), 0).getDate())) * 100))}%` } as CSSProperties} />
+              {monthDelta ? <em className={monthDelta.delta >= 0 ? 'up' : 'down'}>{monthDelta.delta >= 0 ? '↑' : '↓'} {formatHours(Math.abs(monthDelta.delta))}h</em> : null}
+            </button>
+            <button type="button" className="bento-mini-card salary" onClick={() => setDetailOpen(true)}>
+              <span>{HOURS_ONLY ? '本月出勤' : '本月工资'}</span>
+              <strong>{HOURS_ONLY ? `${summary.workDays}天` : `¥${formatMoney(settlement.total)}`}</strong>
+              <p>{HOURS_ONLY ? '按天累计' : `待结算 ¥${formatMoney(settlement.pending)}`}</p>
+            </button>
+          </div>
+        </section>
+      ) : (
+        <section className="work-overview" aria-label="月总计">
+          <div className="work-overview-primary">
+            <span>本月总工时</span>
+            <div className="work-overview-number">
+              <strong>{formatHours(summary.totalHours)}</strong>
+              <small>小时</small>
+            </div>
+            {monthDelta ? (
+              <span className={`hero-delta${monthDelta.delta >= 0 ? ' up' : ' down'}`}>
+                {monthDelta.delta >= 0 ? '↑' : '↓'} 比上月 {monthDelta.delta >= 0 ? '+' : ''}{formatHours(monthDelta.delta)} 小时（{monthDelta.delta >= 0 ? '+' : ''}{monthDelta.percent}%）
+              </span>
+            ) : null}
+          </div>
+          <div className="work-overview-details hours-only-layout">
+            {HOURS_ONLY ? null : (
+              <div className="work-overview-pay">
+                <span>待结算</span>
+                <strong>¥{formatMoney(settlement.pending)}</strong>
+                {settlement.total > 0 ? (
+                  <small>已结算 ¥{formatMoney(settlement.settled)}</small>
+                ) : summary.workDays > 0 ? (
+                  <small className="setup-wage-hint">未设时薪 · 去我的页设置</small>
+                ) : (
+                  <small>未设时薪</small>
+                )}
+              </div>
             )}
+            <dl className="work-overview-stats">
+              <div><dt>工作日</dt><dd>{summary.workDays}<small> 天</small></dd></div>
+              <div><dt>日均</dt><dd>{formatHours(summary.averageHours)}<small> 小时</small></dd></div>
+            </dl>
           </div>
-          )}
-          <dl className="work-overview-stats">
-            <div>
-              <dt>工作日</dt>
-              <dd>{summary.workDays}<small> 天</small></dd>
-            </div>
-            <div>
-              <dt>日均</dt>
-              <dd>{formatHours(summary.averageHours)}<small> 小时</small></dd>
-            </div>
-          </dl>
-        </div>
-      </section>
+        </section>
+      )}
 
       {!isCurrentMonth ? (
         <button type="button" className="back-to-now" onClick={() => setYearMonth(currentMonthKey())}>
           <CalendarDays size={14} />
           回到本月
         </button>
-      ) : null}
-
-      {isCurrentMonth ? (
-        <section className="today-workspace" aria-label="今天">
-          <div className="today-workspace-main">
-            <div className="today-workspace-copy">
-              <span>今天 · 周{weekdayName(new Date(`${today}T00:00:00`).getDay())}</span>
-              <strong>{formatDateLabel(today)}</strong>
-              <p>{todayRecord?.remark || (!todayRecord && todayEntries.length === 0 ? '今天还没有记录' : HOURS_ONLY ? '今天的工作' : '今天的工作与账目')}</p>
-            </div>
-            <div className="today-workspace-actions">
-              {onOpenLedger ? (
-              <button
-                type="button"
-                className="today-ledger-button"
-                onClick={() => onOpenLedger?.(today)}
-                aria-label="今天记一笔账"
-                title="记一笔账"
-              >
-                <WalletCards size={16} />
-                记一笔
-              </button>
-              ) : null}
-              <button type="button" className="today-record-button" onClick={() => setEditingDate(today)}>
-                <PenLine size={17} />
-                {todayRecord ? '修改记录' : '记工时'}
-              </button>
-            </div>
-          </div>
-          <div className={`today-readout${HOURS_ONLY ? ' hours-only' : ''}`} aria-label="今天汇总">
-            <div>
-              <span>工时</span>
-              <strong>
-                {todayRecord ? (
-                  <>
-                    {formatHours(todayRecord.hours)}
-                    <small> 小时</small>
-                  </>
-                ) : (
-                  '--'
-                )}
-              </strong>
-            </div>
-            {HOURS_ONLY ? null : (
-            <div>
-              <span>收入</span>
-              <strong className="income">{todayIncome > 0 ? `¥${formatMoney(todayIncome)}` : '--'}</strong>
-            </div>
-            )}
-            {HOURS_ONLY ? null : (
-            <div>
-              <span>账目</span>
-              <strong>
-                {todayEntries.length > 0 ? (
-                  <>
-                    {todayEntries.length}
-                    <small> 笔</small>
-                  </>
-                ) : (
-                  '--'
-                )}
-              </strong>
-            </div>
-            )}
-          </div>
-          {todayIncome > 0 || todayExpense > 0 ? (
-            <div className="today-entry-list">
-              {todayEntries.map((entry) => (
-                <button
-                  type="button"
-                  key={entry.id}
-                  className={`today-entry-row ${entry.type}`}
-                  onClick={() => setEditingDate(today)}
-                  aria-label={`今天 ${entry.category} ${entry.type === 'income' ? '收入' : '支出'} ¥${formatMoney(entry.amount)}`}
-                >
-                  <span className="today-entry-category">{entry.category}</span>
-                  <span className={`today-entry-amount ${entry.type}`}>
-                    {entry.type === 'income' ? '+' : '-'}¥{formatMoney(entry.amount)}
-                  </span>
-                </button>
-              ))}
-            </div>
-          ) : null}
-        </section>
       ) : null}
 
       <section
@@ -428,6 +435,12 @@ export function MonthView({
             const linkedCount = activity?.linkedCount ?? 0
             const hasAmount = dayIncome > 0 || dayExpense > 0
             const isFuture = day.date > today
+            const hoursTone =
+              record && (record.settled || record.hours > 8)
+                ? 'warn'
+                : record && record.hours > 0
+                  ? 'recorded'
+                  : ''
             const classes = [
               'calendar-day',
               day.isToday ? 'today' : '',
@@ -468,6 +481,9 @@ export function MonthView({
                   !HOURS_ONLY && linkedCount > 0 ? ` ${linkedCount}笔关联账目` : ''
                 }`}
               >
+                {!HOURS_ONLY && record?.settled ? (
+                  <span className="calendar-settled-mark" aria-hidden="true" />
+                ) : null}
                 <span className={`day-number${day.isToday ? " today" : ""}${record && record.hours > 0 ? " recorded" : ""}`}>
                   {day.day}
                 </span>
@@ -475,10 +491,12 @@ export function MonthView({
                   record.hours === 0 ? (
                     <span className="calendar-hours rest-label">休</span>
                   ) : (
-                    <span className="calendar-hours">{formatHours(record.hours)}</span>
+                    <span className={`calendar-hours ${hoursTone}`}>{formatHours(record.hours)}</span>
                   )
                 ) : (
-                  <span className="calendar-hours muted">-</span>
+                  <span className="calendar-hours muted" aria-hidden="true">
+                    <i className="calendar-empty-dot" />
+                  </span>
                 )}
                 <span className="calendar-dots" aria-hidden="true">
                   {!HOURS_ONLY && record?.settled ? <span className="calendar-dot settled-dot" /> : null}

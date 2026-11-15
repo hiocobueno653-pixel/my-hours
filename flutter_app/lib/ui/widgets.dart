@@ -146,6 +146,51 @@ class _PressableState extends State<Pressable> {
   }
 }
 
+/// 数字滚动文本：数值变化时从旧值平滑过渡到新值。
+///
+/// 仅在视觉上滚动，不改变底层计算；统一启用等宽数字，避免宽度跳动。
+class AnimatedNumericText extends StatelessWidget {
+  const AnimatedNumericText({
+    super.key,
+    required this.value,
+    required this.formatter,
+    this.style,
+    this.textAlign,
+    this.maxLines = 1,
+    this.softWrap = false,
+    this.duration = const Duration(milliseconds: 220),
+    this.curve = Curves.easeOutCubic,
+  });
+
+  final num value;
+  final String Function(num value) formatter;
+  final TextStyle? style;
+  final TextAlign? textAlign;
+  final int? maxLines;
+  final bool softWrap;
+  final Duration duration;
+  final Curve curve;
+
+  @override
+  Widget build(BuildContext context) {
+    final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(end: value.toDouble()),
+      duration: motionDuration(duration, disableAnimations: disable),
+      curve: curve,
+      builder: (context, current, _) => Text(
+        formatter(current),
+        textAlign: textAlign,
+        maxLines: maxLines,
+        softWrap: softWrap,
+        style: (style ?? DefaultTextStyle.of(context).style).copyWith(
+          fontFeatures: tabularFigures,
+        ),
+      ),
+    );
+  }
+}
+
 /// 主按钮：品牌蓝实心，白字。
 class PrimaryButton extends StatelessWidget {
   const PrimaryButton({

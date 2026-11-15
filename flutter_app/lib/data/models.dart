@@ -303,6 +303,7 @@ class ParsedBackupData {
     required this.customCategories,
     required this.workProfiles,
     required this.budgetTargets,
+    this.droppedItems = 0,
   });
 
   final List<WorkDayRecord> records;
@@ -310,4 +311,7 @@ class ParsedBackupData {
   final List<CustomLedgerCategory> customCategories;
   final List<WorkProfile> workProfiles;
   final BudgetTargets budgetTargets;
+
+  /// 导入时被逐条跳过的不合法条目数。
+  final int droppedItems;
 }

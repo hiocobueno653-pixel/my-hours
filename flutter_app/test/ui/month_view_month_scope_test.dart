@@ -7,6 +7,7 @@ import 'package:my_hours/core/theme_tokens.dart';
 import 'package:my_hours/data/dates.dart';
 import 'package:my_hours/data/persistence.dart';
 import 'package:my_hours/features/work/month_view.dart';
+import 'package:my_hours/features/work/work_bento_header.dart';
 import 'package:my_hours/state/app_controller.dart';
 
 /// 记工页的时间语境：只有当前月才渲染「今天」工作区。
@@ -73,8 +74,8 @@ void main() {
     );
     await tester.pump();
 
-    // 默认停在本月：今天卡片在场。
-    expect(find.byType(TodayCard), findsOneWidget);
+    // 默认停在本月：今日 Bento 概览在场。
+    expect(find.byType(WorkBentoHeader), findsOneWidget);
     expect(find.text('回到本月'), findsNothing);
 
     container
@@ -82,8 +83,44 @@ void main() {
         .setMonth(shiftMonth(currentMonthKey(), -1));
     await tester.pump();
 
-    // 历史月份：今天卡片消失，替换为可点的回本月提示。
-    expect(find.byType(TodayCard), findsNothing);
+    // 历史月份：今日 Bento 消失，替换为可点的回本月提示。
+    expect(find.byType(WorkBentoHeader), findsNothing);
     expect(find.text('回到本月'), findsOneWidget);
+  });
+
+  testWidgets('Bento 快捷工时会写回今天记录', (tester) async {
+    tester.view.physicalSize = const Size(400, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final dir = Directory.systemTemp.createTempSync('my_hours_quick_');
+    final container = ProviderContainer(
+      overrides: [storeProvider.overrideWithValue(LocalStore(dir))],
+    );
+    addTearDown(container.dispose);
+    addTearDown(() {
+      if (dir.existsSync()) dir.deleteSync(recursive: true);
+    });
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          theme: buildAppTheme(AppColors.light, AppTokens.lightTokens),
+          home: const Scaffold(body: MonthView()),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    await tester.tap(find.text('＋1h'));
+    await tester.pump();
+    expect(container.read(appControllerProvider).records.single.hours, 1);
+
+    await tester.tap(find.text('8h'));
+    await tester.pump();
+    expect(container.read(appControllerProvider).records.single.hours, 8);
+    container.read(appControllerProvider.notifier).flushPendingPersist();
+    await tester.pump();
   });
 }

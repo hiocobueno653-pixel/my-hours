@@ -51,7 +51,11 @@ class TimepageLoadingScreen extends StatelessWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    TimepageLoader(width: loaderWidth),
+                    TimepageLoader(
+                      width: loaderWidth,
+                      color: colors.primary,
+                      useDarkAsset: dark,
+                    ),
                     const SizedBox(height: 26),
                     Text(
                       '记录时间，记下生活。',

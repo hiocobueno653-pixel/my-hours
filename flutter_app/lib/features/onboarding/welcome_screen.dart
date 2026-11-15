@@ -4,14 +4,12 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/formatters.dart';
 import '../../core/theme_tokens.dart';
+import '../../data/constants.dart';
 import '../../ui/widgets.dart';
 
-const welcomeBackground = Color(0xFFF4F5F7);
-const _ink = Color(0xFF111827);
-const _muted = Color(0xFF6B7280);
-
-/// 时页品牌首屏：书法字标、品牌承诺与三段能力卡片。
+/// 时页品牌首屏：书法字标、1+2 Bento 预览与本地优先承诺。
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key, required this.onStart});
 
@@ -26,7 +24,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   late final AnimationController _entryController = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 1100),
-    // 加载页切到欢迎页时先给内容一个可见底，避免首帧整页空白。
     value: 0.14,
   );
   bool _starting = false;
@@ -71,16 +68,9 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final dark = theme.brightness == Brightness.dark;
-    final background = dark ? const Color(0xFF0A1020) : welcomeBackground;
-    final ink = dark ? const Color(0xFFF7F9FF) : _ink;
-    final muted = dark ? const Color(0xFFA9B5CF) : _muted;
-    final card = dark ? const Color(0xFF161D2E) : Colors.white;
-    final cardBorder = dark
-        ? Colors.white.withValues(alpha: 0.08)
-        : Colors.white;
     final colors = context.colors;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final background = colors.page;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
@@ -100,41 +90,15 @@ class _WelcomeScreenState extends State<WelcomeScreen>
         body: Stack(
           fit: StackFit.expand,
           children: [
-            Positioned(
-              top: -120,
-              right: -110,
-              child: IgnorePointer(
-                child: Container(
-                  width: 360,
-                  height: 360,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [
-                        colors.primary.withValues(alpha: dark ? 0.20 : 0.14),
-                        colors.primary.withValues(alpha: 0),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              left: -150,
-              bottom: -160,
-              child: IgnorePointer(
-                child: Container(
-                  width: 330,
-                  height: 330,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [
-                        colors.primary.withValues(alpha: dark ? 0.11 : 0.055),
-                        colors.primary.withValues(alpha: 0),
-                      ],
-                    ),
-                  ),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  center: const Alignment(0, -0.22),
+                  radius: 0.84,
+                  colors: [
+                    colors.primary.withValues(alpha: dark ? 0.16 : 0.09),
+                    background.withValues(alpha: 0),
+                  ],
                 ),
               ),
             ),
@@ -146,7 +110,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                       physics: const BouncingScrollPhysics(
                         parent: AlwaysScrollableScrollPhysics(),
                       ),
-                      padding: const EdgeInsets.fromLTRB(24, 28, 24, 22),
+                      padding: const EdgeInsets.fromLTRB(24, 26, 24, 18),
                       child: Center(
                         child: ConstrainedBox(
                           constraints: const BoxConstraints(maxWidth: 430),
@@ -156,69 +120,72 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                               _StaggerReveal(
                                 controller: _entryController,
                                 begin: 0,
-                                end: 0.46,
+                                end: 0.40,
                                 offset: 0.05,
-                                child: _WelcomeHeading(
-                                  dark: dark,
-                                  ink: ink,
-                                  muted: muted,
-                                ),
+                                child: const _WelcomeHeading(),
                               ),
-                              const SizedBox(height: 26),
+                              const SizedBox(height: 22),
                               _StaggerReveal(
                                 controller: _entryController,
-                                begin: 0.12,
-                                end: 0.60,
-                                offset: 0.16,
-                                child: _FeatureCard(
-                                  icon: Icons.calendar_month_rounded,
-                                  accent: colors.primary,
-                                  dark: dark,
-                                  card: card,
-                                  border: cardBorder,
-                                  title: '日历记工',
-                                  description: '点选日期，快速记录工时、加班与休息日。',
-                                ),
+                                begin: 0.10,
+                                end: 0.54,
+                                offset: 0.12,
+                                child: const _BentoPreview(),
                               ),
                               const SizedBox(height: 12),
-                              _StaggerReveal(
-                                controller: _entryController,
-                                begin: 0.24,
-                                end: 0.72,
-                                offset: 0.16,
-                                child: _FeatureCard(
-                                  icon: Icons.payments_rounded,
-                                  accent: colors.income,
-                                  dark: dark,
-                                  card: card,
-                                  border: cardBorder,
-                                  title: '工资自动核算',
-                                  description: '累计工时、日均时长与待结算工资实时算清。',
+                              IntrinsicHeight(
+                                child: Row(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    Expanded(
+                                      child: _StaggerReveal(
+                                        controller: _entryController,
+                                        begin: 0.24,
+                                        end: 0.70,
+                                        offset: 0.12,
+                                        child: const _LocalFirstCard(),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: _StaggerReveal(
+                                        controller: _entryController,
+                                        begin: 0.30,
+                                        end: 0.76,
+                                        offset: 0.12,
+                                        child: const _HoursPresetCard(),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                              const SizedBox(height: 12),
+                              const SizedBox(height: 14),
                               _StaggerReveal(
                                 controller: _entryController,
-                                begin: 0.36,
+                                begin: 0.40,
                                 end: 0.84,
-                                offset: 0.16,
-                                child: _FeatureCard(
-                                  icon: Icons.receipt_long_rounded,
-                                  accent: colors.warning,
-                                  dark: dark,
-                                  card: card,
-                                  border: cardBorder,
-                                  title: '收支与结算',
-                                  description: '收入、支出和结算状态在同一页看清。',
+                                offset: 0.06,
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.lock_outline_rounded,
+                                      size: 13,
+                                      color: colors.text3,
+                                    ),
+                                    const SizedBox(width: 5),
+                                    Flexible(
+                                      child: Text(
+                                        '数据只保存在本机 · 无需账号',
+                                        style: TextStyle(
+                                          color: colors.text3,
+                                          fontSize: 11.5,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ),
-                              const SizedBox(height: 20),
-                              _StaggerReveal(
-                                controller: _entryController,
-                                begin: 0.48,
-                                end: 0.94,
-                                offset: 0,
-                                child: _PrivacyNote(muted: muted),
                               ),
                             ],
                           ),
@@ -227,20 +194,15 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                     ),
                   ),
                   Padding(
-                    padding: EdgeInsets.fromLTRB(
-                      24,
-                      8,
-                      24,
-                      MediaQuery.paddingOf(context).bottom + 14,
-                    ),
+                    padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
                     child: Center(
                       child: ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: 430),
                         child: _StaggerReveal(
                           controller: _entryController,
                           begin: 0.50,
-                          end: 0.98,
-                          offset: 0.32,
+                          end: 1,
+                          offset: 0.24,
                           child: _StartButton(
                             busy: _starting,
                             onPressed: _starting ? null : _start,
@@ -260,18 +222,12 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 }
 
 class _WelcomeHeading extends StatelessWidget {
-  const _WelcomeHeading({
-    required this.dark,
-    required this.ink,
-    required this.muted,
-  });
-
-  final bool dark;
-  final Color ink;
-  final Color muted;
+  const _WelcomeHeading();
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
+    final dark = colors.isDark;
     final width = math.min(310.0, MediaQuery.sizeOf(context).width - 62);
     return Column(
       children: [
@@ -293,9 +249,7 @@ class _WelcomeHeading extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: ShapeDecoration(
-            color: dark
-                ? Colors.white.withValues(alpha: 0.06)
-                : Colors.white.withValues(alpha: 0.78),
+            color: colors.card.withValues(alpha: dark ? 0.74 : 0.88),
             shape: RoundedSuperellipseBorder(
               borderRadius: BorderRadius.circular(Radii.pill),
               side: BorderSide(
@@ -312,7 +266,7 @@ class _WelcomeHeading extends StatelessWidget {
                 width: 5,
                 height: 5,
                 decoration: BoxDecoration(
-                  color: context.colors.primary,
+                  color: colors.primary,
                   shape: BoxShape.circle,
                 ),
               ),
@@ -320,7 +274,7 @@ class _WelcomeHeading extends StatelessWidget {
               Text(
                 '时页 · 本地优先',
                 style: TextStyle(
-                  color: muted,
+                  color: colors.text2,
                   fontSize: 11.5,
                   fontWeight: FontWeight.w500,
                   letterSpacing: 0.1,
@@ -334,7 +288,7 @@ class _WelcomeHeading extends StatelessWidget {
           '记录时间，记下生活。',
           textAlign: TextAlign.center,
           style: TextStyle(
-            color: ink,
+            color: colors.text,
             fontSize: 22,
             fontWeight: FontWeight.w700,
             height: 1.28,
@@ -343,110 +297,165 @@ class _WelcomeHeading extends StatelessWidget {
         ),
         const SizedBox(height: 7),
         Text(
-          '把工时、工资与每一笔收支，留在属于你的时间页。',
+          kHoursOnly ? '把每一天的工时，留在属于你的时间页。' : '把工时、工资与每一笔收支，留在属于你的时间页。',
           textAlign: TextAlign.center,
-          style: TextStyle(color: muted, fontSize: 13.5, height: 1.55),
+          style: TextStyle(color: colors.text2, fontSize: 13.5, height: 1.55),
         ),
       ],
     );
   }
 }
 
-class _FeatureCard extends StatelessWidget {
-  const _FeatureCard({
-    required this.icon,
-    required this.accent,
-    required this.dark,
-    required this.card,
-    required this.border,
-    required this.title,
-    required this.description,
-  });
-
-  final IconData icon;
-  final Color accent;
-  final bool dark;
-  final Color card;
-  final Color border;
-  final String title;
-  final String description;
+class _BentoPreview extends StatelessWidget {
+  const _BentoPreview();
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 15),
+      padding: const EdgeInsets.all(16),
       decoration: ShapeDecoration(
-        color: card,
-        shape: Radii.shape(22),
-        shadows: dark
-            ? null
-            : const [
-                BoxShadow(
-                  color: Color(0x080F172A),
-                  blurRadius: 20,
-                  offset: Offset(0, 6),
+        color: colors.card,
+        shape: Radii.shape(24),
+        shadows: colors.isDark ? null : context.shadows.take(2).toList(),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                '本周预览',
+                style: TextStyle(
+                  color: colors.text,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: ShapeDecoration(
+                  color: colors.inset,
+                  shape: Radii.pillShape,
+                ),
+                child: Text(
+                  '示例',
+                  style: TextStyle(
+                    color: colors.text3,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: _PreviewMetric(
+                    label: '本周工时',
+                    value: '32.0',
+                    unit: 'h',
+                    background: colors.primaryContainer,
+                    foreground: colors.onPrimaryContainer,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: 2,
+                  child: _PreviewMetric(
+                    label: kHoursOnly ? '出勤' : '本周工资',
+                    value: kHoursOnly ? '5' : '¥800',
+                    unit: kHoursOnly ? '天' : '',
+                    background: kHoursOnly
+                        ? colors.incomeSoft
+                        : colors.warningSoft,
+                    foreground: kHoursOnly ? colors.income : colors.warning,
+                  ),
                 ),
               ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          _WeekBars(colors: colors),
+          const SizedBox(height: 9),
+          Text(
+            kHoursOnly ? '日历点选记工 · 工时与出勤一起看清' : '日历点选记工 · 工时、工资与收支一起看清',
+            style: TextStyle(color: colors.text2, fontSize: 11.5, height: 1.45),
+          ),
+        ],
       ),
-      foregroundDecoration: ShapeDecoration(
-        shape: RoundedSuperellipseBorder(
-          borderRadius: BorderRadius.circular(22),
-          side: BorderSide(color: border),
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+    );
+  }
+}
+
+class _PreviewMetric extends StatelessWidget {
+  const _PreviewMetric({
+    required this.label,
+    required this.value,
+    required this.unit,
+    required this.background,
+    required this.foreground,
+  });
+
+  final String label;
+  final String value;
+  final String unit;
+  final Color background;
+  final Color foreground;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
+      decoration: ShapeDecoration(color: background, shape: Radii.shape(18)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  dark ? colors.card.withValues(alpha: 0.86) : Colors.white,
-                  accent.withValues(alpha: dark ? 0.22 : 0.12),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: foreground.withValues(alpha: 0.72),
+              fontSize: 10.5,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 3),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: value,
+                    style: TextStyle(
+                      color: foreground,
+                      fontSize: 23,
+                      height: 1,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.04,
+                      fontFeatures: tabularFigures,
+                    ),
+                  ),
+                  if (unit.isNotEmpty)
+                    TextSpan(
+                      text: unit,
+                      style: TextStyle(
+                        color: foreground,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                 ],
               ),
-              border: Border.all(
-                color: dark
-                    ? Colors.white.withValues(alpha: 0.08)
-                    : Colors.white,
-              ),
-            ),
-            child: Icon(icon, size: 21, color: accent),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    color: dark ? const Color(0xFFF7F9FF) : _ink,
-                    fontSize: 15.5,
-                    fontWeight: FontWeight.w700,
-                    height: 1.25,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  description,
-                  style: TextStyle(
-                    color: dark
-                        ? const Color(0xFFA9B5CF)
-                        : const Color(0xFF6B7280),
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w400,
-                    height: 1.45,
-                  ),
-                ),
-              ],
             ),
           ),
         ],
@@ -455,31 +464,153 @@ class _FeatureCard extends StatelessWidget {
   }
 }
 
-class _PrivacyNote extends StatelessWidget {
-  const _PrivacyNote({required this.muted});
+class _WeekBars extends StatelessWidget {
+  const _WeekBars({required this.colors});
 
-  final Color muted;
+  final AppColors colors;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Icon(Icons.lock_outline_rounded, size: 13, color: muted),
-        const SizedBox(width: 5),
-        Flexible(
-          child: Text(
-            '数据只保存在本机 · 无需账号',
-            textAlign: TextAlign.center,
+    const levels = [0.42, 0.72, 0.56, 0.92, 0.68, 0.34, 0.46];
+    return SizedBox(
+      height: 26,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          for (final level in levels) ...[
+            Expanded(
+              child: Container(
+                height: 8 + 16 * level,
+                decoration: ShapeDecoration(
+                  color: colors.primary.withValues(alpha: 0.18 + 0.48 * level),
+                  shape: Radii.shape(5),
+                ),
+              ),
+            ),
+            if (level != levels.last) const SizedBox(width: 4),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _LocalFirstCard extends StatelessWidget {
+  const _LocalFirstCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: ShapeDecoration(color: colors.card, shape: Radii.shape(22)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: ShapeDecoration(
+              color: colors.incomeSoft,
+              shape: Radii.shape(12),
+            ),
+            child: Icon(Icons.shield_outlined, size: 19, color: colors.income),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            '本地离线',
             style: TextStyle(
-              color: muted,
-              fontSize: 11.5,
-              height: 1.4,
-              letterSpacing: 0.1,
+              color: colors.text,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
             ),
           ),
-        ),
-      ],
+          const SizedBox(height: 3),
+          Text(
+            '三代备份 · 无需账号',
+            style: TextStyle(color: colors.text2, fontSize: 11.5, height: 1.4),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HoursPresetCard extends StatefulWidget {
+  const _HoursPresetCard();
+
+  @override
+  State<_HoursPresetCard> createState() => _HoursPresetCardState();
+}
+
+class _HoursPresetCardState extends State<_HoursPresetCard> {
+  int _selected = 8;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: ShapeDecoration(color: colors.card, shape: Radii.shape(22)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '日工时预设',
+            style: TextStyle(
+              color: colors.text,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            '进入后可随时调整',
+            style: TextStyle(color: colors.text2, fontSize: 11.5),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              for (final hours in const [8, 10]) ...[
+                Expanded(
+                  child: Pressable(
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      setState(() => _selected = hours);
+                    },
+                    shape: Radii.pillShape,
+                    pressedScale: 0.95,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      curve: Curves.easeOutCubic,
+                      height: 32,
+                      alignment: Alignment.center,
+                      decoration: ShapeDecoration(
+                        color: hours == _selected
+                            ? colors.primaryContainer
+                            : colors.inset,
+                        shape: Radii.pillShape,
+                      ),
+                      child: Text(
+                        '${hours}h',
+                        style: TextStyle(
+                          color: hours == _selected
+                              ? colors.onPrimaryContainer
+                              : colors.text2,
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          fontFeatures: tabularFigures,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                if (hours == 8) const SizedBox(width: 6),
+              ],
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
@@ -492,7 +623,9 @@ class _StartButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     final radius = BorderRadius.circular(28);
+    final bottom = Color.lerp(colors.primary, Colors.black, 0.24)!;
     return Semantics(
       button: true,
       enabled: onPressed != null,
@@ -504,22 +637,23 @@ class _StartButton extends StatelessWidget {
         height: 56,
         child: Pressable(
           onTap: onPressed,
+          haptic: false,
           shape: RoundedSuperellipseBorder(borderRadius: radius),
-          pressedScale: 0.975,
+          pressedScale: 0.97,
           child: DecoratedBox(
             decoration: BoxDecoration(
               borderRadius: radius,
-              gradient: const LinearGradient(
+              gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: [Color(0xFF2563EB), Color(0xFF1D4ED8)],
+                colors: [colors.primary, bottom],
               ),
               border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
-              boxShadow: const [
+              boxShadow: [
                 BoxShadow(
-                  color: Color(0x332563EB),
+                  color: colors.primary.withValues(alpha: 0.28),
                   blurRadius: 26,
-                  offset: Offset(0, 12),
+                  offset: const Offset(0, 12),
                 ),
               ],
             ),
@@ -551,20 +685,22 @@ class _StartButton extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         if (busy) ...[
-                          const SizedBox(
+                          SizedBox(
                             width: 16,
                             height: 16,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation(Colors.white),
+                              valueColor: AlwaysStoppedAnimation(
+                                colors.onPrimary,
+                              ),
                             ),
                           ),
                           const SizedBox(width: 9),
                         ],
                         Text(
                           busy ? '正在进入…' : '开始使用',
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: colors.onPrimary,
                             fontSize: 17,
                             fontWeight: FontWeight.w600,
                             letterSpacing: 0.2,
@@ -572,10 +708,10 @@ class _StartButton extends StatelessWidget {
                         ),
                         if (!busy) ...[
                           const SizedBox(width: 5),
-                          const Icon(
+                          Icon(
                             Icons.arrow_forward_rounded,
                             size: 18,
-                            color: Colors.white,
+                            color: colors.onPrimary,
                           ),
                         ],
                       ],

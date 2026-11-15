@@ -231,4 +231,18 @@ void main() {
 
     expect(st().entries.any((e) => e.id == 'legacy-1'), isFalse);
   });
+
+  test('连续编辑 300ms 内合并，flush 后只落盘最终状态', () {
+    final store = container.read(storeProvider);
+    ctrl().saveDay('2026-08-15', 1, 'first');
+    ctrl().saveDay('2026-08-15', 2, 'second');
+
+    expect(store.mainFile.existsSync(), isFalse);
+    expect(ctrl().flushPendingPersist(), isTrue);
+
+    final result = store.load();
+    expect(result.status, LoadStatus.ok);
+    expect(result.document!.records.single.hours, 2);
+    expect(result.document!.records.single.remark, 'second');
+  });
 }

@@ -76,13 +76,28 @@ class StoreDocument {
 enum LoadStatus { ok, missing, corrupted }
 
 class LoadResult {
-  const LoadResult(this.status, this.document, {this.source});
+  const LoadResult(
+    this.status,
+    this.document, {
+    this.source,
+    this.droppedItems = 0,
+  });
 
   final LoadStatus status;
   final StoreDocument? document;
 
   /// 命中的文件：`main` / `bak` / `bak1`。
   final String? source;
+
+  /// 本地存档中被逐条跳过的不合法记录数量；备份导入仍走严格校验。
+  final int droppedItems;
+}
+
+class _ParsedStore {
+  const _ParsedStore(this.document, this.droppedItems);
+
+  final StoreDocument document;
+  final int droppedItems;
 }
 
 /// 本机自动快照。每天最多保留一份，供「数据与备份」手动恢复。
@@ -180,8 +195,9 @@ class LocalStore {
 
     final main = File(_mainPath);
     if (!main.existsSync()) return null;
-    final document = _tryParse(main);
-    if (document == null) return null;
+    final parsed = _tryParseDetailed(main);
+    if (parsed == null) return null;
+    final document = parsed.document;
     if (document.records.isEmpty &&
         document.entries.isEmpty &&
         document.customCategories.isEmpty) {
@@ -265,10 +281,15 @@ class LocalStore {
       final file = File(entry.value);
       if (!file.existsSync()) continue;
       anyExists = true;
-      final document = _tryParse(file);
-      if (document != null) {
+      final parsed = _tryParseDetailed(file);
+      if (parsed != null) {
         _loadSource = entry.key;
-        return LoadResult(LoadStatus.ok, document, source: entry.key);
+        return LoadResult(
+          LoadStatus.ok,
+          parsed.document,
+          source: entry.key,
+          droppedItems: parsed.droppedItems,
+        );
       }
     }
     _loadSource = anyExists ? quarantine : null;
@@ -278,7 +299,7 @@ class LocalStore {
     );
   }
 
-  StoreDocument? _tryParse(File file) {
+  _ParsedStore? _tryParseDetailed(File file) {
     try {
       final raw = file.readAsStringSync();
       if (raw.trim().isEmpty) return null;
@@ -288,16 +309,20 @@ class LocalStore {
       final version = decoded['version'];
       if (version is! num || version.toInt() != 4) return null;
 
+      var dropped = 0;
       final records = <WorkDayRecord>[];
       final recordsRaw = decoded['records'];
       if (recordsRaw is List) {
         for (final item in recordsRaw) {
           final record = _recordFromJson(item);
-          if (record == null) return null;
+          if (record == null) {
+            dropped++;
+            continue;
+          }
           records.add(record);
         }
       } else {
-        return null;
+        dropped++;
       }
 
       final entries = <LedgerEntry>[];
@@ -305,11 +330,14 @@ class LocalStore {
       if (entriesRaw is List) {
         for (final item in entriesRaw) {
           final entry = _entryFromJson(item);
-          if (entry == null) return null;
+          if (entry == null) {
+            dropped++;
+            continue;
+          }
           entries.add(entry);
         }
       } else {
-        return null;
+        dropped++;
       }
 
       final categories = <CustomLedgerCategory>[];
@@ -317,7 +345,10 @@ class LocalStore {
       if (categoriesRaw is List) {
         for (final item in categoriesRaw) {
           final category = _categoryFromJson(item);
-          if (category == null) return null;
+          if (category == null) {
+            dropped++;
+            continue;
+          }
           categories.add(category);
         }
       }
@@ -327,20 +358,26 @@ class LocalStore {
       if (profilesRaw is List) {
         for (final item in profilesRaw) {
           final profile = _profileFromJson(item);
-          if (profile == null) return null;
+          if (profile == null) {
+            dropped++;
+            continue;
+          }
           profiles.add(profile);
         }
       }
 
-      return StoreDocument(
-        records: dedupeRecords(records),
-        entries: dedupeLedgerEntries(entries),
-        customCategories: dedupeLedgerCategories(categories),
-        workProfiles: ensureDefaultWorkProfile(dedupeWorkProfiles(profiles)),
-        budgetTargets: _budgetFromJson(decoded['budgetTargets']),
-        exportedAt: decoded['exportedAt'] is String
-            ? decoded['exportedAt'] as String
-            : null,
+      return _ParsedStore(
+        StoreDocument(
+          records: dedupeRecords(records),
+          entries: dedupeLedgerEntries(entries),
+          customCategories: dedupeLedgerCategories(categories),
+          workProfiles: ensureDefaultWorkProfile(dedupeWorkProfiles(profiles)),
+          budgetTargets: _budgetFromJson(decoded['budgetTargets']),
+          exportedAt: decoded['exportedAt'] is String
+              ? decoded['exportedAt'] as String
+              : null,
+        ),
+        dropped,
       );
     } on Object {
       return null;

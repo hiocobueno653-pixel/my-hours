@@ -15,9 +15,11 @@ import 'core/settings.dart';
 import 'core/text_scaling.dart';
 import 'core/theme_tokens.dart';
 import 'data/persistence.dart';
+import 'features/onboarding/loading_screen.dart';
 import 'features/onboarding/welcome_screen.dart';
 import 'state/app_controller.dart';
 import 'ui/dialog.dart';
+import 'ui/widgets.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -30,10 +32,71 @@ Future<void> main() async {
       systemNavigationBarContrastEnforced: false,
     ),
   );
-  try {
-    runApp(_buildApp(await _loadBootData()));
-  } on Object {
-    runApp(const _BootFailureApp());
+  runApp(const _BootstrapRoot());
+}
+
+/// 首帧立即展示品牌加载；数据准备完成后淡出并启动应用。
+class _BootstrapRoot extends StatefulWidget {
+  const _BootstrapRoot();
+
+  @override
+  State<_BootstrapRoot> createState() => _BootstrapRootState();
+}
+
+class _BootstrapRootState extends State<_BootstrapRoot>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _fade = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 280),
+    value: 1,
+  );
+  bool _started = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _boot());
+  }
+
+  Future<void> _boot() async {
+    if (_started) return;
+    _started = true;
+    final startedAt = DateTime.now();
+    try {
+      final data = await _loadBootData();
+      final elapsed = DateTime.now().difference(startedAt);
+      const minimum = Duration(milliseconds: 650);
+      if (elapsed < minimum) {
+        await Future<void>.delayed(minimum - elapsed);
+      }
+      if (!mounted) return;
+      final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+      if (!disable) await _fade.reverse();
+      if (mounted) runApp(_buildApp(data));
+    } on Object {
+      if (mounted) runApp(const _BootFailureApp());
+    }
+  }
+
+  @override
+  void dispose() {
+    _fade.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: '时页',
+      debugShowCheckedModeBanner: false,
+      theme: buildAppTheme(AppColors.light, AppTokens.lightTokens),
+      darkTheme: buildAppTheme(AppColors.dark, AppTokens.darkTokens),
+      themeMode: ThemeMode.system,
+      home: FadeTransition(
+        opacity: _fade,
+        child: const TimepageLoadingScreen(),
+      ),
+    );
   }
 }
 
@@ -75,6 +138,9 @@ Widget _buildApp(_BootData data) {
       ),
       startupRecoveredProvider.overrideWithValue(
         recoveredFromBackup(data.startupLoad),
+      ),
+      startupDroppedItemsProvider.overrideWithValue(
+        data.startupLoad.droppedItems,
       ),
     ],
     child: MyHoursApp(settings: data.settings),
@@ -148,17 +214,28 @@ class _BootErrorScreen extends StatelessWidget {
                 style: TextStyle(color: colors.text2, fontSize: 13),
               ),
               const SizedBox(height: 20),
-              FilledButton(
-                onPressed: retrying ? null : onRetry,
-                style: FilledButton.styleFrom(
-                  backgroundColor: colors.primary,
-                  foregroundColor: colors.onPrimary,
+              Pressable(
+                onTap: retrying ? null : onRetry,
+                shape: Radii.pillShape,
+                pressedScale: 0.96,
+                child: Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 24,
                     vertical: 12,
                   ),
+                  decoration: ShapeDecoration(
+                    color: colors.primary,
+                    shape: Radii.pillShape,
+                  ),
+                  child: Text(
+                    retrying ? '正在重试…' : '重试',
+                    style: TextStyle(
+                      color: colors.onPrimary,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
-                child: Text(retrying ? '正在重试…' : '重试'),
               ),
             ],
           ),
@@ -294,6 +371,7 @@ class _AppLaunchGate extends ConsumerWidget {
     final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     final corrupted = ref.watch(startupCorruptionProvider);
     final recovered = ref.watch(startupRecoveredProvider);
+    final droppedItems = ref.watch(startupDroppedItemsProvider);
     return AnimatedBuilder(
       animation: settings,
       builder: (context, _) {
@@ -302,20 +380,34 @@ class _AppLaunchGate extends ConsumerWidget {
             const Duration(milliseconds: 420),
             disableAnimations: disable,
           ),
-          switchInCurve: Curves.easeOutCubic,
-          switchOutCurve: Curves.easeInCubic,
+          switchInCurve: Curves.linear,
+          switchOutCurve: Curves.linear,
           transitionBuilder: (child, animation) {
-            final curved = CurvedAnimation(
+            final incomingShell = child.key == const ValueKey('app-shell');
+            if (incomingShell) {
+              final fade = CurvedAnimation(
+                parent: animation,
+                curve: const Interval(0.30, 1, curve: Curves.easeOutCubic),
+              );
+              final scale = Tween<double>(begin: 1.03, end: 1).animate(
+                CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+              );
+              return FadeTransition(
+                opacity: fade,
+                child: ScaleTransition(scale: scale, child: child),
+              );
+            }
+            final fadeOut = CurvedAnimation(
               parent: animation,
-              curve: Curves.easeOutCubic,
-              reverseCurve: Curves.easeInCubic,
+              curve: const Interval(0.50, 1, curve: Curves.easeOut),
             );
+            final scaleOut = Tween<double>(
+              begin: 0.96,
+              end: 1,
+            ).animate(animation);
             return FadeTransition(
-              opacity: curved,
-              child: ScaleTransition(
-                scale: Tween<double>(begin: 0.985, end: 1).animate(curved),
-                child: child,
-              ),
+              opacity: fadeOut,
+              child: ScaleTransition(scale: scaleOut, child: child),
             );
           },
           layoutBuilder: (current, previous) {
@@ -341,6 +433,7 @@ class _AppLaunchGate extends ConsumerWidget {
         return _StartupCorruptionGuard(
           corrupted: corrupted,
           recovered: recovered,
+          droppedItems: droppedItems,
           child: content,
         );
       },
@@ -352,6 +445,7 @@ class _StartupCorruptionGuard extends StatefulWidget {
   const _StartupCorruptionGuard({
     required this.corrupted,
     required this.recovered,
+    required this.droppedItems,
     required this.child,
   });
 
@@ -359,6 +453,9 @@ class _StartupCorruptionGuard extends StatefulWidget {
 
   /// 主文件不可读、已从备份回退：数据可用，但最近一次改动可能丢失。
   final bool recovered;
+
+  /// 启动时逐条跳过的不合法记录数。
+  final int droppedItems;
   final Widget child;
 
   @override
@@ -372,7 +469,7 @@ class _StartupCorruptionGuardState extends State<_StartupCorruptionGuard> {
   @override
   void initState() {
     super.initState();
-    if (widget.corrupted || widget.recovered) {
+    if (widget.corrupted || widget.recovered || widget.droppedItems > 0) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _showNotice());
     }
   }
@@ -382,7 +479,8 @@ class _StartupCorruptionGuardState extends State<_StartupCorruptionGuard> {
     super.didUpdateWidget(oldWidget);
     final became =
         (!oldWidget.corrupted && widget.corrupted) ||
-        (!oldWidget.recovered && widget.recovered);
+        (!oldWidget.recovered && widget.recovered) ||
+        (oldWidget.droppedItems == 0 && widget.droppedItems > 0);
     if (became) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _showNotice());
     }
@@ -391,6 +489,16 @@ class _StartupCorruptionGuardState extends State<_StartupCorruptionGuard> {
   Future<void> _showNotice() async {
     if (!mounted || _shown) return;
     _shown = true;
+    if (widget.droppedItems > 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('已跳过 ${widget.droppedItems} 条无法识别的本地记录，其余数据正常打开'),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 6),
+        ),
+      );
+      return;
+    }
     if (!widget.corrupted) {
       // 回退成功是「数据还在，但可能在旧版本」：轻提示，不打断。
       ScaffoldMessenger.of(context).showSnackBar(

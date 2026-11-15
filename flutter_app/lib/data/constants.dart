@@ -4,6 +4,9 @@
 /// 归一化与导入阻断逻辑里，任何偏差都会让两版对同一份备份给出不同结果。
 library;
 
+/// 构建变体：只记工时，不生成工资账目。
+const bool kHoursOnly = bool.fromEnvironment('HOURS_ONLY');
+
 /// 备注长度上限（工时与账目共用 200）。
 const int maxRemarkLength = 200;
 const int maxLedgerRemarkLength = 200;

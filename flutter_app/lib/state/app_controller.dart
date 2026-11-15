@@ -8,6 +8,8 @@
 /// 3. **`HOURS_ONLY` 分支**：只记工时变体不生成、不对账工资账目（结算只是标记）。
 library;
 
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -20,7 +22,7 @@ import '../data/records.dart';
 import '../data/wage_entries.dart';
 
 /// 「只记工时」变体开关（`--dart-define=HOURS_ONLY=true`）。
-const bool kHoursOnly = bool.fromEnvironment('HOURS_ONLY');
+export '../data/constants.dart' show kHoursOnly;
 
 class AppState {
   const AppState({
@@ -88,6 +90,9 @@ final storeProvider = Provider<LocalStore>(
 final startupLoadProvider = Provider<LoadResult>(
   (ref) => ref.read(storeProvider).load(),
 );
+
+/// 启动时被逐条跳过的不合法本地记录数。
+final startupDroppedItemsProvider = Provider<int>((ref) => 0);
 
 /// 主文档与两代备份都损坏时为 true；由启动层提示用户，避免静默当成空数据。
 final startupCorruptionProvider = Provider<bool>((ref) => false);
@@ -168,9 +173,16 @@ class AppController extends Notifier<AppState> {
   late LocalStore _store;
   bool _initialized = false;
   SaveFailure? _pendingSaveFailure;
+  Timer? _persistTimer;
+  AppState? _pendingPersist;
 
   @override
   AppState build() {
+    ref.onDispose(() {
+      _persistTimer?.cancel();
+      _persistTimer = null;
+      _pendingPersist = null;
+    });
     _initialized = false;
     _store = ref.read(storeProvider);
     final loaded = ref.read(startupLoadProvider);
@@ -193,7 +205,10 @@ class AppController extends Notifier<AppState> {
       );
       if (!identical(synced, state.entries)) {
         state = state.copyWith(entries: synced);
-        _persist(state);
+        final repaired = state;
+        Future.microtask(() {
+          if (ref.mounted) _persist(repaired);
+        });
       }
     }
     _initialized = true;
@@ -207,7 +222,36 @@ class AppController extends Notifier<AppState> {
   /// 但会把失败写进 [saveFailureProvider]，由根布局常驻提示并允许重试。
   /// 隔离态则在写入口就被 [_writeBlocked] 拦下，避免 UI 显示一份永远
   /// 不可能落盘的数据。
+  void _clearScheduledPersist() {
+    _persistTimer?.cancel();
+    _persistTimer = null;
+    _pendingPersist = null;
+  }
+
+  /// 普通编辑走 300ms 合并写盘：连续点击只写最后一次，避免每一下都做
+  /// JSON 序列化与文件轮转。导入/清空/重试仍使用立即落盘。
+  void _schedulePersist(AppState next) {
+    _pendingPersist = next;
+    _persistTimer?.cancel();
+    _persistTimer = Timer(const Duration(milliseconds: 300), () {
+      _persistTimer = null;
+      final pending = _pendingPersist;
+      _pendingPersist = null;
+      if (pending != null) _persist(pending);
+    });
+  }
+
+  /// 应用进入后台或即将销毁时把尚未合并的编辑立即落盘。
+  bool flushPendingPersist() {
+    _persistTimer?.cancel();
+    _persistTimer = null;
+    final pending = _pendingPersist;
+    _pendingPersist = null;
+    return pending == null || _persist(pending);
+  }
+
   bool _persist(AppState next, {bool overrideQuarantine = false}) {
+    _clearScheduledPersist();
     final ok = _store.save(
       next.toDocument(),
       overrideQuarantine: overrideQuarantine,
@@ -339,7 +383,7 @@ class AppController extends Notifier<AppState> {
             date,
           );
     final next = state.copyWith(records: nextRecords, entries: nextEntries);
-    _persist(next);
+    _schedulePersist(next);
     state = next;
   }
 
@@ -366,7 +410,7 @@ class AppController extends Notifier<AppState> {
             date,
           );
     final next = state.copyWith(records: nextRecords, entries: nextEntries);
-    _persist(next);
+    _schedulePersist(next);
     state = next;
     return removed;
   }
@@ -414,7 +458,7 @@ class AppController extends Notifier<AppState> {
             date,
           );
     final next = state.copyWith(records: nextRecords, entries: nextEntries);
-    _persist(next);
+    _schedulePersist(next);
     state = next;
     return true;
   }
@@ -443,7 +487,7 @@ class AppController extends Notifier<AppState> {
         ? state.entries
         : syncWageEntries(nextRecords, state.entries, state.workProfiles);
     final next = state.copyWith(records: nextRecords, entries: nextEntries);
-    _persist(next);
+    _schedulePersist(next);
     state = next;
   }
 
@@ -457,7 +501,7 @@ class AppController extends Notifier<AppState> {
       entry,
     ]);
     final next = state.copyWith(entries: nextEntries);
-    _persist(next);
+    _schedulePersist(next);
     state = next;
   }
 
@@ -476,7 +520,7 @@ class AppController extends Notifier<AppState> {
         if (entry.id != id) entry,
     ];
     final next = state.copyWith(entries: nextEntries);
-    _persist(next);
+    _schedulePersist(next);
     state = next;
     return removed;
   }
@@ -505,7 +549,7 @@ class AppController extends Notifier<AppState> {
       ),
     ]);
     final next = state.copyWith(customCategories: nextCategories);
-    _persist(next);
+    _schedulePersist(next);
     state = next;
     return true;
   }
@@ -528,7 +572,7 @@ class AppController extends Notifier<AppState> {
         if (category.id != id) category,
     ];
     final next = state.copyWith(customCategories: nextCategories);
-    _persist(next);
+    _schedulePersist(next);
     state = next;
     return true;
   }
@@ -585,7 +629,7 @@ class AppController extends Notifier<AppState> {
       records: nextRecords,
       workProfiles: nextProfiles,
     );
-    _persist(next);
+    _schedulePersist(next);
     state = next;
     return true;
   }
@@ -616,7 +660,7 @@ class AppController extends Notifier<AppState> {
       records: nextRecords,
       workProfiles: nextProfiles,
     );
-    _persist(next);
+    _schedulePersist(next);
     state = next;
   }
 
@@ -626,7 +670,7 @@ class AppController extends Notifier<AppState> {
     if (_writeBlocked()) return;
     final normalized = normalizeBudgetTargets(targets.toJson());
     final next = state.copyWith(budgetTargets: normalized);
-    _persist(next);
+    _schedulePersist(next);
     state = next;
   }
 
@@ -726,6 +770,14 @@ class SelectedMonth extends Notifier<String> {
 final selectedMonthProvider = NotifierProvider<SelectedMonth, String>(
   SelectedMonth.new,
 );
+
+/// 当前月份的工时汇总。只在所选月份或工时列表变化时重算，
+/// 账本、预算、分类等无关写入不会让首页统计重新计算。
+final currentMonthWorkSummaryProvider = Provider<MonthSummary>((ref) {
+  final month = ref.watch(selectedMonthProvider);
+  final records = ref.watch(appControllerProvider.select((s) => s.records));
+  return getMonthSummary(records, month);
+});
 
 String _currentMonth() {
   final now = DateTime.now();

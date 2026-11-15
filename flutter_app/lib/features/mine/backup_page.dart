@@ -125,6 +125,7 @@ class _BackupPageState extends ConsumerState<BackupPage> {
       title: '导入会替换当前全部数据',
       description:
           '备份包含 ${parsed.records.length} 条工时、${parsed.entries.length} 条账目。'
+          '${parsed.droppedItems > 0 ? '其中 ${parsed.droppedItems} 条无法识别的数据将被跳过。' : ''}'
           '导入后会在下方给出对账结果；不一致会明确标红。',
       confirmLabel: '导入',
       danger: true,
@@ -146,7 +147,8 @@ class _BackupPageState extends ConsumerState<BackupPage> {
       setState(() {
         _report = report;
         _status = written
-            ? MigrationReport.summaryOf(report)
+            ? '${parsed.droppedItems > 0 ? '已跳过 ${parsed.droppedItems} 条不合法数据；' : ''}'
+                  '${MigrationReport.summaryOf(report)}'
             : '数据已载入但写入本地失败（仅本次运行有效），请检查存储空间后重试';
       });
       _refreshSnapshots();
@@ -176,6 +178,7 @@ class _BackupPageState extends ConsumerState<BackupPage> {
       title: '恢复本机快照？',
       description:
           '快照包含 ${parsed.records.length} 条工时、${parsed.entries.length} 条账目。'
+          '${parsed.droppedItems > 0 ? '其中 ${parsed.droppedItems} 条无法识别的数据将被跳过。' : ''}'
           '恢复前会先为当前数据再留一份现场，然后替换为这份快照。',
       confirmLabel: '恢复',
       danger: true,
@@ -194,7 +197,8 @@ class _BackupPageState extends ConsumerState<BackupPage> {
       setState(() {
         _report = report;
         _status = written
-            ? '已恢复本机快照；${MigrationReport.summaryOf(report)}'
+            ? '${parsed.droppedItems > 0 ? '已跳过 ${parsed.droppedItems} 条不合法数据；' : ''}'
+                  '已恢复本机快照；${MigrationReport.summaryOf(report)}'
             : '快照已载入但写入本地失败（仅本次运行有效）';
       });
       _refreshSnapshots();
