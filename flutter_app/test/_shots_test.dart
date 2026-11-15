@@ -59,19 +59,17 @@ void _seed(ProviderContainer container) {
   controller.saveWorkProfile(
     const WorkProfile(id: 'w2', name: '家教', hourlyRate: 90),
   );
-  const hours = <int, double>{
-    2: 8,
-    3: 8.5,
-    4: 6,
-    5: 8,
-    9: 9.5,
-    10: 8,
-    11: 7.5,
-    12: 8,
-    13: 4,
-    14: 8,
-    15: 5.5,
-  };
+  // 整月填满（周日休息）：只有前半个月有数据时，日历下半月会成片空白，
+  // 评审容易把「没数据」误读成「留白失控」。
+  final hours = <int, double>{};
+  for (var d = 1; d <= 28; d++) {
+    if (!valid(d)) continue;
+    final weekday = DateTime(now.year, now.month, d).weekday;
+    if (weekday == DateTime.sunday && d != now.day) continue;
+    hours[d] = weekday == DateTime.saturday ? 4 : 8;
+  }
+  hours[9] = 9.5; // 加班
+  hours[15] = 5.5; // 今天
   const remarks = <int, String>{
     4: '收尾，提前走',
     9: '加班两小时',

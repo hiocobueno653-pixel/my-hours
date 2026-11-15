@@ -214,7 +214,7 @@ class MyView extends ConsumerWidget {
                                   child: Text(
                                     '元',
                                     style: TextStyle(
-                                      fontSize: 11.5,
+                                      fontSize: TypeScale.caption,
                                       color: colors.text2,
                                     ),
                                   ),
@@ -223,7 +223,7 @@ class MyView extends ConsumerWidget {
                                 Text(
                                   '待结算 ${formatAmount(settlement.pending)}',
                                   style: TextStyle(
-                                    fontSize: 11.5,
+                                    fontSize: TypeScale.caption,
                                     color: colors.text2,
                                   ),
                                 ),
@@ -299,7 +299,12 @@ class MyView extends ConsumerWidget {
                               ),
                             ),
                           ),
-                          Divider(height: 1, color: colors.divider),
+                          Divider(
+                            height: 1,
+                            color: colors.divider,
+                            indent: 16,
+                            endIndent: 16,
+                          ),
                           ListRow(
                             title: '数据与备份',
                             subtitle: '导出 / 导入 / 迁移对账',
@@ -311,7 +316,12 @@ class MyView extends ConsumerWidget {
                               ),
                             ),
                           ),
-                          Divider(height: 1, color: colors.divider),
+                          Divider(
+                            height: 1,
+                            color: colors.divider,
+                            indent: 16,
+                            endIndent: 16,
+                          ),
                           ListRow(
                             title: '主题与外观',
                             subtitle: '主题色、液态玻璃、底栏与文本缩放',
@@ -323,14 +333,24 @@ class MyView extends ConsumerWidget {
                               ),
                             ),
                           ),
-                          Divider(height: 1, color: colors.divider),
+                          Divider(
+                            height: 1,
+                            color: colors.divider,
+                            indent: 16,
+                            endIndent: 16,
+                          ),
                           ListRow(
                             title: '分类管理',
                             subtitle: '默认分类与自定义分类',
                             showChevron: true,
                             onTap: () => showCategoryManager(context),
                           ),
-                          Divider(height: 1, color: colors.divider),
+                          Divider(
+                            height: 1,
+                            color: colors.divider,
+                            indent: 16,
+                            endIndent: 16,
+                          ),
                           ListRow(
                             title: '使用设置',
                             subtitle: '深色模式、大字、动效、清空数据',
@@ -444,7 +464,7 @@ class _MiniMetric extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: TextStyle(fontSize: 11.5, color: colors.text2)),
+          Text(label, style: TextStyle(fontSize: TypeScale.caption, color: colors.text2)),
           const SizedBox(height: 2),
           FittedBox(
             fit: BoxFit.scaleDown,
@@ -499,7 +519,7 @@ class _BudgetMiniRow extends StatelessWidget {
                   ? '${formatAmount(value)} / ${formatAmount(target)}'
                   : '未设置',
               style: TextStyle(
-                fontSize: 11.5,
+                fontSize: TypeScale.caption,
                 color: reached ? color : colors.text2,
                 fontFeatures: tabularFigures,
               ),
@@ -509,8 +529,10 @@ class _BudgetMiniRow extends StatelessWidget {
         const SizedBox(height: 4),
         ProgressBar(
           ratio: hasTarget ? ratio : 0,
-          color: reached ? color : colors.primary,
-          height: 4,
+          // 未达成时用本行语义色的半透明：预算条跟随「支出/收入」，
+          // 不要用品牌蓝——亮蓝在整页里看起来像可点击的主操作。
+          color: reached ? color : color.withValues(alpha: 0.5),
+          height: 5,
         ),
       ],
     );

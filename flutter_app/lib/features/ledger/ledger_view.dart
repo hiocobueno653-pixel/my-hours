@@ -670,7 +670,7 @@ class _BalanceCard extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: Gaps.lg),
+          const SizedBox(height: Gaps.md),
           // 收入 / 支出等宽双栏，中间一条 1px 细线做分隔：
           // 原来两个指标左对齐挤在一起，金额位数一变就对不齐。
           Row(
@@ -814,7 +814,7 @@ class _EntryRow extends StatelessWidget {
                   width: 40,
                   height: 40,
                   decoration: ShapeDecoration(
-                    color: isIncome ? colors.incomeSoft : colors.expenseSoft,
+                    color: colors.block,
                     shape: Radii.shape(12),
                   ),
                   child: Icon(
@@ -833,7 +833,7 @@ class _EntryRow extends StatelessWidget {
                       Text(
                         entry.category,
                         style: TextStyle(
-                          fontSize: 14,
+                          fontSize: TypeScale.title,
                           fontWeight: FontWeight.w500,
                           color: colors.text,
                         ),
@@ -847,7 +847,10 @@ class _EntryRow extends StatelessWidget {
                         ].join(' · '),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 11.5, color: colors.text3),
+                        style: TextStyle(
+                          fontSize: TypeScale.caption,
+                          color: colors.text2,
+                        ),
                       ),
                     ],
                   ),
@@ -860,8 +863,9 @@ class _EntryRow extends StatelessWidget {
                     child: Text(
                       '${isIncome ? '+' : '-'}${formatAmount(entry.amount)}',
                       style: TextStyle(
-                        fontSize: 14.5,
-                        fontWeight: FontWeight.w600,
+                        fontSize: TypeScale.title,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.02,
                         color: isIncome ? colors.income : colors.expense,
                         fontFeatures: tabularFigures,
                       ),

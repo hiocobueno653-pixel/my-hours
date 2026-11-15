@@ -1070,12 +1070,12 @@ class _CalendarCard extends StatelessWidget {
             itemCount: leadingBlanks + dates.length,
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 7,
-              mainAxisSpacing: 4,
+              mainAxisSpacing: 3,
               crossAxisSpacing: 3,
               // 固定行高而不是按宽度算正方形：窄屏/键盘弹出时 7 列宽度
               // 只有约 44dp，正方形会把日期内容挤爆；50dp 能容纳
               // 日期 + 工时 + 状态点，同时保留足够的纵向触控面积。
-              mainAxisExtent: 56 * textScale,
+              mainAxisExtent: 53 * textScale,
             ),
             itemBuilder: (context, index) {
               if (index < leadingBlanks) return const SizedBox.shrink();
@@ -1269,8 +1269,12 @@ class _CalendarCell extends StatelessWidget {
                 borderRadius: BorderRadius.circular(14),
                 side: isToday
                     ? BorderSide(
-                        color: Colors.white.withValues(alpha: 0.92),
-                        width: 1.5,
+                        // 暗色下纯白描边会比格内数字更亮，反而抢走焦点；
+                        // 换成低透明的品牌蓝，仍然清楚但不刺眼。
+                        color: colors.isDark
+                            ? colors.primary.withValues(alpha: 0.30)
+                            : Colors.white.withValues(alpha: 0.92),
+                        width: colors.isDark ? 1.1 : 1.5,
                       )
                     : BorderSide.none,
               ),

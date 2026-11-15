@@ -22,7 +22,7 @@ class GlassCard extends StatelessWidget {
   const GlassCard({
     super.key,
     required this.child,
-    this.padding = const EdgeInsets.fromLTRB(20, 18, 20, 18),
+    this.padding = const EdgeInsets.fromLTRB(16, 14, 16, 14),
     this.radius = Radii.card,
     this.onTap,
     this.margin,
@@ -410,9 +410,9 @@ class HeaderGlassSurface extends StatelessWidget {
           shadows: [
             BoxShadow(
               color: Colors.black.withValues(
-                alpha: isDark ? 0.24 : (bright ? 0.05 : 0.045),
+                alpha: isDark ? 0.16 : (bright ? 0.05 : 0.045),
               ),
-              blurRadius: 14,
+              blurRadius: 16,
               offset: const Offset(0, 4),
             ),
           ],
