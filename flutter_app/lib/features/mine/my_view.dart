@@ -429,12 +429,18 @@ class MyView extends ConsumerWidget {
           body: SafeArea(top: false, child: page),
         ),
         transitionsBuilder: (context, animation, _, child) {
-          final curved = CurvedAnimation(parent: animation, curve: Curves2.out);
+          // 进场减速、退场加速：页面从右侧推入，返回时沿同一条路径退回右侧，
+          // 而不是「淡出消失」——用户看到的来路和去路是同一个。
+          final curved = CurvedAnimation(
+            parent: animation,
+            curve: Curves2.standardDecelerate,
+            reverseCurve: Curves2.standardAccelerate,
+          );
           return FadeTransition(
             opacity: curved,
             child: SlideTransition(
               position: Tween<Offset>(
-                begin: const Offset(0.06, 0),
+                begin: const Offset(0.04, 0),
                 end: Offset.zero,
               ).animate(curved),
               child: child,

@@ -15,7 +15,6 @@ import 'core/settings.dart';
 import 'core/text_scaling.dart';
 import 'core/theme_tokens.dart';
 import 'data/persistence.dart';
-import 'features/onboarding/loading_screen.dart';
 import 'features/onboarding/welcome_screen.dart';
 import 'state/app_controller.dart';
 import 'ui/dialog.dart';
@@ -43,13 +42,7 @@ class _BootstrapRoot extends StatefulWidget {
   State<_BootstrapRoot> createState() => _BootstrapRootState();
 }
 
-class _BootstrapRootState extends State<_BootstrapRoot>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _fade = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 280),
-    value: 1,
-  );
+class _BootstrapRootState extends State<_BootstrapRoot> {
   bool _started = false;
 
   @override
@@ -61,17 +54,8 @@ class _BootstrapRootState extends State<_BootstrapRoot>
   Future<void> _boot() async {
     if (_started) return;
     _started = true;
-    final startedAt = DateTime.now();
     try {
       final data = await _loadBootData();
-      final elapsed = DateTime.now().difference(startedAt);
-      const minimum = Duration(milliseconds: 650);
-      if (elapsed < minimum) {
-        await Future<void>.delayed(minimum - elapsed);
-      }
-      if (!mounted) return;
-      final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
-      if (!disable) await _fade.reverse();
       if (mounted) runApp(_buildApp(data));
     } on Object {
       if (mounted) runApp(const _BootFailureApp());
@@ -79,23 +63,16 @@ class _BootstrapRootState extends State<_BootstrapRoot>
   }
 
   @override
-  void dispose() {
-    _fade.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: '时页',
-      debugShowCheckedModeBanner: false,
-      theme: buildAppTheme(AppColors.light, AppTokens.lightTokens),
-      darkTheme: buildAppTheme(AppColors.dark, AppTokens.darkTokens),
-      themeMode: ThemeMode.system,
-      home: FadeTransition(
-        opacity: _fade,
-        child: const TimepageLoadingScreen(),
-      ),
+    // 首帧只铺一层页面底色：不再有品牌擦除动画，也没有「最低停留 650ms」。
+    // 数据读完就切到真正界面，冷启动少掉一次等待 + 一次淡出。
+    // 系统原生开屏仍然在，所以用户看到的是：系统 splash → 应用首页。
+    final dark =
+        WidgetsBinding.instance.platformDispatcher.platformBrightness ==
+        Brightness.dark;
+    return ColoredBox(
+      color: (dark ? AppColors.dark : AppColors.light).page,
+      child: const SizedBox.expand(),
     );
   }
 }

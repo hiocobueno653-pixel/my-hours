@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/motion.dart';
 import '../../core/formatters.dart';
 import '../../core/theme_tokens.dart';
 import '../../data/constants.dart';
@@ -23,8 +24,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _entryController = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 1100),
-    value: 0.14,
+    duration: const Duration(milliseconds: 820),
   );
   bool _starting = false;
 
@@ -110,7 +110,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                       physics: const BouncingScrollPhysics(
                         parent: AlwaysScrollableScrollPhysics(),
                       ),
-                      padding: const EdgeInsets.fromLTRB(24, 26, 24, 18),
+                      padding: const EdgeInsets.fromLTRB(24, 26, 24, 32),
                       child: Center(
                         child: ConstrainedBox(
                           constraints: const BoxConstraints(maxWidth: 430),
@@ -120,15 +120,15 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                               _StaggerReveal(
                                 controller: _entryController,
                                 begin: 0,
-                                end: 0.40,
-                                offset: 0.05,
+                                end: 0.38,
+                                offset: 0.06,
                                 child: const _WelcomeHeading(),
                               ),
                               const SizedBox(height: 22),
                               _StaggerReveal(
                                 controller: _entryController,
                                 begin: 0.10,
-                                end: 0.54,
+                                end: 0.48,
                                 offset: 0.12,
                                 child: const _BentoPreview(),
                               ),
@@ -141,8 +141,8 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                                     Expanded(
                                       child: _StaggerReveal(
                                         controller: _entryController,
-                                        begin: 0.24,
-                                        end: 0.70,
+                                        begin: 0.20,
+                                        end: 0.58,
                                         offset: 0.12,
                                         child: const _LocalFirstCard(),
                                       ),
@@ -151,8 +151,8 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                                     Expanded(
                                       child: _StaggerReveal(
                                         controller: _entryController,
-                                        begin: 0.30,
-                                        end: 0.76,
+                                        begin: 0.26,
+                                        end: 0.64,
                                         offset: 0.12,
                                         child: const _HoursPresetCard(),
                                       ),
@@ -163,8 +163,8 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                               const SizedBox(height: 14),
                               _StaggerReveal(
                                 controller: _entryController,
-                                begin: 0.40,
-                                end: 0.84,
+                                begin: 0.34,
+                                end: 0.72,
                                 offset: 0.06,
                                 child: Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
@@ -194,15 +194,15 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                     ),
                   ),
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+                    padding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
                     child: Center(
                       child: ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: 430),
                         child: _StaggerReveal(
                           controller: _entryController,
-                          begin: 0.50,
-                          end: 1,
-                          offset: 0.24,
+                          begin: 0.42,
+                          end: 0.90,
+                          offset: 0.18,
                           child: _StartButton(
                             busy: _starting,
                             onPressed: _starting ? null : _start,
@@ -372,8 +372,12 @@ class _BentoPreview extends StatelessWidget {
                     label: kHoursOnly ? '出勤' : '本周工资',
                     value: kHoursOnly ? '5' : '¥800',
                     unit: kHoursOnly ? '天' : '',
+                    // 暗色的 warningSoft(#3E2A0C) 压在卡片(#151D2E) 上几乎
+                    // 分不出来，改用半透明琥珀做底，块面才立得住。
                     background: kHoursOnly
                         ? colors.incomeSoft
+                        : colors.isDark
+                        ? colors.warning.withValues(alpha: 0.18)
                         : colors.warningSoft,
                     foreground: kHoursOnly ? colors.income : colors.warning,
                   ),
@@ -648,12 +652,12 @@ class _StartButton extends StatelessWidget {
                 end: Alignment.bottomCenter,
                 colors: [colors.primary, bottom],
               ),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
               boxShadow: [
                 BoxShadow(
-                  color: colors.primary.withValues(alpha: 0.28),
-                  blurRadius: 26,
-                  offset: const Offset(0, 12),
+                  color: colors.primary.withValues(alpha: 0.22),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
                 ),
               ],
             ),
@@ -673,7 +677,7 @@ class _StartButton extends StatelessWidget {
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
                           colors: [
-                            Colors.white.withValues(alpha: 0.22),
+                            Colors.white.withValues(alpha: 0.16),
                             Colors.transparent,
                           ],
                         ),
@@ -773,7 +777,7 @@ class _StaggerRevealState extends State<_StaggerReveal> {
     final interval = Interval(
       widget.begin,
       widget.end,
-      curve: Curves.easeOutCubic,
+      curve: Curves2.standardDecelerate,
     );
     _fade = CurvedAnimation(parent: widget.controller, curve: interval);
     _slideCurve = CurvedAnimation(parent: widget.controller, curve: interval);

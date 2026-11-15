@@ -32,7 +32,9 @@ Future<T?> showAppSheet<T>({
     ),
     pageBuilder: (sheetContext, animation, secondaryAnimation) {
       final scrimOpacity = animation.drive(
-        CurveTween(curve: const Interval(0, 0.42, curve: Curves.easeOutCubic)),
+        CurveTween(
+          curve: const Interval(0, 0.42, curve: Curves2.standardDecelerate),
+        ),
       );
       final curved = CurvedAnimation(
         parent: animation,

@@ -49,7 +49,9 @@ Future<bool?> showConfirmDialog(
         ),
       );
       final scrimOpacity = animation.drive(
-        CurveTween(curve: const Interval(0, 0.45, curve: Curves.easeOutCubic)),
+        CurveTween(
+          curve: const Interval(0, 0.45, curve: Curves2.standardDecelerate),
+        ),
       );
       return Stack(
         children: [
@@ -68,7 +70,10 @@ Future<bool?> showConfirmDialog(
             child: AnimatedBuilder(
               animation: animation,
               builder: (context, child) {
-                final progress = Curves.easeOutCubic.transform(animation.value);
+                // 进场减速、反向即加速退回点击点：同一组 begin/end 值正反各跑一遍。
+                final progress = Curves2.standardDecelerate.transform(
+                  animation.value,
+                );
                 final screen = MediaQuery.sizeOf(dialogContext);
                 final screenCenter = Offset(
                   screen.width / 2,

@@ -17,6 +17,7 @@ import 'package:my_hours/data/constants.dart';
 import 'package:my_hours/data/models.dart';
 import 'package:my_hours/data/persistence.dart';
 import 'package:my_hours/features/ledger/ledger_view.dart';
+import 'package:my_hours/features/onboarding/welcome_screen.dart';
 import 'package:my_hours/features/mine/my_view.dart';
 import 'package:my_hours/features/work/month_view.dart';
 import 'package:my_hours/state/app_controller.dart';
@@ -213,5 +214,24 @@ void main() {
       MyView(largeText: false, onLargeTextChanged: (_) {}),
     );
     await _capture(tester, 'mine-light');
+  });
+
+  testWidgets('欢迎页 · 亮色', (tester) async {
+    tester.view.physicalSize = const Size(390 * 2, 844 * 2);
+    tester.view.devicePixelRatio = 2;
+    addTearDown(tester.view.reset);
+    await _boot(tester, WelcomeScreen(onStart: () async {}));
+    // 入场 820ms，等它落定再抓图，否则拍到的是半透明的中间帧。
+    await tester.pump(const Duration(milliseconds: 900));
+    await _capture(tester, 'welcome-light');
+  });
+
+  testWidgets('欢迎页 · 暗色', (tester) async {
+    tester.view.physicalSize = const Size(390 * 2, 844 * 2);
+    tester.view.devicePixelRatio = 2;
+    addTearDown(tester.view.reset);
+    await _boot(tester, WelcomeScreen(onStart: () async {}), dark: true);
+    await tester.pump(const Duration(milliseconds: 900));
+    await _capture(tester, 'welcome-dark');
   });
 }

@@ -454,7 +454,7 @@ class _FadeTabView extends StatelessWidget {
                         slideOffset: !slide || tab == active
                             ? Offset.zero
                             : Offset(
-                                (tabs.indexOf(tab) - activeIndex).sign * 0.014,
+                                (tabs.indexOf(tab) - activeIndex).sign * 0.028,
                                 0,
                               ),
                         duration: motionDuration(

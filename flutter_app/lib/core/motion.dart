@@ -10,6 +10,23 @@ library;
 
 import 'package:flutter/animation.dart';
 
+/// 动效纪律（改动画前先读这里）
+///
+/// 1. **从哪来，回哪去**：任何「开」的动作都要能被「关」原路撤回。
+///    - 对话框：从触发它的按压坐标生长，反向沿同一路径缩回该坐标
+///      （`MotionOrigin` + `Curves2.standardAccelerate`）。
+///    - 二级页：从右侧推入，返回时推回右侧，不做「淡出消失」。
+///    - 底部弹层：从屏幕底部升起，返回底部。
+///    - 月份切换：往左滑动 → 新月份从右进、旧月份往左退；方向由
+///      `_calendarDirection` 记住，点月份选择器跳转也按大小定方向。
+///    判断标准：用户能说出「它从哪儿冒出来的」；说不出来就是错的。
+/// 2. **进场减速、退场加速**：`standardDecelerate` 落定，`standardAccelerate`
+///    离开。退场用进场曲线会让元素「恋恋不舍」地慢慢消失。
+/// 3. **透明度不做过冲**：只有位置与缩放可以用 `softSpring`。颜色、不透明度
+///    一旦过冲就会闪。
+/// 4. **系统级「移除动画」优先**：所有时长走 `motionDuration`，或在
+///    `MediaQuery.maybeDisableAnimationsOf` 为真时直接给终态。
+///
 /// 时长档位。
 abstract final class Timings {
   /// 按压反馈。

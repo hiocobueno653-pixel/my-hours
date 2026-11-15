@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/formatters.dart';
+import '../../core/motion.dart';
 import '../../core/theme_tokens.dart';
 import '../../data/constants.dart';
 import '../../data/dates.dart';
@@ -869,7 +870,7 @@ class _SwipeableCalendarState extends State<_SwipeableCalendar>
   late final AnimationController _slideController =
       AnimationController(
         vsync: this,
-        duration: const Duration(milliseconds: 260),
+        duration: const Duration(milliseconds: 300),
       )..addStatusListener((status) {
         if (status == AnimationStatus.completed && mounted) {
           setState(() => _outgoing = null);
@@ -957,7 +958,9 @@ class _SwipeableCalendarState extends State<_SwipeableCalendar>
         : AnimatedBuilder(
             animation: _slideController,
             builder: (context, _) {
-              final progress = Curves.easeOutCubic.transform(
+              // 进场减速（落定），退场由 reverse 走 Curves2.out.flipped，
+              // 方向与进场一致：新月份从来的那侧进、旧月份回它来的那侧。
+              final progress = Curves2.standardDecelerate.transform(
                 _slideController.value,
               );
               final travel = MediaQuery.sizeOf(context).width * 0.18;
@@ -1005,9 +1008,11 @@ class _SwipeableCalendarState extends State<_SwipeableCalendar>
       child: AnimatedContainer(
         duration: _dragging || disable
             ? Duration.zero
-            : const Duration(milliseconds: 220),
-        curve: Curves.easeOutCubic,
-        transform: Matrix4.translationValues(_dragDx * 0.55, 0, 0),
+            : const Duration(milliseconds: 260),
+        // 松手未过阈值时回到原位：轻度过冲带来「物理回弹」的手感，
+        // 但落点仍是唯一原位，不会漂移。
+        curve: Curves2.softSpring,
+        transform: Matrix4.translationValues(_dragDx * 0.62, 0, 0),
         child: content,
       ),
     );
