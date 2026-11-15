@@ -586,7 +586,7 @@ class _HoursPresetCardState extends State<_HoursPresetCard> {
                     pressedScale: 0.95,
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 180),
-                      curve: Curves.easeOutCubic,
+                      curve: Curves2.out,
                       height: 32,
                       alignment: Alignment.center,
                       decoration: ShapeDecoration(

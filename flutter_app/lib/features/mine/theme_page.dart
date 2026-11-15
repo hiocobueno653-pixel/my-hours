@@ -7,6 +7,7 @@ import '../../ui/glass_menu.dart';
 import '../../ui/pinned_header.dart';
 import '../../ui/sheet.dart';
 import '../../ui/widgets.dart';
+import '../../core/motion.dart';
 
 /// 主题与外观。版式参考系统主题页：顶部实时预览 + 分区设置卡片。
 class ThemePage extends ConsumerWidget {
@@ -375,7 +376,7 @@ class _ThemePreview extends StatelessWidget {
       padding: const EdgeInsets.all(Gaps.md),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 260),
-        curve: Curves.easeOutCubic,
+        curve: Curves2.out,
         height: 226,
         decoration: ShapeDecoration(
           color: colors.isDark ? colors.card : const Color(0xFFF8FAFC),

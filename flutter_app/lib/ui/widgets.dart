@@ -167,7 +167,7 @@ class AnimatedNumericText extends StatelessWidget {
     this.maxLines = 1,
     this.softWrap = false,
     this.duration = const Duration(milliseconds: 220),
-    this.curve = Curves.easeOutCubic,
+    this.curve = Curves2.out,
   });
 
   final num value;
@@ -901,14 +901,16 @@ class _RevealOnMountState extends State<RevealOnMount>
   );
   Timer? _startTimer;
 
+  bool _started = false;
+
   @override
-  void initState() {
-    super.initState();
-    final disable = WidgetsBinding
-        .instance
-        .platformDispatcher
-        .accessibilityFeatures
-        .disableAnimations;
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_started) return;
+    _started = true;
+    // 读 MediaQuery 而不是 platformDispatcher：应用内的「减少动效」会被
+    // main.dart 合成进 MediaQuery.disableAnimations，只读系统开关会漏掉它。
+    final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     if (disable) {
       _controller.value = 1;
       return;

@@ -99,11 +99,13 @@ ParsedBackupData parseBackupText(String text, {int? byteLength}) {
     normalizedRecords.add(record);
   }
 
-  final entriesRaw = version == 1
-      ? const <Object?>[]
-      : (parsed['entries'] ?? const <Object?>[]);
+  // v2 起 entries 是必需字段。缺字段若按空数组放行，一份被截断的备份会
+  // 「导入成功、跳过 0 条」地把整本账目清空。
+  final entriesRaw = version == 1 ? const <Object?>[] : parsed['entries'];
   if (entriesRaw is! List) {
-    throw const BackupParseException('备份文件账目数据格式不正确');
+    throw BackupParseException(
+      version == 1 ? '备份文件账目数据格式不正确' : '备份文件缺少账目数据',
+    );
   }
   final normalizedEntries = normalizeLedgerEntries(entriesRaw);
   droppedItems += entriesRaw.length - normalizedEntries.length;
@@ -165,7 +167,10 @@ Object? _decodeJson(String text) => jsonDecode(text);
 /// CSV 单元格：公式注入防护 + 必要转义。
 String csvCell(String value) {
   var text = value;
+  // 纯数字（含负数）不是公式：月结余为负是常态，加前缀会让 Excel
+  // 把整列读成文本，既不能计算也不能排序。
   final startsRisky =
+      !RegExp(r'^-?\d+(\.\d+)?$').hasMatch(text) &&
       text.isNotEmpty &&
       (text.startsWith('=') ||
           text.startsWith('+') ||

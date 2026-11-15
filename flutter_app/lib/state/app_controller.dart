@@ -352,9 +352,11 @@ class AppController extends Notifier<AppState> {
     if (rate != null && rate.isFinite && rate > 0 && rate <= maxHourlyRate) {
       record = record.copyWith(rate: roundMoney(rate));
     }
+    // 0 与「未设置」同义：计钱口径是 fixedPay > 0。若把 0 存进来，这一条
+    // 会改按「工时 × 时薪」计钱，用户填「0 元」反而全额入账。
     if (fixedPay != null &&
         fixedPay.isFinite &&
-        fixedPay >= 0 &&
+        fixedPay > 0 &&
         fixedPay <= maxFixedPay) {
       record = record.copyWith(fixedPay: roundMoney(fixedPay));
     }

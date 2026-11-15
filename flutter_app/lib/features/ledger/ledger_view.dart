@@ -296,7 +296,7 @@ class _LedgerViewState extends ConsumerState<LedgerView> {
                                             ) ??
                                             false,
                                       ),
-                                      curve: Curves.easeOutCubic,
+                                      curve: Curves2.out,
                                       padding: const EdgeInsets.symmetric(
                                         horizontal: 13,
                                         vertical: 8.5,
@@ -318,7 +318,7 @@ class _LedgerViewState extends ConsumerState<LedgerView> {
                                               ) ??
                                               false,
                                         ),
-                                        curve: Curves.easeOutCubic,
+                                        curve: Curves2.out,
                                         style: TextStyle(
                                           fontSize: 12.5,
                                           fontWeight: FontWeight.w500,

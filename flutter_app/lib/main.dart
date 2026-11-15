@@ -364,10 +364,10 @@ class _AppLaunchGate extends ConsumerWidget {
             if (incomingShell) {
               final fade = CurvedAnimation(
                 parent: animation,
-                curve: const Interval(0.30, 1, curve: Curves.easeOutCubic),
+                curve: const Interval(0.30, 1, curve: Curves2.out),
               );
               final scale = Tween<double>(begin: 1.03, end: 1).animate(
-                CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+                CurvedAnimation(parent: animation, curve: Curves2.out),
               );
               return FadeTransition(
                 opacity: fade,

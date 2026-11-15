@@ -958,8 +958,9 @@ class _SwipeableCalendarState extends State<_SwipeableCalendar>
         : AnimatedBuilder(
             animation: _slideController,
             builder: (context, _) {
-              // 进场减速（落定），退场由 reverse 走 Curves2.out.flipped，
-              // 方向与进场一致：新月份从来的那侧进、旧月份回它来的那侧。
+              // 方向约定：_slideDirection = 1 表示「下个月」（用户向左滑）。
+              // 旧月份必须往左退场、新月份从右侧进场；反过来就是「往左滑、
+              // 卡片往右飞」。
               final progress = Curves2.standardDecelerate.transform(
                 _slideController.value,
               );
@@ -970,7 +971,7 @@ class _SwipeableCalendarState extends State<_SwipeableCalendar>
                   Opacity(
                     opacity: 1 - progress,
                     child: Transform.translate(
-                      offset: Offset(_slideDirection * travel * progress, 0),
+                      offset: Offset(-_slideDirection * travel * progress, 0),
                       child: _CalendarCard(
                         month: outgoing.month,
                         dates: outgoing.dates,
@@ -986,7 +987,7 @@ class _SwipeableCalendarState extends State<_SwipeableCalendar>
                     opacity: 0.65 + 0.35 * progress,
                     child: Transform.translate(
                       offset: Offset(
-                        -_slideDirection * travel * (1 - progress),
+                        _slideDirection * travel * (1 - progress),
                         0,
                       ),
                       child: Transform.scale(
@@ -1303,7 +1304,7 @@ class _CalendarCell extends StatelessWidget {
                 const SizedBox(height: 3),
                 AnimatedContainer(
                   duration: const Duration(milliseconds: 180),
-                  curve: Curves.easeOutCubic,
+                  curve: Curves2.out,
                   height: 20,
                   width: double.infinity,
                   alignment: Alignment.center,
@@ -1436,6 +1437,14 @@ class _DayEditorSheetState extends ConsumerState<DayEditorSheet> {
     _remark = TextEditingController();
     _fixedPay = TextEditingController();
     _applyRecord(widget.record);
+    // 「本日工资」「可结算」都从控制器文本实时推导，控制器不通知父级
+    // 就不会重建：输入 8 小时后工资仍然显示 0。
+    _hours.addListener(_onDraftInput);
+    _fixedPay.addListener(_onDraftInput);
+  }
+
+  void _onDraftInput() {
+    if (mounted) setState(() {});
   }
 
   void _applyRecord(WorkDayRecord? record) {
@@ -1456,6 +1465,8 @@ class _DayEditorSheetState extends ConsumerState<DayEditorSheet> {
 
   @override
   void dispose() {
+    _hours.removeListener(_onDraftInput);
+    _fixedPay.removeListener(_onDraftInput);
     _hours.dispose();
     _remark.dispose();
     _fixedPay.dispose();
@@ -1609,7 +1620,7 @@ class _DayEditorSheetState extends ConsumerState<DayEditorSheet> {
             labelOf: (value) =>
                 value == 0 ? '休息' : '${formatHoursValue(value)}h',
             onSelect: (value) {
-              _hours.text = formatHoursValue(value);
+              setState(() => _hours.text = formatHoursValue(value));
               _remarkFocus.requestFocus();
             },
           ),

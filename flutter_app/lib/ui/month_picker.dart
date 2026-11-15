@@ -116,7 +116,7 @@ class _MonthPickerSheetState extends State<_MonthPickerSheet> {
                   shape: Radii.shape(Radii.md),
                   child: AnimatedContainer(
                     duration: colorDuration,
-                    curve: Curves.easeOutCubic,
+                    curve: Curves2.out,
                     alignment: Alignment.center,
                     decoration: ShapeDecoration(
                       color: _key(month) == widget.initialMonth
@@ -129,7 +129,7 @@ class _MonthPickerSheetState extends State<_MonthPickerSheet> {
                       children: [
                         AnimatedDefaultTextStyle(
                           duration: colorDuration,
-                          curve: Curves.easeOutCubic,
+                          curve: Curves2.out,
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
@@ -178,7 +178,7 @@ class _MonthPickerSheetState extends State<_MonthPickerSheet> {
                   shape: Radii.pillShape,
                   child: AnimatedContainer(
                     duration: colorDuration,
-                    curve: Curves.easeOutCubic,
+                    curve: Curves2.out,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 13,
                       vertical: 9,
@@ -191,7 +191,7 @@ class _MonthPickerSheetState extends State<_MonthPickerSheet> {
                     ),
                     child: AnimatedDefaultTextStyle(
                       duration: colorDuration,
-                      curve: Curves.easeOutCubic,
+                      curve: Curves2.out,
                       style: TextStyle(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w500,

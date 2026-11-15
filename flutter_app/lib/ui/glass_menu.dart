@@ -3,6 +3,7 @@ import 'package:fluid_glass/fluid_glass.dart';
 
 import '../core/theme_tokens.dart';
 import 'widgets.dart';
+import '../core/motion.dart';
 
 /// 单选项液体玻璃菜单。
 ///
@@ -80,7 +81,7 @@ class GlassSelectMenu<T> extends StatelessWidget {
                   AnimatedRotation(
                     turns: isOpen ? 0.5 : 0,
                     duration: const Duration(milliseconds: 180),
-                    curve: Curves.easeOutCubic,
+                    curve: Curves2.out,
                     child: Icon(
                       Icons.expand_more_rounded,
                       size: 16,

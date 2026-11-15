@@ -43,7 +43,7 @@ Future<T?> showAppSheet<T>({
       );
       final panelFade = CurvedAnimation(
         parent: animation,
-        curve: const Interval(0, 0.72, curve: Curves.easeOutCubic),
+        curve: const Interval(0, 0.72, curve: Curves2.out),
         reverseCurve: Curves.easeInCubic,
       );
       return Stack(
