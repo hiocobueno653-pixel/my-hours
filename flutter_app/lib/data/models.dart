@@ -1,4 +1,4 @@
-/// 与 `src/data/types.ts` 一一对应。
+/// 与旧版 React `src/data/types.ts` 一一对应。
 ///
 /// 字段顺序、可空性与 JSON 键名必须保持一致：JSON 备份 v4 同时是
 /// 存储格式与迁移通道（见 docs/adr/0001-storage-format.md）。

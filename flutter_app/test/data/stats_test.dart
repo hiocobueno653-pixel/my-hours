@@ -2,7 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:my_hours/data/models.dart';
 import 'package:my_hours/data/stats.dart';
 
-/// 期望值取自 `src/data/stats.test.ts`。
+/// 期望值取自旧版 React `src/data/stats.test.ts`。
 void main() {
   const records = <WorkDayRecord>[
     WorkDayRecord(date: '2026-08-01', hours: 8, rate: 20),

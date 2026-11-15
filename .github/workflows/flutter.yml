@@ -59,10 +59,9 @@ jobs:
           channel: stable
           cache: true
 
-      # Gradle 读的是仓库根 android/keystore.properties，不读环境变量。
+      # Gradle 读的是 flutter_app/android/keystore.properties，不读环境变量。
       # 这里把 secrets 落成文件；缺密钥就失败，绝不产出 debug 签名包。
       - name: Install release keystore
-        working-directory: .
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}

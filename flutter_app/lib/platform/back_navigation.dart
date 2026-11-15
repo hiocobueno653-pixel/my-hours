@@ -1,6 +1,6 @@
 /// 返回键栈。
 ///
-/// 对齐旧版 `src/navigation/backNavigation.ts` 的语义：
+/// 对齐旧版 React `src/navigation/backNavigation.ts` 的语义：
 /// 弹层（sheet/dialog）先消费返回键 → 非「记工」tab 回到「记工」→
 /// 根页 2 秒内再按一次才退出。弹层消费返回时**重置双击计时**，
 /// 避免「关弹层的那一下」被算作退出序列的第一击。

@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:my_hours/data/dates.dart';
 
-/// 期望值取自 `src/data/dates.test.ts`。
+/// 期望值取自旧版 React `src/data/dates.test.ts`。
 void main() {
   group('日期工具', () {
     test('返回一个月内所有日期与星期名', () {

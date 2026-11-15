@@ -1,6 +1,6 @@
 /// 账目：校验、归一化、排序、月度汇总与分类管理。
 ///
-/// 与 `src/data/ledger.ts` 等价。`csv`/`xlsx` 导出的金额都从这里取，
+/// 与旧版 React `src/data/ledger.ts` 等价。`csv`/`xlsx` 导出的金额都从这里取，
 /// 任何舍入差异都会在导出文件里放大，所以 `roundMoney` 必须逐处使用。
 library;
 

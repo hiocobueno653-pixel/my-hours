@@ -4,7 +4,7 @@ import 'package:my_hours/data/models.dart';
 import 'package:my_hours/data/profiles.dart';
 import 'package:my_hours/data/records.dart';
 
-/// 期望值取自 `src/data/profiles.test.ts`。
+/// 期望值取自旧版 React `src/data/profiles.test.ts`。
 /// 注意：`profiles.ts` 里那份只读快照的 `getRecordPay` 未移植，
 /// 工资统一走 `records.recordPay`（无 workProfiles 时行为等价）。
 void main() {

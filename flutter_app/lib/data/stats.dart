@@ -1,6 +1,6 @@
 /// 统计聚合：年度趋势、分类占比、按工作分组、年度汇总。
 ///
-/// 与 `src/data/stats.ts` 等价。所有金额都经过 `recordPay`（逐条两位小数）
+/// 与旧版 React `src/data/stats.ts` 等价。所有金额都经过 `recordPay`（逐条两位小数）
 /// 后再累加，与 `records.dart` 的聚合顺序保持一致。
 library;
 

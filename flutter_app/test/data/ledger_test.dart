@@ -3,7 +3,7 @@ import 'package:my_hours/data/constants.dart';
 import 'package:my_hours/data/ledger.dart';
 import 'package:my_hours/data/models.dart';
 
-/// 期望值取自 `src/data/ledger.test.ts`。
+/// 期望值取自旧版 React `src/data/ledger.test.ts`。
 void main() {
   const entries = <LedgerEntry>[
     LedgerEntry(

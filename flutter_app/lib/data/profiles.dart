@@ -1,6 +1,6 @@
 /// 工作（时薪）与预算目标。
 ///
-/// 与 `src/data/profiles.ts` 等价。注意：`profiles.ts` 里那份
+/// 与旧版 React `src/data/profiles.ts` 等价。注意：`profiles.ts` 里那份
 /// `getRecordPay`（只用 rate 快照、不回退）是历史残留，**不要**移植；
 /// 工资口径以 `records.dart` 的 `recordPay` 为准。
 library;

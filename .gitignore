@@ -1,48 +1,23 @@
-# Logs
+# 日志
 logs
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
-
-# 构建/调试产物
+# 构建产物
 *.apk
-myhours-home.png
-ui-baseline.png
-*.work.png
-/*.png
+*.aab
 _apkcheck/
-
-android/.gradle
-android/local.properties
-android/build
-
-# 签名密钥（严禁提交！丢失无法升级应用）
-android/*.keystore
-android/*.jks
-android/keystore.properties
-
-# 构建产物（「只记工时」变体）与评审截图
-dist-hours/
-screenshots/
-android/app/src/hours/assets/
-
-# 临时输出
 test-output.txt
+screenshots/
 .codex-attachments/
+
+# Dart / Flutter 侧忽略规则见 flutter_app/.gitignore；
+# 签名密钥（keystore.properties / *.keystore / *.jks）同样在那里声明，严禁提交。
 
 # 工具运行时目录
 .playwright-mcp/
 .zcode/
 .mimosa/
-android/.mimosa/
+.hallmark/
 
 # Editor directories and files
 .vscode/*
@@ -55,5 +30,4 @@ android/.mimosa/
 *.sln
 *.sw?
 
-# Hallmark 设计系统记忆
-.hallmark/
+.alma-snapshots

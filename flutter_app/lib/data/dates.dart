@@ -1,6 +1,6 @@
 /// 日期与月份工具。
 ///
-/// 与 `src/data/dates.ts` 等价：本地时区、`YYYY-MM-DD` / `YYYY-MM` 字面量、
+/// 与旧版 React `src/data/dates.ts` 等价：本地时区、`YYYY-MM-DD` / `YYYY-MM` 字面量、
 /// 周一至周日以 0（周日）… 6（周六）表达，对齐 JS `Date.getDay()`。
 library;
 

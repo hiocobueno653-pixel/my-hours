@@ -3,7 +3,7 @@ import 'package:my_hours/data/models.dart';
 import 'package:my_hours/data/records.dart';
 import 'package:my_hours/data/wage_entries.dart';
 
-/// 期望值全部取自 `src/data/records.test.ts` 与 `src/data/wageEntries.ts`，
+/// 期望值全部取自旧版 React `src/data/records.test.ts` 与旧版 React `src/data/wageEntries.ts`，
 /// 不重新推导——这是「两版金额逐位一致」的证据链。
 void main() {
   const profiles = <WorkProfile>[

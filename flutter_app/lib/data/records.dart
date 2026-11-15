@@ -1,6 +1,6 @@
 /// 工时记录：校验、归一化、排序与工资口径。
 ///
-/// 与 `src/data/records.ts` 等价。**这是全部金额的唯一出口**：
+/// 与旧版 React `src/data/records.ts` 等价。**这是全部金额的唯一出口**：
 /// - 工资 = `fixedPay > 0 ? fixedPay : round(hours × 有效时薪)`
 /// - 有效时薪 = 记录 `rate` 快照优先，缺省回退该工作当前时薪
 ///

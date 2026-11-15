@@ -5,7 +5,7 @@ import 'package:my_hours/data/backup.dart';
 import 'package:my_hours/data/constants.dart';
 import 'package:my_hours/data/models.dart';
 
-/// 期望值取自 `src/data/backup.test.ts`。
+/// 期望值取自旧版 React `src/data/backup.test.ts`。
 void main() {
   const records = <WorkDayRecord>[
     WorkDayRecord(date: '2026-08-01', hours: 8, remark: '普通班'),

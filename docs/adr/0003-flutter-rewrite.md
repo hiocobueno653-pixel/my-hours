@@ -3,6 +3,7 @@
 - 状态：已采纳
 - 日期：2026-11-08
 - 取代：`src/`（React + Capacitor）作为主客户端，React 版冻结在 `react-1.2.0-baseline`
+- 后续（2026-11-15）：React + Capacitor 客户端已从仓库移除（`src/`、根 `android/`、Vite/Capacitor 配置与脚本），Flutter 为唯一客户端；本文中「冻结基线」的表述仅作历史记录。
 
 ## 背景
 

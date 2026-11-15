@@ -1,13 +1,13 @@
 # 时页 TIMEPAGE · Flutter 版
 
-记录时间，记下生活。React + Capacitor 版的 Flutter 重做。数据契约、金额口径与旧版逐项对齐，见
-`../docs/adr/`。
+记录时间，记下生活。仓库唯一客户端，Android 优先。数据契约与金额口径的
+历史演进见 `../docs/adr/`。
 
 ## 目录
 
 ```
 lib/
-  data/            纯逻辑层（与 React src/data 一一对应，无 UI 依赖）
+  data/            纯逻辑层（无 UI 依赖，可直接单测）
   state/           Riverpod 状态与全部写操作（app_controller.dart）
   core/            主题令牌、动效常量、格式化、设置
   ui/              基础原语（卡片/按压面/撤销条/分段/弹层）
@@ -66,9 +66,10 @@ $env:FLUTTER_STORAGE_BASE_URL='https://storage.flutter-io.cn'
 
 ### 签名
 
-复用旧版 `android/keystore.properties` + `myhours-release.keystore`
-（`rootProject.file("../../android/…")`）。同 applicationId + 同签名 +
-versionCode 递增 = 可覆盖升级，用户不必换包迁移。
+签名清单与密钥放在 `flutter_app/android/`：`keystore.properties` +
+`myhours-release.keystore`（`rootProject.file(…)`，两者都不入库）。
+同 applicationId + 同签名 + versionCode 递增 = 可覆盖升级，用户不必换包迁移。
+缺文件时 release 构建直接失败，不回落到 debug 签名；本地试跑请用 `--debug`。
 
 ## 数据与迁移
 
@@ -76,15 +77,6 @@ versionCode 递增 = 可覆盖升级，用户不必换包迁移。
 - 备份：JSON v4（与 React 版同一契约），严格导入——任一条目非法则整份拒绝。
 - 迁移：旧版「我的 → 数据与设置 → 保存数据备份」导出 → 新版「数据与备份 → 加载备份数据」导入 →
   自动给出五项对账（记录数 / 账目数 / 本月工资 / 已结算 / 结余），不一致标红。
-
-## 与 React 版的功能对齐
-
-已补齐：月份选择弹层、月环比、回到本月、今天账目、周一起始月历、每日工时/收支/结算圆点、
-未来日期禁用、左右滑切月、CSV 导出、记账分类筛选、超预算提示、今天账目行、关联工时、
-我的页工资/预算摘要卡、日编辑未来日期拒绝与「休息」快捷档。
-
-仍保留的差异（详见 `../docs/react-flutter-parity.md`）：Excel 导出、自动备份快照、
-日编辑前后切日、图表点击选月、二级页右滑返回。
 
 ## 品牌与启动
 
@@ -142,7 +134,7 @@ versionCode 递增 = 可覆盖升级，用户不必换包迁移。
   Flutter 引擎本身占大头，无法回到旧版 WebView 的 4 MB。可用
   `--split-per-abi` + `--obfuscate --split-debug-info` 进一步压缩。
 - **首帧**：液态折射 shader 在 x86_64 模拟器上曾把冷启动拉到约 15 秒；1.3.6 起自动在 x86_64/非 ARM 使用 `GlassQuality.plain`，模拟器热身后约 2.6–3.4 秒（受负载波动影响）。arm64 真机的液态层未实测；低核数 ARM 由 FluidGlass 的设备分级自动降级。
-- **Flutter Web**：v1 不发布 Web，React PWA 冻结维护。
+- **Flutter Web**：v1 不发布 Web，只出 Android 包。
 - **导出**：CSV 已接入系统分享；Excel 行数据构建器已在 `lib/data/backup.dart`，但尚未接入表格库。
-- **自动备份**：当前只有单文档三代本地备份，没有 React 版的自动快照副本。
+- **自动备份**：单文档三代本地备份 + 每日本机快照（保留 7 天，可在「数据与备份」恢复）。
 - UI 字体走平台系统字体（Android Roboto + 系统中文字体）；未打包额外字体，旧 Outfit 资源已清理。

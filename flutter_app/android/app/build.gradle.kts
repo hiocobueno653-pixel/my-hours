@@ -7,10 +7,11 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
-// 复用 React 版已有的 release 签名（android/keystore.properties + myhours-release.keystore）。
+// release 签名放在 flutter_app/android/（keystore.properties + myhours-release.keystore）。
+// 该清单与密钥都不入库，由本机或 CI 在构建前写入。
 // 同 applicationId + 同签名 + versionCode 递增 = 可覆盖升级，用户数据不必换包迁移。
 val keystoreProperties = Properties()
-val keystorePropertiesFile = rootProject.file("../../android/keystore.properties")
+val keystorePropertiesFile = rootProject.file("keystore.properties")
 val hasReleaseKeystore = keystorePropertiesFile.exists()
 if (hasReleaseKeystore) {
     FileInputStream(keystorePropertiesFile).use { keystoreProperties.load(it) }
@@ -41,7 +42,7 @@ android {
     signingConfigs {
         if (hasReleaseKeystore) {
             create("release") {
-                storeFile = rootProject.file("../../android/" + keystoreProperties["storeFile"])
+                storeFile = rootProject.file(keystoreProperties["storeFile"] as String)
                 storePassword = keystoreProperties["storePassword"] as String
                 keyAlias = keystoreProperties["keyAlias"] as String
                 keyPassword = keystoreProperties["keyPassword"] as String
@@ -59,7 +60,7 @@ android {
             // 返回 0，校验不报错，问题只会在用户身上爆发。
             if (!hasReleaseKeystore) {
                 throw GradleException(
-                    "缺少 android/keystore.properties 或 myhours-release.keystore：" +
+                    "缺少 flutter_app/android/keystore.properties 或 myhours-release.keystore：" +
                         "release 包必须用固定签名。要本地试跑请用 --debug 构建。",
                 )
             }

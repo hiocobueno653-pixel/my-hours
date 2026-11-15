@@ -1,6 +1,6 @@
 /// 应用状态与全部写操作。
 ///
-/// 与 `src/store/useAppStore.ts` 等价。三条不变量：
+/// 与旧版 React `src/store/useAppStore.ts` 等价。三条不变量：
 /// 1. **写前先判可写、写后必留痕**：隔离态直接拒绝写操作；普通磁盘错误
 ///    保留内存状态并显示全局失败条，避免 UI 假装保存成功；
 /// 2. **对账只在写操作内发生**：`syncWageEntries` / `syncWageEntryForDate` 是工资账目

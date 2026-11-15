@@ -4,7 +4,7 @@ import 'package:my_hours/data/records.dart';
 import 'package:my_hours/data/wage_entries.dart';
 
 /// Golden case：每条都是「输入 → 期望金额」，期望值由 React 版口径推导，
-/// 与 `src/data/records.ts` 的 `recordRate` / `recordPay` 逐行对应。
+/// 与旧版 React `src/data/records.ts` 的 `recordRate` / `recordPay` 逐行对应。
 ///
 /// 覆盖：整数/小数工时 × 整数/小数时薪、fixedPay 优先、快照 0 回退、
 /// 无 workId 回退默认工作、无时薪为 0、跨月汇总、结算账目金额、聚合顺序。
