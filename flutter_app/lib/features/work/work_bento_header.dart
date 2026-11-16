@@ -1,15 +1,18 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/formatters.dart';
 import '../../core/theme_tokens.dart';
-import '../../data/constants.dart';
 import '../../data/dates.dart';
 import '../../data/models.dart';
 import '../../data/records.dart';
 import '../../ui/widgets.dart';
 import '../charts/charts.dart';
 import '../../core/measure_unit.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../state/app_controller.dart';
+import '../../state/timer_controller.dart';
 
 /// 首页首屏的 1+2 Bento 概览：今日状态 + 本月工时 + 本月工资/出勤。
 class WorkBentoHeader extends StatelessWidget {
@@ -395,6 +398,8 @@ class _TodayBentoCard extends StatelessWidget {
               ),
             ],
           ),
+          const SizedBox(height: 7),
+          _TimerBar(date: date),
           if (!kHoursOnly) ...[
             const SizedBox(height: 7),
             Row(
@@ -670,6 +675,160 @@ class _MonthSalaryBentoCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+
+/// 计时条：开始 / 暂停 / 停止，停止时把折合时长写回当天记录。
+///
+/// 秒级刷新只在内存里做，落盘只发生在开始、暂停、停止三个时刻——
+/// 否则每秒一次磁盘写会把这个页面拖垮。
+class _TimerBar extends ConsumerStatefulWidget {
+  const _TimerBar({required this.date});
+
+  final String date;
+
+  @override
+  ConsumerState<_TimerBar> createState() => _TimerBarState();
+}
+
+class _TimerBarState extends ConsumerState<_TimerBar> {
+  Timer? _ticker;
+
+  @override
+  void initState() {
+    super.initState();
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      final timer = ref.read(timerProvider);
+      if (timer != null && timer.running) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    super.dispose();
+  }
+
+  void _start() {
+    HapticFeedback.mediumImpact();
+    ref.read(timerProvider.notifier).start(date: widget.date);
+  }
+
+  void _pause() {
+    HapticFeedback.selectionClick();
+    ref.read(timerProvider.notifier).pause();
+  }
+
+  void _stop() {
+    HapticFeedback.mediumImpact();
+    final hours = ref.read(timerProvider.notifier).stopAndClear();
+    if (hours <= 0) return;
+    final controller = ref.read(appControllerProvider.notifier);
+    final state = ref.read(appControllerProvider);
+    final record = getRecordByDate(state.records, widget.date);
+    controller.saveDay(
+      widget.date,
+      (record?.hours ?? 0) + hours,
+      record?.remark ?? '',
+      workId: record?.workId,
+      rate: record?.rate,
+      fixedPay: record?.fixedPay,
+    );
+  }
+
+  String _clock(Duration d) {
+    final total = d.inSeconds;
+    final h = total ~/ 3600;
+    final m = (total % 3600) ~/ 60;
+    final s = total % 60;
+    String two(int v) => v.toString().padLeft(2, '0');
+    return h > 0 ? '$h:${two(m)}:${two(s)}' : '${two(m)}:${two(s)}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final timer = ref.watch(timerProvider);
+    // 只认今天的计时：别的日子的计时不该出现在这里。
+    final mine = timer != null && timer.date == widget.date ? timer : null;
+    final running = mine?.running ?? false;
+    final elapsed = mine?.elapsed ?? Duration.zero;
+    final active = mine != null && elapsed.inSeconds > 0;
+
+    return Row(
+      children: [
+        Icon(
+          Icons.timer_outlined,
+          size: 15,
+          color: running ? colors.primary : colors.text3,
+        ),
+        const SizedBox(width: 5),
+        Text(
+          active ? _clock(elapsed) : '计时',
+          style: TextStyle(
+            fontSize: TypeScale.label,
+            fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+            color: active ? colors.text : colors.text3,
+            fontFeatures: tabularFigures,
+          ),
+        ),
+        const Spacer(),
+        _TimerAction(
+          label: active ? '结束' : '开始',
+          primary: !active,
+          onTap: active ? _stop : _start,
+        ),
+        if (running) ...[
+          const SizedBox(width: 6),
+          _TimerAction(label: '暂停', primary: false, onTap: _pause),
+        ] else if (mine != null && active) ...[
+          const SizedBox(width: 6),
+          _TimerAction(label: '继续', primary: false, onTap: _start),
+        ],
+      ],
+    );
+  }
+}
+
+class _TimerAction extends StatelessWidget {
+  const _TimerAction({
+    required this.label,
+    required this.primary,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool primary;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return Pressable(
+      onTap: onTap,
+      haptic: false,
+      shape: Radii.pillShape,
+      pressedScale: 0.94,
+      child: Container(
+        height: 26,
+        padding: const EdgeInsets.symmetric(horizontal: 11),
+        alignment: Alignment.center,
+        decoration: ShapeDecoration(
+          color: primary ? colors.primaryContainer : colors.inset,
+          shape: Radii.pillShape,
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: TypeScale.micro,
+            fontWeight: FontWeight.w600,
+            color: primary ? colors.onPrimaryContainer : colors.text2,
+          ),
+        ),
       ),
     );
   }

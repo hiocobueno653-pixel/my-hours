@@ -40,10 +40,22 @@ class AppSettings extends ChangeNotifier {
   static const _kCustomTextScale = 'my-hours.customTextScale';
   static const _kFollowSystemText = 'my-hours.followSystemText';
   static const _kUnit = 'my-hours.unit';
+  static const _kTimer = 'my-hours.timer';
 
   static Future<AppSettings> load() async {
     final prefs = await SharedPreferences.getInstance();
     return AppSettings._(prefs);
+  }
+
+  /// 正在进行的计时（JSON）。进程被杀后靠它恢复。
+  String? get timerSnapshot => _prefs.getString(_kTimer);
+
+  Future<void> setTimerSnapshot(String? raw) async {
+    if (raw == null) {
+      await _prefs.remove(_kTimer);
+    } else {
+      await _prefs.setString(_kTimer, raw);
+    }
   }
 
   /// 计量单位：工时 / 学时 / 次数 / 章 / 页 / 公里。
