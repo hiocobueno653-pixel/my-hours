@@ -386,8 +386,8 @@ class _LedgerViewState extends ConsumerState<LedgerView> {
                                     shape: Radii.pillShape,
                                     pressedScale: 0.90,
                                     child: SizedBox(
-                                      width: 32,
-                                      height: 32,
+                                      width: 44,
+                                      height: 44,
                                       child: Icon(
                                         Icons.close_rounded,
                                         size: 17,
@@ -614,7 +614,7 @@ class _BalanceCard extends StatelessWidget {
                   onTap: () => onChanged(shiftMonth(month, -1)),
                   shape: Radii.shape(12),
                   child: SizedBox(
-                    width: 40,
+                    width: 44,
                     height: 40,
                     child: Icon(
                       Icons.chevron_left_rounded,
@@ -633,7 +633,7 @@ class _BalanceCard extends StatelessWidget {
                   onTap: () => onChanged(shiftMonth(month, 1)),
                   shape: Radii.shape(12),
                   child: SizedBox(
-                    width: 40,
+                    width: 44,
                     height: 40,
                     child: Icon(
                       Icons.chevron_right_rounded,

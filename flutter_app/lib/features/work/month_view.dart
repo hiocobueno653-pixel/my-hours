@@ -355,7 +355,7 @@ class _MonthStepButton extends StatelessWidget {
         shape: Radii.pillShape,
         pressedScale: 0.92,
         child: SizedBox(
-          width: 38,
+          width: 44,
           height: 44,
           child: Icon(icon, size: 18, color: context.colors.text2),
         ),
@@ -961,7 +961,7 @@ class _SwipeableCalendarState extends State<_SwipeableCalendar>
               // 方向约定：_slideDirection = 1 表示「下个月」（用户向左滑）。
               // 旧月份必须往左退场、新月份从右侧进场；反过来就是「往左滑、
               // 卡片往右飞」。
-              final progress = Curves2.standardDecelerate.transform(
+              final progress = Curves2.out.transform(
                 _slideController.value,
               );
               final travel = MediaQuery.sizeOf(context).width * 0.18;
@@ -1012,7 +1012,7 @@ class _SwipeableCalendarState extends State<_SwipeableCalendar>
             : const Duration(milliseconds: 260),
         // 松手未过阈值时回到原位：轻度过冲带来「物理回弹」的手感，
         // 但落点仍是唯一原位，不会漂移。
-        curve: Curves2.softSpring,
+        curve: Curves2.out,
         transform: Matrix4.translationValues(_dragDx * 0.62, 0, 0),
         child: content,
       ),
@@ -1838,7 +1838,7 @@ class _DayStepButton extends StatelessWidget {
           child: Opacity(
             opacity: enabled ? 1 : 0.35,
             child: Container(
-              width: 40,
+              width: 44,
               height: 40,
               alignment: Alignment.center,
               decoration: ShapeDecoration(

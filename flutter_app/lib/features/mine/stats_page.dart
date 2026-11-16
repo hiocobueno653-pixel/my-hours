@@ -101,11 +101,11 @@ class _StatsPageState extends ConsumerState<StatsPage> {
                           child: Center(
                             child: AnimatedSwitcher(
                               duration: motionDuration(
-                                Timings.short,
+                                Timings.fast,
                                 disableAnimations: disable,
                               ),
                               switchInCurve: Curves2.out,
-                              switchOutCurve: Curves2.inCurve,
+                              switchOutCurve: Curves2.out,
                               transitionBuilder: (child, animation) {
                                 return FadeTransition(
                                   opacity: animation,

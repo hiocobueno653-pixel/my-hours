@@ -763,7 +763,7 @@ class _StaggerRevealState extends State<_StaggerReveal> {
     final interval = Interval(
       widget.begin,
       widget.end,
-      curve: Curves2.standardDecelerate,
+      curve: Curves2.out,
     );
     _fade = CurvedAnimation(parent: widget.controller, curve: interval);
     _slideCurve = CurvedAnimation(parent: widget.controller, curve: interval);

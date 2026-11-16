@@ -133,10 +133,10 @@ class _PressableState extends State<Pressable> {
                     child: AnimatedOpacity(
                       opacity: _pressed ? 1 : 0,
                       duration: motionDuration(
-                        Timings.short,
+                        Timings.fast,
                         disableAnimations: disable,
                       ),
-                      curve: Curves2.standard,
+                      curve: Curves2.inOut,
                       child: ClipPath(
                         clipper: ShapeBorderClipper(shape: shape),
                         child: ColoredBox(
@@ -757,10 +757,10 @@ class Segmented<T> extends StatelessWidget {
             children: [
               AnimatedPositioned(
                 duration: motionDuration(
-                  Timings.short,
+                  Timings.fast,
                   disableAnimations: disable,
                 ),
-                curve: Curves2.emphasizedDecelerate,
+                curve: Curves2.out,
                 left: selectedIndex * segmentWidth,
                 top: 0,
                 width: segmentWidth,
@@ -790,10 +790,10 @@ class Segmented<T> extends StatelessWidget {
                             child: Center(
                               child: AnimatedDefaultTextStyle(
                                 duration: motionDuration(
-                                  Timings.short,
+                                  Timings.fast,
                                   disableAnimations: disable,
                                 ),
-                                curve: Curves2.standard,
+                                curve: Curves2.inOut,
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w500,
@@ -837,9 +837,9 @@ class AnimatedMonthLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     return AnimatedSwitcher(
-      duration: motionDuration(Timings.short, disableAnimations: disable),
+      duration: motionDuration(Timings.fast, disableAnimations: disable),
       switchInCurve: Curves2.out,
-      switchOutCurve: Curves2.inCurve,
+      switchOutCurve: Curves2.out,
       layoutBuilder: (current, previous) =>
           Stack(alignment: alignment, children: [...previous, ?current]),
       transitionBuilder: (child, animation) {
@@ -874,7 +874,8 @@ class RevealOnMount extends StatefulWidget {
     super.key,
     required this.child,
     this.delay = Duration.zero,
-    this.duration = const Duration(milliseconds: 380),
+    // R06：UI 动效总长必须 < 300ms。三段错峰 0/40/80 + 200 = 280ms。
+    this.duration = const Duration(milliseconds: 200),
     this.offset = 12,
   });
 

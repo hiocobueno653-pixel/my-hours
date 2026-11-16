@@ -140,7 +140,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     controller.animateTo(
       0,
-      duration: motionDuration(Timings.medium, disableAnimations: disable),
+      duration: motionDuration(Timings.slow, disableAnimations: disable),
       curve: Curves2.out,
     );
   }
@@ -305,11 +305,11 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                     bottom: 0,
                     child: AnimatedSlide(
                       offset: dockEntered ? Offset.zero : const Offset(0, 0.25),
-                      duration: disable ? Duration.zero : Timings.medium,
-                      curve: Curves2.emphasizedDecelerate,
+                      duration: disable ? Duration.zero : Timings.slow,
+                      curve: Curves2.out,
                       child: AnimatedOpacity(
                         opacity: dockEntered ? 1 : 0,
-                        duration: disable ? Duration.zero : Timings.short,
+                        duration: disable ? Duration.zero : Timings.fast,
                         child: dockEntered
                             ? _AppDock(
                                 tabs: _tabs,
@@ -348,7 +348,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                     bottom: false,
                     child: AnimatedSlide(
                       duration: motionDuration(
-                        Timings.short,
+                        Timings.fast,
                         disableAnimations: disable,
                       ),
                       offset: _exitHint == null
@@ -357,7 +357,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                       curve: Curves2.out,
                       child: AnimatedOpacity(
                         duration: motionDuration(
-                          Timings.short,
+                          Timings.fast,
                           disableAnimations: disable,
                         ),
                         opacity: _exitHint == null ? 0 : 1,
@@ -458,7 +458,7 @@ class _FadeTabView extends StatelessWidget {
                                 0,
                               ),
                         duration: motionDuration(
-                          Timings.short,
+                          Timings.fast,
                           disableAnimations: disable,
                         ),
                         child: RepaintBoundary(child: builder(tab)),
@@ -513,11 +513,11 @@ class _TabPaneState extends State<_TabPane> {
       child: AnimatedSlide(
         offset: widget.slideOffset,
         duration: widget.duration,
-        curve: Curves2.emphasizedDecelerate,
+        curve: Curves2.out,
         child: AnimatedOpacity(
           opacity: widget.active ? 1 : 0,
           duration: widget.duration,
-          curve: Curves2.standard,
+          curve: Curves2.inOut,
           onEnd: () {
             if (!widget.active && !_offstage) {
               setState(() => _offstage = true);
@@ -726,7 +726,7 @@ class _PlainDockBar extends StatelessWidget {
                 duration: MediaQuery.maybeDisableAnimationsOf(context) ?? false
                     ? Duration.zero
                     : const Duration(milliseconds: 260),
-                curve: Curves2.emphasizedDecelerate,
+                curve: Curves2.out,
                 left: tabWidth * index + inset,
                 top: inset,
                 width: tabWidth - inset * 2,

@@ -417,11 +417,11 @@ class MyView extends ConsumerWidget {
     Navigator.of(context).push(
       PageRouteBuilder<void>(
         transitionDuration: motionDuration(
-          Timings.medium,
+          Timings.slow,
           disableAnimations: disable,
         ),
         reverseTransitionDuration: motionDuration(
-          Timings.short,
+          Timings.fast,
           disableAnimations: disable,
         ),
         pageBuilder: (routeContext, _, _) => Scaffold(
@@ -435,7 +435,7 @@ class MyView extends ConsumerWidget {
           // 用 drive 而非 CurvedAnimation——transitionsBuilder 每帧都会执行，
           // 后者每次构造都会给路由的 animation 挂一个监听器。
           final curved = animation.drive(
-            CurveTween(curve: Curves2.emphasized),
+            CurveTween(curve: Curves2.out),
           );
           return FadeTransition(
             opacity: curved,

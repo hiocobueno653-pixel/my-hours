@@ -82,8 +82,9 @@ class WorkBentoHeader extends StatelessWidget {
           onTap: onOpenWage,
         );
         // 三层信息错峰落定：今日卡 → 月工时 → 月工资，70ms 一档。
+        // 错峰 0 / 40 / 80ms（R25：一个容器只做一次入场，总长压在 300ms 内）。
         Widget reveal(int index, Widget child) => RevealOnMount(
-          delay: Duration(milliseconds: 70 * index),
+          delay: Duration(milliseconds: 40 * index),
           child: child,
         );
         if (compact) {

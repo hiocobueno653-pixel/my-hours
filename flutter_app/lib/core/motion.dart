@@ -1,168 +1,81 @@
-/// 动效常量。
+/// 动效令牌。
 ///
-/// 数值取自 `E:/蒸馏/FlClash_UI/docs/03-动效系统.md` 的**测量表**（时长、曲线、
-/// 弹簧参数是观测事实，不是代码），并叠加 `interfaces.rauno.me` 的交互纪律：
-/// - 交互反馈类动画 ≤ 200ms；
-/// - 弹层从 0.8 缩放，不从 0；
-/// - 主题切换不触发过渡（避免「整页在渐变」的廉价感）；
-/// - 频繁、低新奇度的动作不加动画。
+/// **唯一数值源**：`E:/alma/ui-motion-playbook/02-令牌.md`（对应 `tokens.css`）。
+/// 五条曲线、八档时长，没有第六种、没有第九档——组件里不许出现裸曲线或
+/// 裸毫秒（`Duration(milliseconds: 260)` 这种写法一律视为错误）。
+///
+/// 早期数值取自 `E:/蒸馏/FlClash_UI` 的测量表，现已并入本表；两套一致
+/// 的部分（如面板曲线 0.32/0.72/0/1）保留原值。
 library;
 
 import 'package:flutter/animation.dart';
 
 /// 动效纪律（改动画前先读这里）
 ///
-/// 1. **从哪来，回哪去**：任何「开」的动作都要能被「关」原路撤回。
-///    - 对话框：从触发它的按压坐标生长，反向沿同一路径缩回该坐标
-///      （`MotionOrigin` + `Curves2.standardAccelerate`）。
-///    - 二级页：从右侧推入，返回时推回右侧，不做「淡出消失」。
+/// 1. **从哪来，回哪去**（R21/R22）：任何「开」都必须是「关」的逆运算。
+///    - 对话框：从触发它的按压坐标生长，反向缩回该坐标（`MotionOrigin`）。
+///    - 二级页：从右侧推入，返回推回右侧，不做「淡出消失」。
 ///    - 底部弹层：从屏幕底部升起，返回底部。
-///    - 月份切换：往左滑动 → 新月份从右进、旧月份往左退；方向由
+///    - 月份切换：往左滑 → 新月份从右进、旧月份往左退；方向由
 ///      `_calendarDirection` 记住，点月份选择器跳转也按大小定方向。
 ///    判断标准：用户能说出「它从哪儿冒出来的」；说不出来就是错的。
-/// 2. **进场减速、退场加速**：`standardDecelerate` 落定，`standardAccelerate`
-///    离开。退场用进场曲线会让元素「恋恋不舍」地慢慢消失。
-/// 3. **透明度不做过冲**：只有位置与缩放可以用 `softSpring`。颜色、不透明度
-///    一旦过冲就会闪。
-/// 4. **系统级「移除动画」优先**：所有时长走 `motionDuration`，或在
+/// 2. **进场一律 `ease-out`，永不 `ease-in`**（R11/R12）。出场走同一曲线的
+///    反向，进度在后段自然加速，观感上比进场更快收走——这就是 R07
+///    「出场永远比进场快」在 Flutter 里的实现方式，不需要单独的时长。
+/// 3. **透明度不做过冲**（R16）：弹簧仅用于位置与缩放，且 bounce 基本为 0。
+/// 4. **每个动效要能一句话回答「为什么动」**（R03）：反馈 / 空间连续 /
+///    状态指示 / 防止突变 / 解释 / 惊喜。答不出就删。
+/// 5. **系统级「移除动画」优先**（R35）：时长走 `motionDuration`，或在
 ///    `MediaQuery.maybeDisableAnimationsOf` 为真时直接给终态。
-///
-/// 时长档位。
 abstract final class Timings {
-  /// 按压反馈。
+  /// 状态切换。
+  static const Duration instant = Duration(milliseconds: 80);
+
+  /// 按下反馈（R14：可点元素必须有）。
   static const Duration press = Duration(milliseconds: 140);
 
-  /// 微交互（勾选、开关内部）。
-  static const Duration micro = Duration(milliseconds: 120);
+  /// tooltip、小 popover。
+  static const Duration micro = Duration(milliseconds: 180);
 
-  /// 短过渡（tab 淡入、图标切换）。
-  static const Duration short = Duration(milliseconds: 220);
+  /// 出场（R07：出场取进场的前一档）。
+  static const Duration fast = Duration(milliseconds: 200);
 
-  /// 中过渡（列表增删、折叠区）。
-  static const Duration medium = Duration(milliseconds: 340);
+  /// 进场。
+  static const Duration base = Duration(milliseconds: 250);
 
-  /// 退场基准。实际退场取进场时长 × [exitFactor]：用户要离开时不该
-  /// 等满一个进场的时长。Kimi 的弹窗是 180ms 进 / 135ms 退（0.75）。
-  static const Duration exit = Duration(milliseconds: 280);
+  /// 大块移动（整屏推入、日历切月）。
+  static const Duration slow = Duration(milliseconds: 320);
 
-  /// 退场时长相对进场的比例。
-  static const double exitFactor = 0.75;
+  /// 弹层、对话框进场。
+  static const Duration panel = Duration(milliseconds: 380);
 
-  /// 弹层进场（比通用档更短一档）。
-  ///
-  /// 退场走同一条动画的反向，靠 `standardAccelerate` 让进度在后段加速，
-  /// 观感上比进场更快收走——`showGeneralDialog` 没有独立的退场时长参数。
-  static const Duration sheetIn = Duration(milliseconds: 260);
+  /// 抽屉、全屏 sheet。
+  static const Duration sheet = Duration(milliseconds: 500);
 
-  /// 对话框进场。
-  static const Duration dialogIn = Duration(milliseconds: 200);
-
-  /// 通用（内容增删、空态进入）。
-  static const Duration common = Duration(milliseconds: 300);
-
-  /// 页面转场。
-  static const Duration page = Duration(milliseconds: 300);
-
-  /// 主题交叉淡入。
-  static const Duration theme = Duration(milliseconds: 200);
-
-  /// Dock 镜头在目标间移动。
-  static const Duration dockTravel = Duration(milliseconds: 400);
-
-  /// Dock 抬升/落下。
-  static const Duration dockLift = Duration(milliseconds: 250);
-
-  /// Dock 松手落定。
-  static const Duration dockSettle = Duration(milliseconds: 500);
-
-  /// Dock 悬停。
-  static const Duration dockHover = Duration(milliseconds: 260);
-
-  /// 玻璃光晕亮起 / 熄灭。
-  static const Duration glowIn = Duration(milliseconds: 100);
-  static const Duration glowOut = Duration(milliseconds: 500);
-
-  /// 骨架脉冲周期。
-  static const Duration skeleton = Duration(milliseconds: 1600);
+  /// toast 专用。
+  static const Duration toast = Duration(milliseconds: 400);
 }
 
 /// 曲线。
+///
+/// **没有 `ease-in`**，不是漏了，是禁止：元素离开时用减速曲线反向跑，
+/// 进度在末段加速，才是「干脆地走」。
 abstract final class Curves2 {
-  static const Curve out = Curves.easeOutCubic;
-  static const Curve inCurve = Curves.easeInCubic;
-  static const Curve inOut = Curves.easeInOut;
-  static const Curve standard = Cubic(0.2, 0, 0, 1);
-  static const Curve standardDecelerate = Cubic(0, 0, 0.2, 1);
-  static const Curve standardAccelerate = Cubic(0.3, 0, 1, 1);
-  static const Curve emphasizedDecelerate = Cubic(0.05, 0.7, 0.1, 1);
+  /// 默认：进场、出场、位移。内置 `easeOut` 是 (0, 0, 0.58, 1)，太软，
+  /// 动起来没有确定感。
+  static const Curve out = Cubic(0.23, 1, 0.32, 1);
 
-  /// 轻微过冲（~5%），用于「落定」而非「弹出」。
-  static const Curve softSpring = Cubic(0.32, 1.3, 0.38, 1);
+  /// 元素在屏幕内移动、变形。
+  static const Curve inOut = Cubic(0.77, 0, 0.175, 1);
 
-  /// 面板 / 底部弹层专用：起手快、收尾缓，行程长时不至于拖着走。
-  /// 取自 Kimi 的 `--ease-motion-panel: cubic-bezier(0.32, 0.72, 0, 1)`。
-  static const Curve panel = Cubic(0.32, 0.72, 0, 1);
+  /// 从边缘推入的抽屉 / 底部弹层。
+  static const Curve drawer = Cubic(0.32, 0.72, 0, 1);
 
-  /// 大位移（页面推入、整屏切换）：比 easeOutCubic 更快离手。
-  /// 取自 Kimi 的 `--ease-motion-out: cubic-bezier(0.23, 1, 0.32, 1)`。
-  static const Curve emphasized = Cubic(0.23, 1, 0.32, 1);
-}
+  /// hover、变色。
+  static const Curve soft = Cubic(0.25, 0.1, 0.25, 1);
 
-/// 弹簧。
-abstract final class Springs {
-  /// 页面推入 / 回退：300ms 临界阻尼。
-  static const SpringDescription page = SpringDescription(
-    mass: 1,
-    stiffness: 170,
-    damping: 26,
-  );
-
-  /// Dock 镜头移动：400ms bounce 0.15。
-  static final SpringDescription dockTravel =
-      SpringDescription.withDampingRatio(mass: 1, stiffness: 240, ratio: 0.85);
-
-  /// Dock 果冻形变：stiffness 100 / ratio 0.4。
-  static const SpringDescription dockJelly = SpringDescription(
-    mass: 1,
-    stiffness: 100,
-    damping: 12.6,
-  );
-
-  /// Dock 弹性按压：stiffness 311 / ratio 0.593。
-  static const SpringDescription dockPress = SpringDescription(
-    mass: 1,
-    stiffness: 311,
-    damping: 20.9,
-  );
-
-  /// Dock 拖拽跟手：stiffness 1024 / ratio 0.9。
-  static const SpringDescription dockFollow = SpringDescription(
-    mass: 1,
-    stiffness: 1024,
-    damping: 57.6,
-  );
-
-  /// 底部弹层：stiffness 333.33 临界阻尼（约 0.5s）。
-  static const SpringDescription sheet = SpringDescription(
-    mass: 1,
-    stiffness: 333.33,
-    damping: 36.5,
-  );
-
-  /// 轻量「落定」（撤销条、toast）。
-  static const SpringDescription settle = SpringDescription(
-    mass: 1,
-    stiffness: 260,
-    damping: 28,
-  );
-}
-
-/// 缩放比例（避免 0→1 的廉价弹出）。
-abstract final class Scales {
-  static const double dialogFrom = 0.86;
-  static const double sheetFrom = 0.94;
-  static const double press = 0.97;
-  static const double dockLens = 1.12;
+  /// 跑马灯、进度、循环。
+  static const Curve linear = Curves.linear;
 }
 
 /// 统一入口：把时长折叠为 0（系统「移除动画」或应用内关闭动效）。

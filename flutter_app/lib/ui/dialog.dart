@@ -25,7 +25,7 @@ Future<bool?> showConfirmDialog(
     barrierLabel: '关闭弹窗',
     barrierColor: Colors.transparent,
     transitionDuration: motionDuration(
-      Timings.dialogIn,
+      Timings.base,
       disableAnimations: disable,
     ),
     pageBuilder: (dialogContext, animation, secondaryAnimation) {
@@ -50,7 +50,7 @@ Future<bool?> showConfirmDialog(
       );
       final scrimOpacity = animation.drive(
         CurveTween(
-          curve: const Interval(0, 0.45, curve: Curves2.standardDecelerate),
+          curve: const Interval(0, 0.45, curve: Curves2.out),
         ),
       );
       return Stack(
@@ -71,7 +71,7 @@ Future<bool?> showConfirmDialog(
               animation: animation,
               builder: (context, child) {
                 // 进场减速、反向即加速退回点击点：同一组 begin/end 值正反各跑一遍。
-                final progress = Curves2.standardDecelerate.transform(
+                final progress = Curves2.out.transform(
                   animation.value,
                 );
                 final screen = MediaQuery.sizeOf(dialogContext);
