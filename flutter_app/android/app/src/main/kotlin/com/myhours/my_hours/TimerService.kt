@@ -10,6 +10,7 @@ import android.content.Intent
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
+import org.json.JSONObject
 
 /**
  * 计时前台服务。
@@ -102,7 +103,9 @@ class TimerService : Service() {
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setShowWhen(true)
-            .setCategory(NotificationCompat.CATEGORY_STOPWATCH)
+            // 必须是「持续状态」分类才会被系统当成正在进行的活动；
+            // 用 STOPWATCH 分类不会进状态栏胶囊。
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
             .setPriority(NotificationCompat.PRIORITY_LOW)
 
         if (running) {
@@ -120,21 +123,50 @@ class TimerService : Service() {
                 .setContentText("已暂停 · ${format(elapsedMs)}")
         }
 
-        // Android 16（API 36）起，带短关键文本的常驻通知会自动进入状态栏
-        // 胶囊（Live Update）。低版本没有这个方法，用反射调用，
-        // 这样一份代码能同时编译给 minSdk 24 和运行在 36 上。
-        if (Build.VERSION.SDK_INT >= 36) {
-            try {
-                val text = format(elapsedMs)
-                builder.javaClass
-                    .getMethod("setShortCriticalText", CharSequence::class.java)
-                    .invoke(builder, text)
-            } catch (_: Throwable) {
-                // 厂商修改了实现：静默降级为普通常驻通知。
-            }
+        applyPromoted(builder, format(elapsedMs))
+        return builder.build()
+    }
+
+    /**
+     * 把这条通知提升为「胶囊级」常驻通知。
+     *
+     * 三条路一起走，能中哪条算哪条：
+     * 1. Android 16 的 `setRequestPromotedOngoing` —— 反射调用，低版本没有这个方法，
+     *    失败即降级，不影响编译（minSdk 24）；
+     * 2. Notification.extras 的平台约定键 —— 部分 ROM 不看 API、直接读 extras；
+     * 3. MIUI 焦点通知的私有参数 —— 小米/红米走这一条。
+     *
+     * 都不中时，它就是一条普通的常驻通知，功能不受影响。
+     */
+    private fun applyPromoted(builder: NotificationCompat.Builder, shortText: String) {
+        try {
+            builder.javaClass
+                .getMethod("setRequestPromotedOngoing", Boolean::class.javaPrimitiveType)
+                .invoke(builder, true)
+        } catch (_: Throwable) {
+            // 系统没有这个 API
         }
 
-        return builder.build()
+        val extras = builder.extras
+        extras.putBoolean("android.requestPromotedOngoing", true)
+        extras.putCharSequence("android.shortCriticalText", shortText)
+        extras.putString("capsule_text", shortText)
+
+        try {
+            val focusParam = JSONObject().apply {
+                put("type", 1)
+                put(
+                    "baseInfo",
+                    JSONObject().apply {
+                        put("title", shortText)
+                        put("content", "时页正在计时")
+                    },
+                )
+            }
+            extras.putString("miui.focus.param", focusParam.toString())
+        } catch (_: Throwable) {
+            // 构造失败就不带这条路
+        }
     }
 
     private fun format(ms: Long): String {

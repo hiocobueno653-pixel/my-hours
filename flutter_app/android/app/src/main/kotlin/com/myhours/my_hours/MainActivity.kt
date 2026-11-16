@@ -32,6 +32,17 @@ class MainActivity : FlutterActivity() {
                             TimerService.stop(this)
                             result.success(null)
                         }
+                        // 让界面能如实告诉用户：这台机器到底支不支持胶囊。
+                        "capabilities" -> {
+                            result.success(
+                                mapOf(
+                                    "sdkInt" to android.os.Build.VERSION.SDK_INT,
+                                    "manufacturer" to android.os.Build.MANUFACTURER,
+                                    "brand" to android.os.Build.BRAND,
+                                    "model" to android.os.Build.MODEL,
+                                ),
+                            )
+                        }
                         else -> result.notImplemented()
                     }
                 } catch (t: Throwable) {

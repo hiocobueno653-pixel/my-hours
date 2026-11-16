@@ -10,6 +10,7 @@ import '../../ui/dialog.dart';
 import 'theme_page.dart';
 import '../../core/measure_unit.dart';
 import '../../ui/sheet.dart';
+import '../../state/live_update_capability.dart';
 
 /// 使用设置：深色模式、大字、动效、清空数据。
 class SettingsPage extends ConsumerStatefulWidget {
@@ -80,6 +81,27 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                             ),
                             showChevron: true,
                             onTap: () => _pickUnit(context),
+                          ),
+                        ),
+                        const SizedBox(height: Gaps.md),
+                        // 如实说明这台机器能不能把计时放进状态栏胶囊。
+                        // 不支持就直说，不给「看起来支持」的错觉。
+                        GlassCard(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: Gaps.xs,
+                          ),
+                          child: ListRow(
+                            title: '实况通知',
+                            subtitle: ref
+                                .watch(liveUpdateCapabilityProvider)
+                                .maybeWhen(
+                                  data: (cap) => cap.summary,
+                                  orElse: () => '检测中…',
+                                ),
+                            leading: Icon(
+                              Icons.notifications_active_outlined,
+                              color: colors.text2,
+                            ),
                           ),
                         ),
                         const SizedBox(height: Gaps.md),
