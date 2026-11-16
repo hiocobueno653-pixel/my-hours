@@ -431,9 +431,11 @@ class MyView extends ConsumerWidget {
         transitionsBuilder: (context, animation, _, child) {
           // 进场减速、退场加速：页面从右侧推入，返回时沿同一条路径退回右侧，
           // 而不是「淡出消失」——用户看到的来路和去路是同一个。
+          // 整屏位移用 emphasized：起手更快离开原位，落定时才收，长行程
+          // 不至于「慢吞吞地推过来」。
           final curved = CurvedAnimation(
             parent: animation,
-            curve: Curves2.standardDecelerate,
+            curve: Curves2.emphasized,
             reverseCurve: Curves2.standardAccelerate,
           );
           return FadeTransition(

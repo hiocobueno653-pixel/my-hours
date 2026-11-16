@@ -27,7 +27,7 @@ Future<T?> showAppSheet<T>({
     barrierLabel: '关闭弹层',
     barrierColor: Colors.transparent,
     transitionDuration: motionDuration(
-      Timings.common,
+      Timings.sheetIn,
       disableAnimations: disable,
     ),
     pageBuilder: (sheetContext, animation, secondaryAnimation) {
@@ -38,8 +38,8 @@ Future<T?> showAppSheet<T>({
       );
       final curved = CurvedAnimation(
         parent: animation,
-        curve: Curves2.out,
-        reverseCurve: Curves2.inCurve,
+        curve: Curves2.panel,
+        reverseCurve: Curves2.standardAccelerate,
       );
       final panelFade = CurvedAnimation(
         parent: animation,

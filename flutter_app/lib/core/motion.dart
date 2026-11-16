@@ -41,8 +41,21 @@ abstract final class Timings {
   /// 中过渡（列表增删、折叠区）。
   static const Duration medium = Duration(milliseconds: 340);
 
-  /// 退场。
+  /// 退场基准。实际退场取进场时长 × [exitFactor]：用户要离开时不该
+  /// 等满一个进场的时长。Kimi 的弹窗是 180ms 进 / 135ms 退（0.75）。
   static const Duration exit = Duration(milliseconds: 280);
+
+  /// 退场时长相对进场的比例。
+  static const double exitFactor = 0.75;
+
+  /// 弹层进场（比通用档更短一档）。
+  ///
+  /// 退场走同一条动画的反向，靠 `standardAccelerate` 让进度在后段加速，
+  /// 观感上比进场更快收走——`showGeneralDialog` 没有独立的退场时长参数。
+  static const Duration sheetIn = Duration(milliseconds: 260);
+
+  /// 对话框进场。
+  static const Duration dialogIn = Duration(milliseconds: 200);
 
   /// 通用（内容增删、空态进入）。
   static const Duration common = Duration(milliseconds: 300);
@@ -85,6 +98,14 @@ abstract final class Curves2 {
 
   /// 轻微过冲（~5%），用于「落定」而非「弹出」。
   static const Curve softSpring = Cubic(0.32, 1.3, 0.38, 1);
+
+  /// 面板 / 底部弹层专用：起手快、收尾缓，行程长时不至于拖着走。
+  /// 取自 Kimi 的 `--ease-motion-panel: cubic-bezier(0.32, 0.72, 0, 1)`。
+  static const Curve panel = Cubic(0.32, 0.72, 0, 1);
+
+  /// 大位移（页面推入、整屏切换）：比 easeOutCubic 更快离手。
+  /// 取自 Kimi 的 `--ease-motion-out: cubic-bezier(0.23, 1, 0.32, 1)`。
+  static const Curve emphasized = Cubic(0.23, 1, 0.32, 1);
 }
 
 /// 弹簧。

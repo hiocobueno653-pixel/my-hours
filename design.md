@@ -555,3 +555,37 @@ v3.4 未覆盖的部分在此收口。
 - 主按钮投影 0.28/26/12 → 0.22/20/8，顶部高光 0.22 → 0.16。
 - 暗色主按钮保持「浅蓝底 + 深墨字」：白字压 `#6D9EFF` 只有约 2.6:1，
   不合对比度要求，这里的明暗语义差异是可访问性换来的。
+
+# v3.7 — 对齐蒸馏包的动效协议（2026-11-16）
+
+取值来源：`E:/蒸馏/kimi-ui-distill/tokens/tokens.css` 与
+`E:/蒸馏/dsh_phone_UI/tokens/tokens.css`。**只取数值与曲线**，
+不引入 GPL（FlClash/prism_ui）或第三方（Kimi/ChatGPT）的代码与资源，
+边界见 `docs/adr/0002-licensing-prism-ui.md`。
+
+## 时长
+
+| 场景 | 旧 | 新 | 依据 |
+| --- | --- | --- | --- |
+| 底部弹层 | 300ms | 260ms | Kimi `--motion-panel-duration: 240ms` |
+| 对话框 | 240ms | 200ms | Kimi `--motion-dialog-duration: 180ms` |
+| 二级页 | 340ms | 300ms | 介于 Kimi view 180 与 panel 240 之间 |
+
+两者的共同点：**同一个弹层类组件，进场 180–240ms**。此前的 240/300
+偏慢，尤其在低端机上体感明显。
+
+## 曲线
+
+- 新增 `Curves2.panel = cubic-bezier(0.32, 0.72, 0, 1)`：底部弹层专用，
+  起手快、收尾缓，行程长也不拖。取自 Kimi `--ease-motion-panel`。
+- 新增 `Curves2.emphasized = cubic-bezier(0.23, 1, 0.32, 1)`：整屏位移
+  （二级页推入）用，比 `easeOutCubic` 更快离开原位。取自 Kimi
+  `--ease-motion-out`。
+- 弹层退场仍走 `standardAccelerate`。**`showGeneralDialog` 没有独立退场
+  时长参数**，`reverseTransitionDuration` 只存在于 `PageRouteBuilder`；
+  退场「更快」只能靠曲线在后段加速来表达。
+
+## 印证
+
+DSH 的 `--dsw-elevation-stroke-color: rgba(0,0,0,0.06)` 与 v3.4 加的
+卡片描边（浅色 6% 冷墨）是同一个量级。两条独立来源对上了，这条不用改。

@@ -25,7 +25,7 @@ Future<bool?> showConfirmDialog(
     barrierLabel: '关闭弹窗',
     barrierColor: Colors.transparent,
     transitionDuration: motionDuration(
-      const Duration(milliseconds: 240),
+      Timings.dialogIn,
       disableAnimations: disable,
     ),
     pageBuilder: (dialogContext, animation, secondaryAnimation) {
