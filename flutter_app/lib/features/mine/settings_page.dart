@@ -8,6 +8,8 @@ import '../../ui/pinned_header.dart';
 import '../../ui/widgets.dart';
 import '../../ui/dialog.dart';
 import 'theme_page.dart';
+import '../../core/measure_unit.dart';
+import '../../ui/sheet.dart';
 
 /// 使用设置：深色模式、大字、动效、清空数据。
 class SettingsPage extends ConsumerStatefulWidget {
@@ -61,6 +63,23 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                             ),
                             showChevron: true,
                             onTap: () => _openTheme(context),
+                          ),
+                        ),
+                        const SizedBox(height: Gaps.md),
+                        GlassCard(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: Gaps.xs,
+                          ),
+                          child: ListRow(
+                            title: '计量单位',
+                            subtitle: '当前：${context.unit.name} · '
+                                '决定「${context.unit.quantity}」的说法',
+                            leading: Icon(
+                              Icons.straighten_rounded,
+                              color: colors.text2,
+                            ),
+                            showChevron: true,
+                            onTap: () => _pickUnit(context),
                           ),
                         ),
                         const SizedBox(height: Gaps.md),
@@ -183,6 +202,36 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         );
       },
     );
+  }
+
+  /// 选计量单位：只换显示标签，不动任何数据。
+  Future<void> _pickUnit(BuildContext context) async {
+    final settings = ref.read(settingsProvider);
+    final current = context.unit;
+    final picked = await showAppSheet<MeasureUnit>(
+      context: context,
+      builder: (sheetContext) => SheetScaffold(
+        title: '计量单位',
+        child: ListView(
+          shrinkWrap: true,
+          padding: const EdgeInsets.fromLTRB(Gaps.lg, 0, Gaps.lg, Gaps.xl),
+          children: [
+            for (final unit in MeasureUnit.presets)
+              ListRow(
+                title: unit.name,
+                subtitle: '本月${unit.quantity} · 数字旁的短单位「${unit.short}」',
+                trailing: unit.id == current.id
+                    ? Icon(Icons.check_rounded, color: context.colors.primary)
+                    : null,
+                onTap: () => Navigator.of(sheetContext).pop(unit),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (picked != null && picked.id != current.id) {
+      await settings.setMeasureUnit(picked);
+    }
   }
 
   void _openTheme(BuildContext context) {

@@ -8,6 +8,7 @@ import 'package:fluid_glass/fluid_glass.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'app.dart';
+import 'core/measure_unit.dart';
 import 'core/glass_policy.dart';
 import 'core/motion.dart';
 import 'core/motion_origin.dart';
@@ -273,8 +274,12 @@ class MyHoursApp extends StatelessWidget {
             final reduceEffects =
                 media.disableAnimations || settings.reduceMotion;
             final glassPreference = settings.glassPreference;
-            final appContent = MediaQuery(
-              data: media.copyWith(
+            // 单位作用域包在 Navigator 之上：所有路由都能取到当前单位，
+            // 设置页切换后整棵树跟着更新。
+            final appContent = MeasureUnitScope(
+              unit: settings.measureUnit,
+              child: MediaQuery(
+                data: media.copyWith(
                 textScaler: AppTextScaler(
                   media.textScaler,
                   settings.textScale,
@@ -283,7 +288,8 @@ class MyHoursApp extends StatelessWidget {
                 // 内容延伸到系统栏下方后，三页的吸顶栏自己消费 padding.top；
                 // 这里保留原始 padding，不做二次扣减。
               ),
-              child: child ?? const SizedBox.shrink(),
+                child: child ?? const SizedBox.shrink(),
+              ),
             );
             final gestureAwareContent = Listener(
               behavior: HitTestBehavior.translucent,

@@ -3,6 +3,7 @@
 /// 只存 UI 偏好，不进备份文档（备份 v4 契约里没有设置字段，加了就破坏兼容）。
 library;
 
+import 'measure_unit.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -38,10 +39,21 @@ class AppSettings extends ChangeNotifier {
   static const _kGlassPreference = 'my-hours.glassPreference';
   static const _kCustomTextScale = 'my-hours.customTextScale';
   static const _kFollowSystemText = 'my-hours.followSystemText';
+  static const _kUnit = 'my-hours.unit';
 
   static Future<AppSettings> load() async {
     final prefs = await SharedPreferences.getInstance();
     return AppSettings._(prefs);
+  }
+
+  /// 计量单位：工时 / 学时 / 次数 / 章 / 页 / 公里。
+  ///
+  /// 只影响显示，不动数据：`WorkDayRecord.hours` 仍然是一个 double。
+  MeasureUnit get measureUnit => MeasureUnit.byId(_prefs.getString(_kUnit));
+
+  Future<void> setMeasureUnit(MeasureUnit unit) async {
+    await _prefs.setString(_kUnit, unit.id);
+    notifyListeners();
   }
 
   ThemeMode get themeMode {

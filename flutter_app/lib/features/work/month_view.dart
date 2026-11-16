@@ -21,6 +21,7 @@ import '../ledger/ledger_view.dart';
 import 'month_detail.dart';
 import 'wage_panel.dart';
 import 'work_bento_header.dart';
+import '../../core/measure_unit.dart';
 
 /// 记工页：今天卡 + 月汇总 + 日历。
 class MonthView extends ConsumerStatefulWidget {
@@ -123,7 +124,7 @@ class _MonthViewState extends ConsumerState<MonthView> {
         ? null
         : '${monthDelta.delta >= 0 ? '↑' : '↓'} 比上月 '
               '${monthDelta.delta >= 0 ? '+' : ''}'
-              '${formatHoursValue(monthDelta.delta.abs())} 小时'
+              '${formatHoursValue(monthDelta.delta.abs())} ${context.unit.name}'
               '（${monthDelta.percent >= 0 ? '+' : ''}${monthDelta.percent}%）';
     final dates = getMonthDates(month);
     // 真实工作日数（周一至周五）。硬编码 22 会让百分比偏离实际值。
@@ -626,7 +627,7 @@ class TodayCard extends StatelessWidget {
                     Padding(
                       padding: const EdgeInsets.only(left: 4, bottom: 4),
                       child: Text(
-                        '小时',
+                        context.unit.name,
                         style: TextStyle(fontSize: 12, color: colors.text3),
                       ),
                     ),
@@ -1243,7 +1244,10 @@ class _CalendarCell extends StatelessWidget {
       '${day.day}日',
       if (isToday) '今天',
       if (isFuture) '未来日期',
-      if (hasRecord) isRest ? '休息' : '${formatHoursValue(hours)}小时',
+      if (hasRecord)
+        isRest
+            ? '休息'
+            : '${formatHoursValue(hours)}${context.unit.name}',
       if (!hasRecord) '未记工',
       if (isSettled) '已结算',
       if (income > 0) '收入${formatAmount(income)}元',
@@ -1611,7 +1615,7 @@ class _DayEditorSheetState extends ConsumerState<DayEditorSheet> {
             child: NumberField(
               controller: _hours,
               hintText: '0',
-              suffixText: '小时',
+              suffixText: context.unit.name,
               autofocus: _record == null,
               onSubmitted: (_) => _remarkFocus.requestFocus(),
             ),
@@ -1883,7 +1887,7 @@ class DayDetailSheet extends ConsumerWidget {
                 child: _DetailMetric(
                   label: '工时',
                   value: formatHoursValue(record.hours),
-                  unit: '小时',
+                  unit: context.unit.name,
                   color: colors.accent,
                 ),
               ),
@@ -1903,7 +1907,7 @@ class DayDetailSheet extends ConsumerWidget {
           _DetailRow(
             label: '有效时薪',
             value:
-                '${formatAmount(effectiveRate(record, state.workProfiles))} 元/小时',
+                '${formatAmount(effectiveRate(record, state.workProfiles))} 元/${context.unit.name}',
           ),
           if (hasFixedPay(record))
             _DetailRow(

@@ -9,6 +9,7 @@ import '../../data/models.dart';
 import '../../data/records.dart';
 import '../../ui/widgets.dart';
 import '../charts/charts.dart';
+import '../../core/measure_unit.dart';
 
 /// 首页首屏的 1+2 Bento 概览：今日状态 + 本月工时 + 本月工资/出勤。
 class WorkBentoHeader extends StatelessWidget {
@@ -322,7 +323,7 @@ class _TodayBentoCard extends StatelessWidget {
                       Padding(
                         padding: const EdgeInsets.only(left: 3, bottom: 3),
                         child: Text(
-                          '小时',
+                          context.unit.name,
                           style: TextStyle(
                             fontSize: TypeScale.micro,
                             color: colors.text3,
@@ -658,7 +659,7 @@ class _MonthSalaryBentoCard extends StatelessWidget {
           const Spacer(),
           Text(
             kHoursOnly
-                ? '日均 ${formatHoursValue(summary.averageHours)} 小时'
+                ? '日均 ${formatHoursValue(summary.averageHours)} ${context.unit.name}'
                 : '待结算 ${formatAmount(settlement.pending)}',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,

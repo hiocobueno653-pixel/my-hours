@@ -15,6 +15,7 @@ import '../../ui/sheet.dart';
 import '../../ui/widgets.dart';
 import '../charts/charts.dart';
 import '../../ui/dialog.dart';
+import '../../core/measure_unit.dart';
 
 /// 工资面板：应得 / 已结算 / 按工作分组 / 批量结算 + 工作管理入口。
 Future<void> showWagePanel(BuildContext context, String month) {
@@ -112,7 +113,7 @@ class WagePanelSheet extends ConsumerWidget {
                             ),
                           ),
                           Text(
-                            '${formatHoursValue(row.hours)} 小时',
+                            '${formatHoursValue(row.hours)} ${context.unit.name}',
                             style: TextStyle(fontSize: 12, color: colors.text2),
                           ),
                         ],

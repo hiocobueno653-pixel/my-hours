@@ -25,6 +25,7 @@ import '../../ui/glass_menu.dart';
 import '../../ui/month_picker.dart';
 import '../../ui/pinned_header.dart';
 import 'category_manager.dart';
+import '../../core/measure_unit.dart';
 
 /// 记账页：月份 + 收支汇总 + 搜索 + 明细列表。
 class LedgerView extends ConsumerStatefulWidget {
@@ -843,7 +844,7 @@ class _EntryRow extends StatelessWidget {
                           formatDateLabel(entry.date),
                           if (entry.remark.isNotEmpty) entry.remark,
                           if (linkedHours != null)
-                            '${formatHoursValue(linkedHours!)}小时',
+                            '${formatHoursValue(linkedHours!)}${context.unit.name}',
                         ].join(' · '),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,

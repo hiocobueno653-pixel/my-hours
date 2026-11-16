@@ -19,6 +19,7 @@ import 'backup_page.dart';
 import 'settings_page.dart';
 import 'stats_page.dart';
 import 'theme_page.dart';
+import '../../core/measure_unit.dart';
 
 /// 我的页：数据带 + 功能入口。二级页走 Navigator（返回键与手势由路由负责）。
 class MyView extends ConsumerWidget {
@@ -122,7 +123,7 @@ class MyView extends ConsumerWidget {
                             Text(
                               '${monthDelta.delta >= 0 ? '↑' : '↓'} 比上月 '
                               '${monthDelta.delta >= 0 ? '+' : ''}'
-                              '${formatHoursValue(monthDelta.delta.abs())} 小时'
+                              '${formatHoursValue(monthDelta.delta.abs())} ${context.unit.name}'
                               '（${monthDelta.percent >= 0 ? '+' : ''}${monthDelta.percent}%）',
                               style: TextStyle(
                                 fontSize: 11,
