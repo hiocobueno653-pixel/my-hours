@@ -139,7 +139,7 @@ class MyView extends ConsumerWidget {
                           Row(
                             children: [
                               _MiniMetric(
-                                label: '工时',
+                                label: context.unit.quantity,
                                 value: formatHoursValue(hours),
                                 color: colors.accent,
                               ),

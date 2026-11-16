@@ -563,7 +563,7 @@ class _AppDock extends StatelessWidget {
   static const double _maxWidth = 356;
 
   static const _labels = {
-    AppTab.work: '记工',
+    AppTab.work: '计时',
     AppTab.ledger: '记账',
     AppTab.mine: '我的',
   };

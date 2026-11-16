@@ -412,7 +412,7 @@ class _ThemePreview extends StatelessWidget {
                     Row(
                       children: [
                         Text(
-                          '记工',
+                          '计时',
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w700,

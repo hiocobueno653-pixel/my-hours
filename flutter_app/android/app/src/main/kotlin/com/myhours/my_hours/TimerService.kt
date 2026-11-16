@@ -8,7 +8,10 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
+import android.os.SystemClock
 import androidx.core.app.NotificationCompat
 import org.json.JSONObject
 
@@ -18,9 +21,8 @@ import org.json.JSONObject
  * 为什么必须是前台服务：Android 8 之后后台进程会被冻结，普通定时器活不过
  * 几分钟。用户锁屏去干活，回来时计时必须还在走——只有前台服务能保证这点。
  *
- * 计时本身交给系统的 Chronometer（`setUsesChronometer`），它由 SystemUI
- * 逐秒重绘，我们不需要每秒唤醒自己去更新通知。这是省电的关键：服务只在
- * 开始 / 暂停 / 停止三个时刻被唤醒。
+ * 时间由本服务自己推算（`SystemClock.elapsedRealtime`），不依赖 Flutter 每秒
+ * 喂数据：App 退到后台后 Dart 侧可能被挂起，而服务必须继续走。
  */
 class TimerService : Service() {
 
@@ -30,6 +32,13 @@ class TimerService : Service() {
         const val EXTRA_ELAPSED = "elapsed_ms"
         const val EXTRA_LABEL = "label"
         const val EXTRA_RUNNING = "running"
+
+        /**
+         * 胶囊收起时显示的短文本是**静态字符串**，不会自己走秒。
+         * 每 10 秒重发一次通知让它跟上——再密就是白耗电，
+         * 再疏用户会觉得「卡住了」。
+         */
+        private const val REFRESH_MS = 10_000L
 
         fun start(context: Context, elapsedMs: Long, label: String, running: Boolean) {
             val intent = Intent(context, TimerService::class.java).apply {
@@ -49,6 +58,30 @@ class TimerService : Service() {
         }
     }
 
+    private val handler = Handler(Looper.getMainLooper())
+
+    private var baseElapsedMs = 0L
+    private var startedAtRealtime = 0L
+    private var running = false
+    private var label = "正在计时"
+    private var foregroundStarted = false
+
+    private val refreshTask = object : Runnable {
+        override fun run() {
+            if (!running) return
+            postNotification()
+            handler.postDelayed(this, REFRESH_MS)
+        }
+    }
+
+    /** 当前已用时长：基准值 + 自上次开始以来的真实时间差。 */
+    private fun currentElapsed(): Long =
+        if (running) {
+            baseElapsedMs + (SystemClock.elapsedRealtime() - startedAtRealtime)
+        } else {
+            baseElapsedMs
+        }
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
@@ -57,12 +90,34 @@ class TimerService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        val elapsed = intent?.getLongExtra(EXTRA_ELAPSED, 0L) ?: 0L
-        val label = intent?.getStringExtra(EXTRA_LABEL) ?: "计时中"
-        val running = intent?.getBooleanExtra(EXTRA_RUNNING, true) ?: true
-        startForeground(NOTIFICATION_ID, buildNotification(elapsed, label, running))
-        // 被系统杀掉后由 START_STICKY 拉起；具体数值由 Flutter 侧恢复时重新下发。
+        baseElapsedMs = intent?.getLongExtra(EXTRA_ELAPSED, 0L) ?: 0L
+        label = intent?.getStringExtra(EXTRA_LABEL) ?: "正在计时"
+        running = intent?.getBooleanExtra(EXTRA_RUNNING, true) ?: true
+        startedAtRealtime = SystemClock.elapsedRealtime()
+
+        val notification = buildNotification(currentElapsed(), label, running)
+        if (!foregroundStarted) {
+            startForeground(NOTIFICATION_ID, notification)
+            foregroundStarted = true
+        } else {
+            getSystemService(NotificationManager::class.java)
+                .notify(NOTIFICATION_ID, notification)
+        }
+
+        handler.removeCallbacks(refreshTask)
+        if (running) handler.postDelayed(refreshTask, REFRESH_MS)
+
         return START_STICKY
+    }
+
+    override fun onDestroy() {
+        handler.removeCallbacksAndMessages(null)
+        super.onDestroy()
+    }
+
+    private fun postNotification() {
+        getSystemService(NotificationManager::class.java)
+            .notify(NOTIFICATION_ID, buildNotification(currentElapsed(), label, running))
     }
 
     private fun ensureChannel() {
@@ -109,21 +164,20 @@ class TimerService : Service() {
             .setPriority(NotificationCompat.PRIORITY_LOW)
 
         if (running) {
-            // 交给 SystemUI 逐秒重绘：不唤醒进程，也不耗电。
+            // 展开态交给 SystemUI 的 Chronometer 逐秒重绘，不唤醒进程。
             builder
                 .setUsesChronometer(true)
                 .setWhen(System.currentTimeMillis() - elapsedMs)
                 .setChronometerCountDown(false)
                 .setContentText(format(elapsedMs))
         } else {
-            // 暂停：停掉 chronometer，改成静态时长。
             builder
                 .setUsesChronometer(false)
                 .setShowWhen(false)
                 .setContentText("已暂停 · ${format(elapsedMs)}")
         }
 
-        applyPromoted(builder, format(elapsedMs))
+        applyPromoted(builder, format(elapsedMs), label)
         return builder.build()
     }
 
@@ -131,14 +185,17 @@ class TimerService : Service() {
      * 把这条通知提升为「胶囊级」常驻通知。
      *
      * 三条路一起走，能中哪条算哪条：
-     * 1. Android 16 的 `setRequestPromotedOngoing` —— 反射调用，低版本没有这个方法，
-     *    失败即降级，不影响编译（minSdk 24）；
-     * 2. Notification.extras 的平台约定键 —— 部分 ROM 不看 API、直接读 extras；
+     * 1. Android 16 的 `setRequestPromotedOngoing` —— 反射调用，低版本没有；
+     * 2. Notification.extras 的平台约定键 —— 部分 ROM 直接读 extras；
      * 3. MIUI 焦点通知的私有参数 —— 小米/红米走这一条。
      *
-     * 都不中时，它就是一条普通的常驻通知，功能不受影响。
+     * 都不中时它就是普通常驻通知，功能不受影响。
      */
-    private fun applyPromoted(builder: NotificationCompat.Builder, shortText: String) {
+    private fun applyPromoted(
+        builder: NotificationCompat.Builder,
+        shortText: String,
+        title: String,
+    ) {
         try {
             builder.javaClass
                 .getMethod("setRequestPromotedOngoing", Boolean::class.javaPrimitiveType)
@@ -158,8 +215,8 @@ class TimerService : Service() {
                 put(
                     "baseInfo",
                     JSONObject().apply {
-                        put("title", shortText)
-                        put("content", "时页正在计时")
+                        put("title", title)
+                        put("content", shortText)
                     },
                 )
             }

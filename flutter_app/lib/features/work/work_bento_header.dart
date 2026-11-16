@@ -13,6 +13,7 @@ import '../../core/measure_unit.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../state/app_controller.dart';
 import '../../state/timer_controller.dart';
+import '../../core/motion.dart';
 
 /// 首页首屏的 1+2 Bento 概览：今日状态 + 本月工时 + 本月工资/出勤。
 class WorkBentoHeader extends StatelessWidget {
@@ -523,7 +524,7 @@ class _MonthHoursBentoCard extends StatelessWidget {
           Row(
             children: [
               Text(
-                '本月工时',
+                '本月${context.unit.quantity}',
                 style: TextStyle(
                   color: colors.text2,
                   fontSize: TypeScale.micro,
@@ -763,18 +764,24 @@ class _TimerBarState extends ConsumerState<_TimerBar> {
       children: [
         Icon(
           Icons.timer_outlined,
-          size: 15,
+          size: 16,
           color: running ? colors.primary : colors.text3,
         ),
-        const SizedBox(width: 5),
-        Text(
-          active ? _clock(elapsed) : '计时',
+        const SizedBox(width: 6),
+        // 计时中：大一号、主色、等宽——数字每 10 秒才在胶囊上刷新一次，
+        // 但界面里是逐秒跳的，字宽不变才不会左右抖。
+        AnimatedDefaultTextStyle(
+          duration: Timings.fast,
           style: TextStyle(
-            fontSize: TypeScale.label,
+            fontSize: active ? TypeScale.body : TypeScale.label,
             fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-            color: active ? colors.text : colors.text3,
+            letterSpacing: active ? -0.01 : 0,
+            color: running
+                ? colors.primary
+                : (active ? colors.text : colors.text3),
             fontFeatures: tabularFigures,
           ),
+          child: Text(active ? _clock(elapsed) : '计时'),
         ),
         const Spacer(),
         _TimerAction(

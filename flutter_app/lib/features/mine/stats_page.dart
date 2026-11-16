@@ -14,6 +14,7 @@ import '../../state/app_controller.dart';
 import '../../ui/pinned_header.dart';
 import '../../ui/widgets.dart';
 import '../charts/charts.dart';
+import '../../core/measure_unit.dart';
 
 /// 年度统计：全年工时/工资趋势、月度收支、分类占比。
 class StatsPage extends ConsumerStatefulWidget {
@@ -191,7 +192,7 @@ class _StatsPageState extends ConsumerState<StatsPage> {
                             ],
                             color: colors.accent,
                             semanticLabel: '全年工时趋势',
-                            seriesName: '工时',
+                            seriesName: context.unit.quantity,
                           ),
                         ],
                       ),
