@@ -31,6 +31,7 @@ class WorkBentoHeader extends StatelessWidget {
     required this.onOpenWage,
     this.deltaText,
     this.deltaColor,
+    this.showToday = true,
   });
 
   final String date;
@@ -50,6 +51,13 @@ class WorkBentoHeader extends StatelessWidget {
   final VoidCallback onOpenWage;
   final String? deltaText;
   final Color? deltaColor;
+
+  /// 历史月份传 false：只保留「本月工时 / 本月工资」两张卡。
+  ///
+  /// 原来非当前月整块 Bento 被一条提示条替换，切月份时上半屏会「唰一下
+  /// 空了」。现在结构不变，只是少了「今天」那张——用户仍然看得到所选
+  /// 月份的数字，视线上是内容缩放而不是整块消失。
+  final bool showToday;
 
   @override
   Widget build(BuildContext context) {
@@ -87,6 +95,18 @@ class WorkBentoHeader extends StatelessWidget {
           delay: Duration(milliseconds: 40 * index),
           child: child,
         );
+        if (!showToday) {
+          return IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(child: reveal(0, hours)),
+                const SizedBox(width: Gaps.sm),
+                Expanded(child: reveal(1, salary)),
+              ],
+            ),
+          );
+        }
         if (compact) {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,

@@ -162,8 +162,16 @@ class _MonthViewState extends ConsumerState<MonthView> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (month == currentMonthKey()) ...[
-                      WorkBentoHeader(
+                    if (month != currentMonthKey()) ...[
+                      // 历史月份：提示条在前，卡片仍在——不再整块顶掉上面。
+                      _PastMonthBanner(
+                        month: month,
+                        onTap: () => _changeMonth(currentMonthKey()),
+                      ),
+                      const SizedBox(height: Gaps.sm),
+                    ],
+                    ...[
+                      WorkBentoHeader(showToday: month == currentMonthKey(),
                         date: today,
                         record: todayRecord,
                         profiles: profiles,
@@ -187,17 +195,11 @@ class _MonthViewState extends ConsumerState<MonthView> {
                             ? colors.income
                             : colors.expense,
                       ),
-                      if (todayEntries.isNotEmpty) ...[
+                      if (month == currentMonthKey() && todayEntries.isNotEmpty) ...[
                         const SizedBox(height: Gaps.sm),
                         _TodayLedgerCard(entries: todayEntries),
                       ],
-                    ] else
-                      // 非当前月不渲染「今天」工作区：否则上面是今天的账、
-                      // 下面是所选月的日历，两套时间语境会互相误导。
-                      _PastMonthBanner(
-                        month: month,
-                        onTap: () => _changeMonth(currentMonthKey()),
-                      ),
+                    ],
                     // 有工时却没算出工资 = 记录缺时薪。不提示的话用户只会看到
                     // 一个恒为 0 的「本月工资」，很难自己想明白是缺时薪。
                     // 只记工时变体没有工资概念，不提示。

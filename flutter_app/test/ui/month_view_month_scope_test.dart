@@ -83,8 +83,10 @@ void main() {
         .setMonth(shiftMonth(currentMonthKey(), -1));
     await tester.pump();
 
-    // 历史月份：今日 Bento 消失，替换为可点的回本月提示。
-    expect(find.byType(WorkBentoHeader), findsNothing);
+    // 历史月份：Bento 结构保留（月工时 / 月工资仍在），只有「今天」卡片
+    // 让位给可点的回本月提示——这样切月份时上半屏不会整块消失。
+    expect(find.byType(WorkBentoHeader), findsOneWidget);
+    expect(find.byKey(const ValueKey('today-bento-card')), findsNothing);
     expect(find.text('回到本月'), findsOneWidget);
   });
 
