@@ -36,15 +36,12 @@ Future<T?> showAppSheet<T>({
           curve: const Interval(0, 0.42, curve: Curves2.standardDecelerate),
         ),
       );
-      final curved = CurvedAnimation(
-        parent: animation,
-        curve: Curves2.panel,
-        reverseCurve: Curves2.standardAccelerate,
-      );
-      final panelFade = CurvedAnimation(
-        parent: animation,
-        curve: const Interval(0, 0.72, curve: Curves2.out),
-        reverseCurve: Curves.easeInCubic,
+      // drive(CurveTween) 而不是 CurvedAnimation：后者构造时会给 parent
+      // 注册 statusListener，在 pageBuilder 里每次重建都留下一个，
+      // 直到路由销毁才回收。
+      final curved = animation.drive(CurveTween(curve: Curves2.panel));
+      final panelFade = animation.drive(
+        CurveTween(curve: const Interval(0, 0.72, curve: Curves2.out)),
       );
       return Stack(
         children: [

@@ -362,21 +362,26 @@ class _AppLaunchGate extends ConsumerWidget {
           transitionBuilder: (child, animation) {
             final incomingShell = child.key == const ValueKey('app-shell');
             if (incomingShell) {
-              final fade = CurvedAnimation(
-                parent: animation,
-                curve: const Interval(0.30, 1, curve: Curves2.out),
+              final fade = animation.drive(
+                CurveTween(
+                  curve: const Interval(0.30, 1, curve: Curves2.out),
+                ),
               );
-              final scale = Tween<double>(begin: 1.03, end: 1).animate(
-                CurvedAnimation(parent: animation, curve: Curves2.out),
+              final scale = animation.drive(
+                Tween<double>(
+                  begin: 1.03,
+                  end: 1,
+                ).chain(CurveTween(curve: Curves2.out)),
               );
               return FadeTransition(
                 opacity: fade,
                 child: ScaleTransition(scale: scale, child: child),
               );
             }
-            final fadeOut = CurvedAnimation(
-              parent: animation,
-              curve: const Interval(0.50, 1, curve: Curves.easeOut),
+            final fadeOut = animation.drive(
+              CurveTween(
+                curve: const Interval(0.50, 1, curve: Curves.easeOut),
+              ),
             );
             final scaleOut = Tween<double>(
               begin: 0.96,

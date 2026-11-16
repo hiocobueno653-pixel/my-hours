@@ -540,15 +540,13 @@ class _LocalFirstCard extends StatelessWidget {
   }
 }
 
-class _HoursPresetCard extends StatefulWidget {
+/// 日工时预设的展示卡。
+///
+/// 这里**不是选择器**：快捷档位在记工页里是固定的 `0/4/6/8/8.5/10/12`，
+/// 欢迎页选了也不会写进任何设置。原来做成可点却什么都不改变，属于假控件；
+/// 现在只把「8h 是常用档」这件事画出来，不提供点击。
+class _HoursPresetCard extends StatelessWidget {
   const _HoursPresetCard();
-
-  @override
-  State<_HoursPresetCard> createState() => _HoursPresetCardState();
-}
-
-class _HoursPresetCardState extends State<_HoursPresetCard> {
-  int _selected = 8;
 
   @override
   Widget build(BuildContext context) {
@@ -569,7 +567,7 @@ class _HoursPresetCardState extends State<_HoursPresetCard> {
           ),
           const SizedBox(height: 3),
           Text(
-            '进入后可随时调整',
+            '记工时一键选',
             style: TextStyle(color: colors.text2, fontSize: 11.5),
           ),
           const SizedBox(height: 10),
@@ -577,34 +575,22 @@ class _HoursPresetCardState extends State<_HoursPresetCard> {
             children: [
               for (final hours in const [8, 10]) ...[
                 Expanded(
-                  child: Pressable(
-                    onTap: () {
-                      HapticFeedback.selectionClick();
-                      setState(() => _selected = hours);
-                    },
-                    shape: Radii.pillShape,
-                    pressedScale: 0.95,
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      curve: Curves2.out,
-                      height: 32,
-                      alignment: Alignment.center,
-                      decoration: ShapeDecoration(
-                        color: hours == _selected
-                            ? colors.primaryContainer
-                            : colors.inset,
-                        shape: Radii.pillShape,
-                      ),
-                      child: Text(
-                        '${hours}h',
-                        style: TextStyle(
-                          color: hours == _selected
-                              ? colors.onPrimaryContainer
-                              : colors.text2,
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w700,
-                          fontFeatures: tabularFigures,
-                        ),
+                  child: Container(
+                    height: 32,
+                    alignment: Alignment.center,
+                    decoration: ShapeDecoration(
+                      color: hours == 8 ? colors.primaryContainer : colors.inset,
+                      shape: Radii.pillShape,
+                    ),
+                    child: Text(
+                      '${hours}h',
+                      style: TextStyle(
+                        color: hours == 8
+                            ? colors.onPrimaryContainer
+                            : colors.text2,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        fontFeatures: tabularFigures,
                       ),
                     ),
                   ),
