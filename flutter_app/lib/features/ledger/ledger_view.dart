@@ -808,21 +808,21 @@ class _EntryRow extends StatelessWidget {
         child: Pressable(
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 10),
+            padding: const EdgeInsets.symmetric(vertical: 12),
             child: Row(
               children: [
                 Container(
-                  width: 40,
-                  height: 40,
+                  width: 44,
+                  height: 44,
                   decoration: ShapeDecoration(
                     color: colors.block,
-                    shape: Radii.shape(12),
+                    shape: Radii.shape(14),
                   ),
                   child: Icon(
                     isIncome
                         ? Icons.arrow_downward_rounded
                         : Icons.arrow_upward_rounded,
-                    size: 18,
+                    size: 20,
                     color: isIncome ? colors.income : colors.expense,
                   ),
                 ),
