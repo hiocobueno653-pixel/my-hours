@@ -20,6 +20,7 @@ import 'settings_page.dart';
 import 'stats_page.dart';
 import 'theme_page.dart';
 import '../../core/measure_unit.dart';
+import 'package:animations/animations.dart';
 
 /// 我的页：数据带 + 功能入口。二级页走 Navigator（返回键与手势由路由负责）。
 class MyView extends ConsumerWidget {
@@ -289,16 +290,23 @@ class MyView extends ConsumerWidget {
                       padding: const EdgeInsets.symmetric(vertical: Gaps.xs),
                       child: Column(
                         children: [
-                          ListRow(
-                            title: '年度统计',
-                            subtitle: '全年工时/工资趋势、收支与分类占比',
-                            showChevron: true,
-                            onTap: () => _push(
-                              context,
-                              StatsPage(
-                                onBack: () => Navigator.of(context).pop(),
-                              ),
+                          // 容器变换：点开的不是「新页面压上来」，而是这一行
+                          // 自己长大成页面，返回时缩回原位——来路和去路同一条。
+                          OpenContainer(
+                            closedBuilder: (itemContext, open) => ListRow(
+                              title: '年度统计',
+                              subtitle: '全年工时/工资趋势、收支与分类占比',
+                              showChevron: true,
+                              onTap: open,
                             ),
+                            // 条目在卡片内部，圆角由外层的 GlassCard 负责。
+                            closedShape: const RoundedRectangleBorder(),
+                            closedColor: Colors.transparent,
+                            openColor: colors.page,
+                            transitionType: ContainerTransitionType.fade,
+                            transitionDuration: Timings.slow,
+                            openBuilder: (pageContext, close) =>
+                                StatsPage(onBack: close),
                           ),
                           Divider(
                             height: 1,
@@ -306,16 +314,19 @@ class MyView extends ConsumerWidget {
                             indent: 16,
                             endIndent: 16,
                           ),
-                          ListRow(
-                            title: '数据与备份',
-                            subtitle: '导出 / 导入 / 迁移对账',
-                            showChevron: true,
-                            onTap: () => _push(
-                              context,
-                              BackupPage(
-                                onBack: () => Navigator.of(context).pop(),
-                              ),
+                          OpenContainer(
+                            closedBuilder: (itemContext, open) => ListRow(
+                              title: '数据与备份',
+                              subtitle: '导出 / 导入 / 迁移对账',
+                              showChevron: true,
+                              onTap: open,
                             ),
+                            closedShape: const RoundedRectangleBorder(),
+                            closedColor: Colors.transparent,
+                            openColor: colors.page,
+                            transitionType: ContainerTransitionType.fade,
+                            transitionDuration: Timings.slow,
+                            openBuilder: (pageContext, close) => BackupPage(onBack: close),
                           ),
                           Divider(
                             height: 1,
@@ -323,16 +334,19 @@ class MyView extends ConsumerWidget {
                             indent: 16,
                             endIndent: 16,
                           ),
-                          ListRow(
-                            title: '主题与外观',
-                            subtitle: '主题色、液态玻璃、底栏与文本缩放',
-                            showChevron: true,
-                            onTap: () => _push(
-                              context,
-                              ThemePage(
-                                onBack: () => Navigator.of(context).pop(),
-                              ),
+                          OpenContainer(
+                            closedBuilder: (itemContext, open) => ListRow(
+                              title: '主题与外观',
+                              subtitle: '主题色、液态玻璃、底栏与文本缩放',
+                              showChevron: true,
+                              onTap: open,
                             ),
+                            closedShape: const RoundedRectangleBorder(),
+                            closedColor: Colors.transparent,
+                            openColor: colors.page,
+                            transitionType: ContainerTransitionType.fade,
+                            transitionDuration: Timings.slow,
+                            openBuilder: (pageContext, close) => ThemePage(onBack: close),
                           ),
                           Divider(
                             height: 1,
@@ -352,17 +366,22 @@ class MyView extends ConsumerWidget {
                             indent: 16,
                             endIndent: 16,
                           ),
-                          ListRow(
-                            title: '使用设置',
-                            subtitle: '深色模式、大字、动效、清空数据',
-                            showChevron: true,
-                            onTap: () => _push(
-                              context,
-                              SettingsPage(
-                                onBack: () => Navigator.of(context).pop(),
-                                largeText: largeText,
-                                onLargeTextChanged: onLargeTextChanged,
-                              ),
+                          OpenContainer(
+                            closedBuilder: (itemContext, open) => ListRow(
+                              title: '使用设置',
+                              subtitle: '深色模式、大字、动效、清空数据',
+                              showChevron: true,
+                              onTap: open,
+                            ),
+                            closedShape: const RoundedRectangleBorder(),
+                            closedColor: Colors.transparent,
+                            openColor: colors.page,
+                            transitionType: ContainerTransitionType.fade,
+                            transitionDuration: Timings.slow,
+                            openBuilder: (pageContext, close) => SettingsPage(
+                              onBack: close,
+                              largeText: largeText,
+                              onLargeTextChanged: onLargeTextChanged,
                             ),
                           ),
                         ],
@@ -413,45 +432,6 @@ class MyView extends ConsumerWidget {
     );
   }
 
-  void _push(BuildContext context, Widget page) {
-    final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
-    Navigator.of(context).push(
-      PageRouteBuilder<void>(
-        transitionDuration: motionDuration(
-          Timings.slow,
-          disableAnimations: disable,
-        ),
-        reverseTransitionDuration: motionDuration(
-          Timings.fast,
-          disableAnimations: disable,
-        ),
-        pageBuilder: (routeContext, _, _) => Scaffold(
-          backgroundColor: routeContext.colors.bg,
-          body: SafeArea(top: false, child: page),
-        ),
-        transitionsBuilder: (context, animation, _, child) {
-          // 进场减速、退场加速：页面从右侧推入，返回时沿同一条路径退回右侧，
-          // 而不是「淡出消失」——用户看到的来路和去路是同一个。
-          // 整屏位移用 emphasized：起手更快离开原位，落定时才收。
-          // 用 drive 而非 CurvedAnimation——transitionsBuilder 每帧都会执行，
-          // 后者每次构造都会给路由的 animation 挂一个监听器。
-          final curved = animation.drive(
-            CurveTween(curve: Curves2.out),
-          );
-          return FadeTransition(
-            opacity: curved,
-            child: SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(0.04, 0),
-                end: Offset.zero,
-              ).animate(curved),
-              child: child,
-            ),
-          );
-        },
-      ),
-    );
-  }
 }
 
 class _MiniMetric extends StatelessWidget {
