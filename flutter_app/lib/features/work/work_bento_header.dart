@@ -469,22 +469,28 @@ class _QuickHoursChip extends StatelessWidget {
           haptic: false,
           shape: Radii.pillShape,
           pressedScale: 0.96,
+          // R37：点击区域至少 44。视觉高度保持 30，用外层的最小高度撑开命中区，
+          // 手指偏一点也能点中；三个并排时不会互相盖住。
           child: Container(
-            height: 30,
+            constraints: const BoxConstraints(minHeight: 44),
             alignment: Alignment.center,
-            decoration: ShapeDecoration(
-              color: colors.inset,
-              shape: Radii.pillShape,
-            ),
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.fade,
-              style: TextStyle(
-                color: colors.text2,
-                fontSize: TypeScale.label,
-                fontWeight: FontWeight.w600,
-                fontFeatures: tabularFigures,
+            child: Container(
+              height: 30,
+              alignment: Alignment.center,
+              decoration: ShapeDecoration(
+                color: colors.inset,
+                shape: Radii.pillShape,
+              ),
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.fade,
+                style: TextStyle(
+                  color: colors.text2,
+                  fontSize: TypeScale.label,
+                  fontWeight: FontWeight.w600,
+                  fontFeatures: tabularFigures,
+                ),
               ),
             ),
           ),

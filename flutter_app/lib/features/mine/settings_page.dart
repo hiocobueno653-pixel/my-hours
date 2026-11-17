@@ -53,6 +53,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       children: [
                         GlassCard(
                           radius: 20,
+                          flat: true,
                           padding: const EdgeInsets.symmetric(
                             vertical: Gaps.xs,
                           ),
@@ -70,6 +71,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                         const SizedBox(height: Gaps.lg),
                         GlassCard(
                           radius: 20,
+                          flat: true,
                           padding: const EdgeInsets.symmetric(
                             vertical: Gaps.xs,
                           ),
@@ -90,6 +92,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                         // 不支持就直说，不给「看起来支持」的错觉。
                         GlassCard(
                           radius: 20,
+                          flat: true,
                           padding: const EdgeInsets.symmetric(
                             vertical: Gaps.xs,
                           ),
@@ -110,6 +113,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                         const SizedBox(height: Gaps.lg),
                         GlassCard(
                           radius: 20,
+                          flat: true,
                           padding: const EdgeInsets.symmetric(
                             vertical: Gaps.xs,
                           ),
@@ -141,6 +145,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                         const SizedBox(height: Gaps.lg),
                         GlassCard(
                           radius: 20,
+                          flat: true,
                           padding: const EdgeInsets.symmetric(
                             vertical: Gaps.xs,
                           ),

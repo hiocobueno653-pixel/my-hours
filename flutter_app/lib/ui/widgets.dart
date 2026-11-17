@@ -26,6 +26,7 @@ class GlassCard extends StatelessWidget {
     this.onTap,
     this.margin,
     this.bordered = true,
+    this.flat = false,
   });
 
   final Widget child;
@@ -36,6 +37,13 @@ class GlassCard extends StatelessWidget {
 
   /// 是否绘制 1px 细描边。嵌套卡（卡片里的次级面）关掉，避免描边套描边。
   final bool bordered;
+
+  /// 平贴卡片：不画阴影，只靠填充色和细描边分层。
+  ///
+  /// iOS 的 inset grouped 列表就是这种做法——分组卡贴在同一层上，
+  /// 用「组」而不是用「浮起」来区分。数据卡仍然保留阴影，
+  /// 因为那些卡片确实浮在内容之上。
+  final bool flat;
 
   @override
   Widget build(BuildContext context) {
@@ -48,7 +56,7 @@ class GlassCard extends StatelessWidget {
       decoration: ShapeDecoration(
         color: context.colors.card,
         shape: shape,
-        shadows: context.shadows,
+        shadows: flat ? null : context.shadows,
       ),
       child: child,
     );
