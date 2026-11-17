@@ -52,6 +52,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         GlassCard(
+                          radius: 20,
                           padding: const EdgeInsets.symmetric(
                             vertical: Gaps.xs,
                           ),
@@ -66,8 +67,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                             onTap: () => _openTheme(context),
                           ),
                         ),
-                        const SizedBox(height: Gaps.md),
+                        const SizedBox(height: Gaps.lg),
                         GlassCard(
+                          radius: 20,
                           padding: const EdgeInsets.symmetric(
                             vertical: Gaps.xs,
                           ),
@@ -83,10 +85,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                             onTap: () => _pickUnit(context),
                           ),
                         ),
-                        const SizedBox(height: Gaps.md),
+                        const SizedBox(height: Gaps.lg),
                         // 如实说明这台机器能不能把计时放进状态栏胶囊。
                         // 不支持就直说，不给「看起来支持」的错觉。
                         GlassCard(
+                          radius: 20,
                           padding: const EdgeInsets.symmetric(
                             vertical: Gaps.xs,
                           ),
@@ -104,8 +107,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                             ),
                           ),
                         ),
-                        const SizedBox(height: Gaps.md),
+                        const SizedBox(height: Gaps.lg),
                         GlassCard(
+                          radius: 20,
                           padding: const EdgeInsets.symmetric(
                             vertical: Gaps.xs,
                           ),
@@ -134,8 +138,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                             ],
                           ),
                         ),
-                        const SizedBox(height: Gaps.md),
+                        const SizedBox(height: Gaps.lg),
                         GlassCard(
+                          radius: 20,
                           padding: const EdgeInsets.symmetric(
                             vertical: Gaps.xs,
                           ),
@@ -170,7 +175,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                             },
                           ),
                         ),
-                        const SizedBox(height: Gaps.md),
+                        const SizedBox(height: Gaps.lg),
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
