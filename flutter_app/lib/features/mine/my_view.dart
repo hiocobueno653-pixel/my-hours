@@ -295,7 +295,7 @@ class MyView extends ConsumerWidget {
                           OpenContainer(
                             closedBuilder: (itemContext, open) => ListRow(
                               title: '年度统计',
-                              subtitle: '全年工时/工资趋势、收支与分类占比',
+                              subtitle: '全年${context.unit.quantity}/工资趋势、收支与分类占比',
                               showChevron: true,
                               onTap: open,
                             ),

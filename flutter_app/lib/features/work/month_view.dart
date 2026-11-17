@@ -438,7 +438,7 @@ class _MissingRateHint extends StatelessWidget {
     final colors = context.colors;
     return Semantics(
       button: true,
-      label: '$days 天有工时但未设时薪，去设置时薪',
+      label: '$days 天有${context.unit.quantity}但未设时薪，去设置时薪',
       onTap: onTap,
       excludeSemantics: true,
       child: Pressable(
@@ -462,7 +462,7 @@ class _MissingRateHint extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  '$days 天记了工时却没算工资：先给工作设时薪',
+                  '$days 天记了${context.unit.quantity}却没算工资：先给工作设时薪',
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -1359,7 +1359,7 @@ class _DayEditorSheetState extends ConsumerState<DayEditorSheet> {
     final colors = context.colors;
     final state = ref.watch(appControllerProvider);
     return SheetScaffold(
-      title: '${formatDateLabel(_date)} 工时',
+      title: '${formatDateLabel(_date)} ${context.unit.quantity}',
       guard: () => _isDirty && !_submitted,
       titleWidget: _DayDateNavigator(
         date: _date,
@@ -1436,7 +1436,7 @@ class _DayEditorSheetState extends ConsumerState<DayEditorSheet> {
           ),
           FormRow(
             label: '当日工资',
-            hint: '留空 = 工时 × 时薪',
+            hint: '留空 = ${context.unit.quantity} × 时薪',
             child: NumberField(
               controller: _fixedPay,
               hintText: '自动',

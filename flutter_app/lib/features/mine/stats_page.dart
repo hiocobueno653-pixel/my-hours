@@ -144,7 +144,7 @@ class _StatsPageState extends ConsumerState<StatsPage> {
                       child: Row(
                         children: [
                           _YearMetric(
-                            label: '总工时',
+                            label: '总${context.unit.quantity}',
                             value: formatHoursValue(summary.totalHours),
                             unit: 'h',
                             color: colors.accent,
@@ -174,7 +174,7 @@ class _StatsPageState extends ConsumerState<StatsPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            '全年工时趋势',
+                            '全年${context.unit.quantity}趋势',
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
@@ -191,7 +191,7 @@ class _StatsPageState extends ConsumerState<StatsPage> {
                                 '${int.parse(point.yearMonth.split('-')[1])}',
                             ],
                             color: colors.accent,
-                            semanticLabel: '全年工时趋势',
+                            semanticLabel: '全年${context.unit.quantity}趋势',
                             seriesName: context.unit.quantity,
                           ),
                         ],

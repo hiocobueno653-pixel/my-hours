@@ -151,7 +151,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                           ),
                           child: ListRow(
                             title: '清空全部数据',
-                            subtitle: '工时、账目、分类、工作与预算全部删除，不可恢复',
+                            subtitle: '${context.unit.quantity}、账目、分类、工作与预算全部删除，不可恢复',
                             danger: true,
                             onTap: () async {
                               final confirmed = await showConfirmDialog(

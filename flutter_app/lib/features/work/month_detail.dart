@@ -9,6 +9,7 @@ import '../../state/app_controller.dart';
 import '../../ui/sheet.dart';
 import '../../ui/widgets.dart';
 import 'month_view.dart';
+import '../../core/measure_unit.dart';
 
 /// 月明细：当月每天一行，底部月总计。
 Future<void> showMonthDetail(BuildContext context, String month) {
@@ -54,7 +55,7 @@ class MonthDetailSheet extends ConsumerWidget {
             child: Row(
               children: [
                 _Metric(
-                  label: '总工时',
+                  label: '总${context.unit.quantity}',
                   value: formatHoursValue(summary.totalHours),
                 ),
                 _Metric(label: '工作天数', value: '${summary.workDays}'),
