@@ -47,15 +47,15 @@ class AppSettings extends ChangeNotifier {
   static const _kTimer = 'my-hours.timer';
   static const _kDashboardCards = 'my-hours.dashboardCards';
 
-  static const Color defaultAccentColor = Color(0xFF007AFF);
+  static const Color defaultAccentColor = Color(0xFF1E5BFF);
 
   static const List<Color> defaultAccentPalette = [
-    Color(0xFF007AFF),
-    Color(0xFF8B5CF6),
-    Color(0xFF10B981),
-    Color(0xFFF59E0B),
-    Color(0xFFEC4899),
-    Color(0xFF64748B),
+    Color(0xFF1E5BFF),
+    Color(0xFFE5484D),
+    Color(0xFF0E9F6E),
+    Color(0xFF6E56CF),
+    Color(0xFFD97706),
+    Color(0xFF334155),
   ];
 
   static Future<AppSettings> load() async {

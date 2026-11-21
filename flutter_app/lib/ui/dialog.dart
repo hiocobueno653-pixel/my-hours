@@ -41,11 +41,11 @@ Future<bool?> showConfirmDialog(
       final confirmForeground = danger ? Colors.white : colors.onPrimary;
       final dialogShape = Radii.shape(Radii.alert);
       final outerStroke = isDark
-          ? Colors.white.withValues(alpha: 0.10)
-          : const Color(0xFF0F172A).withValues(alpha: 0.07);
+          ? Colors.white.withValues(alpha: 0.12)
+          : const Color(0xFF0F172A).withValues(alpha: 0.08);
       final surfaceColor = isDark
-          ? colors.card.withValues(alpha: highContrast ? 1.0 : 0.96)
-          : Colors.white.withValues(alpha: highContrast ? 1.0 : 0.97);
+          ? colors.card.withValues(alpha: highContrast ? 1.0 : 0.94)
+          : colors.card.withValues(alpha: highContrast ? 1.0 : 0.96);
       final blurSigma = highContrast ? 0.0 : (disable ? 8.0 : 16.0);
       final scrimOpacity = animation.drive(
         CurveTween(
@@ -75,6 +75,18 @@ Future<bool?> showConfirmDialog(
                   animation.value,
                 );
                 final progress = springProgress.clamp(0.0, 1.0);
+                final focusBlur = disable
+                    ? 0.0
+                    : (1.0 - (progress / 0.78).clamp(0.0, 1.0)) * 5.5;
+                final contentChild = focusBlur > 0.25
+                    ? ImageFiltered(
+                        imageFilter: ImageFilter.blur(
+                          sigmaX: focusBlur,
+                          sigmaY: focusBlur,
+                        ),
+                        child: child,
+                      )
+                    : child;
                 if (dialogOrigin == null) {
                   final scale = entering
                       ? FlClashSprings.alertEntryScale -
@@ -83,7 +95,7 @@ Future<bool?> showConfirmDialog(
                       : 1.0;
                   return Opacity(
                     opacity: progress,
-                    child: Transform.scale(scale: scale, child: child),
+                    child: Transform.scale(scale: scale, child: contentChild),
                   );
                 }
                 final screen = MediaQuery.sizeOf(dialogContext);
@@ -99,7 +111,7 @@ Future<bool?> showConfirmDialog(
                     offset: travel,
                     child: Transform.scale(
                       scale: 0.86 + 0.14 * progress,
-                      child: child,
+                      child: contentChild,
                     ),
                   ),
                 );

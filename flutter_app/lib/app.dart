@@ -233,7 +233,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                 children: [
                   BackdropLayer(
                     backdrop: _backdrop,
-                    child: tabView,
+                    child: AmbientPageGlow(child: tabView),
                   ),
                   if (!showSidebar)
                     Positioned(
@@ -690,11 +690,11 @@ class _BottomNavBar extends StatelessWidget {
                 accent: colors.primary,
                 content: colors.text,
                 container: colors.isDark
-                    ? const Color(0xFF1A1C22).withValues(
+                    ? const Color(0xFF131926).withValues(
                         alpha: highContrast ? 1.0 : 0.86,
                       )
-                    : Colors.white.withValues(
-                        alpha: highContrast ? 1.0 : 0.88,
+                    : colors.card.withValues(
+                        alpha: highContrast ? 1.0 : 0.92,
                       ),
               ),
               child: LiquidBottomTabs(

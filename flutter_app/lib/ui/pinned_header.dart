@@ -19,16 +19,23 @@ class _HeaderScrim extends StatelessWidget {
     final colors = context.colors;
     final highContrast = MediaQuery.maybeOf(context)?.highContrast ?? false;
     if (highContrast) return ColoredBox(color: colors.page);
-    final base = colors.page;
+    final pureBlack = colors.isDark && colors.page.toARGB32() == 0xFF000000;
+    final base = pureBlack
+        ? colors.page
+        : Color.lerp(
+            colors.page,
+            colors.primary,
+            colors.isDark ? 0.055 : 0.032,
+          )!;
     return DecoratedBox(
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            base.withValues(alpha: 0.94),
-            base.withValues(alpha: 0.86),
-            base.withValues(alpha: 0.52),
+            base.withValues(alpha: 0.92),
+            base.withValues(alpha: 0.78),
+            base.withValues(alpha: 0.36),
             base.withValues(alpha: 0.0),
           ],
           stops: const [0.0, 0.56, 0.82, 1.0],

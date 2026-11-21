@@ -22,3 +22,9 @@ with the FluidGlass package in its `LICENSE`, `NOTICE` and
 No `prism_ui` or FlClash source code, shaders, glyph assets or fonts are
 included. The FlClash_UI distillation was used only for design measurements
 and token values; see `../docs/adr/0004-flclash-visual-language.md`.
+
+## Outfit Font
+
+- Copyright 2021 The Outfit Project Authors (https://github.com/Outfitio/Outfit-Fonts)
+- Licensed under the SIL Open Font License, Version 1.1
+- Bundled as Latin/numeral static weights (`assets/fonts/Outfit-*.ttf`); CJK glyphs continue to use platform system fonts.

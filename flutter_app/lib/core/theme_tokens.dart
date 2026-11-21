@@ -69,7 +69,21 @@ class AppColors {
 
   /// 轻盈描边：暗色纯黑与玻璃浮层上提供微弱轮廓，亮色卡片靠面差呼吸。
   Color get cardBorder =>
-      isDark ? const Color(0xFF262830) : const Color(0xFFE6E8EE);
+      isDark ? const Color(0xFF253046) : const Color(0xFFE2E8F2);
+
+  /// 英雄卡片深空基底色：随当前主题强调色微妙偏移，始终与品牌光感统一。
+  Color get heroBase => Color.lerp(
+    isDark ? const Color(0xFF121A2B) : const Color(0xFF0C1324),
+    primary,
+    isDark ? 0.16 : 0.14,
+  )!;
+
+  /// 英雄卡片高光端色。
+  Color get heroHighlight => Color.lerp(
+    isDark ? const Color(0xFF182540) : const Color(0xFF152342),
+    primary,
+    isDark ? 0.28 : 0.26,
+  )!;
 
   AppColors copyWith({
     Color? page,
@@ -211,96 +225,137 @@ class AppColors {
   }
 
   static const AppColors light = AppColors(
-    page: Color(0xFFF5F6F8),
+    page: Color(0xFFF3F5FA),
     card: Color(0xFFFFFFFF),
-    block: Color(0xFFECEEF2),
-    inset: Color(0xFFE1E4EA),
-    text: Color(0xFF14151A),
-    text2: Color(0xFF5A5E6B),
-    text3: Color(0xFF8C919E),
-    divider: Color(0xFFECEEF3),
-    outline: Color(0xFF9EA3B0),
-    primary: Color(0xFF2563EB),
+    block: Color(0xFFEAEFF7),
+    inset: Color(0xFFDDE4F0),
+    text: Color(0xFF0F172A),
+    text2: Color(0xFF526077),
+    text3: Color(0xFF8A96AB),
+    divider: Color(0xFFE6ECF4),
+    outline: Color(0xFF9EABC0),
+    primary: Color(0xFF1E5BFF),
     onPrimary: Color(0xFFFFFFFF),
-    primaryContainer: Color(0xFFEDF3FF),
-    onPrimaryContainer: Color(0xFF1A47B8),
-    income: Color(0xFF15845E),
-    incomeSoft: Color(0xFFECF8F3),
-    expense: Color(0xFFD6403B),
-    expenseSoft: Color(0xFFFDF0EF),
-    warning: Color(0xFFD17A0E),
-    warningSoft: Color(0xFFFEF6EA),
+    primaryContainer: Color(0xFFE8F0FF),
+    onPrimaryContainer: Color(0xFF123DB3),
+    income: Color(0xFF0E8A5F),
+    incomeSoft: Color(0xFFE5F6EF),
+    expense: Color(0xFFDC3F35),
+    expenseSoft: Color(0xFFFDECEB),
+    warning: Color(0xFFD97706),
+    warningSoft: Color(0xFFFEF3E2),
     chart: [
-      Color(0xFF2563EB),
-      Color(0xFF5B5CE6),
-      Color(0xFF15845E),
-      Color(0xFFD98218),
-      Color(0xFFD6403B),
-      Color(0xFF9B51E0),
+      Color(0xFF1E5BFF),
+      Color(0xFF0E9F6E),
+      Color(0xFF6E56CF),
+      Color(0xFFD97706),
+      Color(0xFFE5484D),
+      Color(0xFF64748B),
     ],
     isDark: false,
   );
 
   static const AppColors dark = AppColors(
-    page: Color(0xFF0E0F12),
-    card: Color(0xFF17181D),
-    block: Color(0xFF22242B),
-    inset: Color(0xFF2E313A),
-    text: Color(0xFFF5F5F7),
-    text2: Color(0xFFA4A8B4),
-    text3: Color(0xFF727684),
-    divider: Color(0xFF23252D),
-    outline: Color(0xFF6C707E),
-    primary: Color(0xFF5B93FF),
+    page: Color(0xFF0A0E17),
+    card: Color(0xFF131926),
+    block: Color(0xFF1C2436),
+    inset: Color(0xFF263147),
+    text: Color(0xFFF1F5FB),
+    text2: Color(0xFF9BA8BF),
+    text3: Color(0xFF66758F),
+    divider: Color(0xFF20293B),
+    outline: Color(0xFF5D6C86),
+    primary: Color(0xFF5C93FF),
     onPrimary: Color(0xFF061326),
-    primaryContainer: Color(0xFF1A3159),
+    primaryContainer: Color(0xFF182F58),
     onPrimaryContainer: Color(0xFFD6E8FF),
     income: Color(0xFF34D399),
-    incomeSoft: Color(0xFF12382B),
+    incomeSoft: Color(0xFF0F352A),
     expense: Color(0xFFF87171),
-    expenseSoft: Color(0xFF421E21),
+    expenseSoft: Color(0xFF3F1D23),
     warning: Color(0xFFFBBF24),
-    warningSoft: Color(0xFF3D2E14),
+    warningSoft: Color(0xFF3B2C13),
     chart: [
-      Color(0xFF5B93FF),
-      Color(0xFF8B89F8),
+      Color(0xFF5C93FF),
       Color(0xFF34D399),
+      Color(0xFFA78BFA),
       Color(0xFFFBBF24),
       Color(0xFFF87171),
-      Color(0xFFC084FC),
+      Color(0xFF94A3B8),
     ],
     isDark: true,
   );
 
   static const AppColors darkPureBlack = AppColors(
     page: Color(0xFF000000),
-    card: Color(0xFF111216),
-    block: Color(0xFF1C1E24),
-    inset: Color(0xFF282B33),
-    text: Color(0xFFF7F7FA),
-    text2: Color(0xFFC4C4CF),
-    text3: Color(0xFF8D8D9B),
-    divider: Color(0xFF1D2028),
-    outline: Color(0xFF787C87),
-    primary: Color(0xFF5B93FF),
+    card: Color(0xFF10141E),
+    block: Color(0xFF1A202E),
+    inset: Color(0xFF262E40),
+    text: Color(0xFFF4F7FC),
+    text2: Color(0xFFA9B6CC),
+    text3: Color(0xFF74849E),
+    divider: Color(0xFF1D2433),
+    outline: Color(0xFF677690),
+    primary: Color(0xFF5C93FF),
     onPrimary: Color(0xFF061326),
-    primaryContainer: Color(0xFF1A3159),
+    primaryContainer: Color(0xFF182F58),
     onPrimaryContainer: Color(0xFFD6E8FF),
     income: Color(0xFF34D399),
-    incomeSoft: Color(0xFF12382B),
+    incomeSoft: Color(0xFF0F352A),
     expense: Color(0xFFF87171),
-    expenseSoft: Color(0xFF421E21),
+    expenseSoft: Color(0xFF3F1D23),
     warning: Color(0xFFFBBF24),
-    warningSoft: Color(0xFF3D2E14),
+    warningSoft: Color(0xFF3B2C13),
     chart: [
-      Color(0xFF5B93FF),
-      Color(0xFF8B89F8),
+      Color(0xFF5C93FF),
       Color(0xFF34D399),
+      Color(0xFFA78BFA),
       Color(0xFFFBBF24),
       Color(0xFFF87171),
-      Color(0xFFC084FC),
+      Color(0xFF94A3B8),
     ],
     isDark: true,
+  );
+}
+
+/// 内置几何数字与英文品牌字族（拉丁与数字走 Outfit，中文自动回退系统字体）。
+const String kDisplayFont = 'Outfit';
+
+/// 深空琉璃英雄卡统一装饰：深邃蓝曜渐变 + 顶部微光描边 + 柔和景深阴影。
+ShapeDecoration studioHeroDecoration(
+  AppColors colors, {
+  double radius = Radii.hero,
+}) {
+  final shape = Radii.shape(radius).copyWith(
+    side: BorderSide(
+      color: Colors.white.withValues(alpha: colors.isDark ? 0.12 : 0.16),
+      width: 0.9,
+    ),
+  );
+  final shadowTint = Color.lerp(
+    const Color(0xFF0B1222),
+    colors.primary,
+    0.32,
+  )!;
+  return ShapeDecoration(
+    shape: shape,
+    gradient: LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [colors.heroHighlight, colors.heroBase],
+    ),
+    shadows: [
+      BoxShadow(
+        color: shadowTint.withValues(alpha: colors.isDark ? 0.45 : 0.22),
+        blurRadius: 24,
+        offset: const Offset(0, 10),
+      ),
+      BoxShadow(
+        color: shadowTint.withValues(alpha: colors.isDark ? 0.24 : 0.08),
+        blurRadius: 4,
+        offset: const Offset(0, 2),
+      ),
+    ],
   );
 }
 
@@ -406,23 +461,23 @@ class AppTokens extends ThemeExtension<AppTokens> {
     colors: AppColors.light,
     shadows: [
       BoxShadow(
-        color: Color(0x060F172A),
-        blurRadius: 8,
-        offset: Offset(0, 2),
+        color: Color(0x0A0F172A),
+        blurRadius: 16,
+        offset: Offset(0, 4),
       ),
       BoxShadow(
         color: Color(0x050F172A),
-        blurRadius: 1.5,
+        blurRadius: 2,
         offset: Offset(0, 1),
       ),
     ],
     floatingShadows: [
       BoxShadow(
-        color: Color(0x140F172A),
-        blurRadius: 20,
-        offset: Offset(0, 8),
+        color: Color(0x1A0F172A),
+        blurRadius: 24,
+        offset: Offset(0, 10),
       ),
-      BoxShadow(color: Color(0x080F172A), blurRadius: 4, offset: Offset(0, 1)),
+      BoxShadow(color: Color(0x0A0F172A), blurRadius: 5, offset: Offset(0, 2)),
     ],
   );
 
@@ -486,7 +541,7 @@ double pageBottomInset(BuildContext context) {
     return keyboardInset > safeInset ? keyboardInset : safeInset;
   }
   final wide = MediaQuery.sizeOf(context).width >= 720;
-  return wide ? system + 28 : system + 112;
+  return wide ? system + 28 : system + 124;
 }
 
 /// 构建 ThemeData。
@@ -495,13 +550,15 @@ ThemeData buildAppTheme(
   AppTokens tokens, {
   String? fontFamily,
 }) {
-  final effectiveFont = (fontFamily != null && fontFamily.isNotEmpty)
-      ? fontFamily
-      : null;
+  final fallbackFonts = <String>[
+    if (fontFamily != null && fontFamily.isNotEmpty && fontFamily != kDisplayFont)
+      fontFamily,
+  ];
   final base = ThemeData(
     brightness: colors.isDark ? Brightness.dark : Brightness.light,
     useMaterial3: true,
-    fontFamily: effectiveFont,
+    fontFamily: kDisplayFont,
+    fontFamilyFallback: fallbackFonts.isEmpty ? null : fallbackFonts,
     scaffoldBackgroundColor: colors.page,
     canvasColor: colors.page,
     splashFactory: LiquidInkHighlight.splashFactory,
@@ -633,7 +690,8 @@ ThemeData buildAppTheme(
   // 主题层统一关闭文字装饰；弹层还会提供透明 Material，避免 MaterialApp
   // 的 fallback 错误样式（黄色双下划线）泄漏到正文。
   final normalizedTextTheme = textTheme.apply(
-    fontFamily: effectiveFont,
+    fontFamily: kDisplayFont,
+    fontFamilyFallback: fallbackFonts.isEmpty ? null : fallbackFonts,
     decoration: TextDecoration.none,
     decorationColor: Colors.transparent,
   );

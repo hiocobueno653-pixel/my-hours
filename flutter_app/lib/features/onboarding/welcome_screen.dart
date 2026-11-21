@@ -227,46 +227,61 @@ class _WelcomeHeading extends StatelessWidget {
     final width = math.min(260.0, MediaQuery.sizeOf(context).width - 96);
     return Column(
       children: [
-        Container(
-          width: 72,
-          height: 72,
-          padding: const EdgeInsets.all(10),
-          decoration: ShapeDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: dark
-                  ? [const Color(0xFF232736), const Color(0xFF171A24)]
-                  : [Colors.white, const Color(0xFFF3F6FD)],
-            ),
-            shape: Radii.shape(20).copyWith(
-              side: BorderSide(
-                color: dark
-                    ? Colors.white.withValues(alpha: 0.14)
-                    : Colors.white,
-                width: 1.5,
+        Stack(
+          alignment: Alignment.center,
+          clipBehavior: Clip.none,
+          children: [
+            Container(
+              width: 132,
+              height: 132,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    colors.primary.withValues(alpha: dark ? 0.28 : 0.18),
+                    colors.primary.withValues(alpha: 0.0),
+                  ],
+                ),
               ),
             ),
-            shadows: [
-              BoxShadow(
-                color: colors.primary.withValues(alpha: dark ? 0.28 : 0.16),
-                blurRadius: 22,
-                offset: const Offset(0, 10),
+            Container(
+              width: 76,
+              height: 76,
+              padding: const EdgeInsets.all(10),
+              decoration: ShapeDecoration(
+                color: colors.card,
+                shape: Radii.shape(22).copyWith(
+                  side: BorderSide(
+                    color: dark
+                        ? Colors.white.withValues(alpha: 0.12)
+                        : colors.primary.withValues(alpha: 0.12),
+                    width: 0.9,
+                  ),
+                ),
+                shadows: [
+                  BoxShadow(
+                    color: colors.primary.withValues(alpha: dark ? 0.34 : 0.18),
+                    blurRadius: 24,
+                    offset: const Offset(0, 10),
+                  ),
+                  BoxShadow(
+                    color: const Color(0xFF0F172A).withValues(
+                      alpha: dark ? 0.26 : 0.06,
+                    ),
+                    blurRadius: 5,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
-              BoxShadow(
-                color: Colors.black.withValues(alpha: dark ? 0.30 : 0.05),
-                blurRadius: 6,
-                offset: const Offset(0, 2),
+              child: Image.asset(
+                'assets/brand/app_icon.png',
+                fit: BoxFit.contain,
+                filterQuality: FilterQuality.high,
               ),
-            ],
-          ),
-          child: Image.asset(
-            'assets/brand/app_icon.png',
-            fit: BoxFit.contain,
-            filterQuality: FilterQuality.high,
-          ),
+            ),
+          ],
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 6),
         Semantics(
           image: true,
           label: '时页 TIMEPAGE',
@@ -344,36 +359,61 @@ class _BentoPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    return GlassCard(
-      flat: true,
-      radius: Radii.card,
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+    const ivory = Color(0xFFF8FAFC);
+    const muted = Color(0xFFA8B5CE);
+    const emerald = Color(0xFF34D399);
+    return Container(
+      decoration: studioHeroDecoration(colors, radius: Radii.hero),
+      child: ClipPath(
+        clipper: ShapeBorderClipper(shape: Radii.shape(Radii.hero)),
+        child: Stack(
+          children: [
+            Positioned(
+              top: -46,
+              right: -30,
+              width: 170,
+              height: 170,
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: RadialGradient(
+                      colors: [
+                        colors.primary.withValues(alpha: 0.34),
+                        colors.primary.withValues(alpha: 0.0),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
           Row(
             children: [
               Text(
                 '本周预览',
                 style: TextStyle(
-                  color: colors.text,
+                  color: ivory,
                   fontSize: 14,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
               const Spacer(),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: ShapeDecoration(
-                  color: colors.block,
+                  color: Colors.white.withValues(alpha: 0.10),
                   shape: Radii.shape(Radii.sm),
                 ),
                 child: Text(
                   '示例',
                   style: TextStyle(
-                    color: colors.text3,
+                    color: muted,
                     fontSize: TypeScale.micro,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ),
@@ -390,8 +430,8 @@ class _BentoPreview extends StatelessWidget {
                     label: '本周工时',
                     value: '32.0',
                     unit: 'h',
-                    background: colors.primaryContainer,
-                    foreground: colors.onPrimaryContainer,
+                    background: Colors.white.withValues(alpha: 0.07),
+                    foreground: ivory,
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -401,12 +441,8 @@ class _BentoPreview extends StatelessWidget {
                     label: kHoursOnly ? '出勤' : '本周工资',
                     value: kHoursOnly ? '5' : '¥800',
                     unit: kHoursOnly ? '天' : '',
-                    background: kHoursOnly
-                        ? colors.incomeSoft
-                        : colors.isDark
-                        ? colors.warning.withValues(alpha: 0.18)
-                        : colors.warningSoft,
-                    foreground: kHoursOnly ? colors.income : colors.warning,
+                    background: Colors.white.withValues(alpha: 0.07),
+                    foreground: emerald,
                   ),
                 ),
               ],
@@ -417,9 +453,13 @@ class _BentoPreview extends StatelessWidget {
           const SizedBox(height: 9),
           Text(
             kHoursOnly ? '日历点选记工 · 工时与出勤一起看清' : '日历点选记工 · 工时、工资与收支一起看清',
-            style: TextStyle(color: colors.text2, fontSize: 11.5, height: 1.45),
+            style: const TextStyle(color: muted, fontSize: 11.5, height: 1.45),
           ),
         ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -506,6 +546,7 @@ class _WeekBars extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const levels = [0.42, 0.72, 0.56, 0.92, 0.68, 0.34, 0.46];
+    final barAccent = Color.lerp(colors.primary, Colors.white, 0.34)!;
     return SizedBox(
       height: 26,
       child: Row(
@@ -516,7 +557,9 @@ class _WeekBars extends StatelessWidget {
               child: Container(
                 height: 8 + 16 * level,
                 decoration: ShapeDecoration(
-                  color: colors.primary.withValues(alpha: 0.18 + 0.48 * level),
+                  color: barAccent.withValues(
+                    alpha: 0.24 + 0.72 * level,
+                  ),
                   shape: Radii.shape(5),
                 ),
               ),
@@ -547,7 +590,12 @@ class _LocalFirstCard extends StatelessWidget {
             height: 34,
             decoration: ShapeDecoration(
               color: colors.incomeSoft,
-              shape: Radii.shape(10),
+              shape: Radii.shape(10).copyWith(
+                side: BorderSide(
+                  color: colors.income.withValues(alpha: 0.16),
+                  width: 0.6,
+                ),
+              ),
             ),
             child: Icon(Icons.shield_outlined, size: 18, color: colors.income),
           ),
@@ -645,11 +693,64 @@ class _StartButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PrimaryButton(
-      label: busy ? '正在进入…' : '开始使用',
-      icon: busy ? null : Icons.arrow_forward_rounded,
-      expand: true,
-      onPressed: onPressed,
+    final colors = context.colors;
+    final shape = Radii.shape(Radii.lg);
+    final gradStart = colors.primary;
+    final gradEnd = Color.lerp(colors.primary, const Color(0xFF0F172A), 0.24)!;
+    return SizedBox(
+      width: double.infinity,
+      child: Opacity(
+        opacity: onPressed == null ? 0.45 : 1,
+        child: Pressable(
+          onTap: onPressed,
+          shape: shape,
+          pressedScale: 0.97,
+          child: Container(
+            height: 48,
+            padding: const EdgeInsets.symmetric(horizontal: Gaps.xl),
+            decoration: ShapeDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [gradStart, gradEnd],
+              ),
+              shape: shape,
+              shadows: onPressed == null
+                  ? null
+                  : [
+                      BoxShadow(
+                        color: colors.primary.withValues(
+                          alpha: colors.isDark ? 0.38 : 0.32,
+                        ),
+                        blurRadius: 18,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (!busy) ...[
+                  Icon(
+                    Icons.arrow_forward_rounded,
+                    size: 18,
+                    color: colors.onPrimary,
+                  ),
+                  const SizedBox(width: Gaps.sm),
+                ],
+                Text(
+                  busy ? '正在进入…' : '开始使用',
+                  style: TextStyle(
+                    color: colors.onPrimary,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

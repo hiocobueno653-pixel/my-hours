@@ -140,94 +140,192 @@ class _StatsPageState extends ConsumerState<StatsPage> {
                       ),
                       const SizedBox(height: Gaps.md),
                     ],
-                    GlassCard(
-                      radius: Radii.hero,
-                      padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
-                      child: Column(
-                        children: [
-                          Row(
-                            children: [
-                              _YearMetric(
-                                label: '全年${context.unit.quantity}',
-                                numericValue: summary.totalHours,
-                                formatter: (v) =>
-                                    formatHoursValue(v.toDouble()),
-                                unit: context.unit.short,
-                                color: colors.text,
-                              ),
-                              _YearMetric(
-                                label: '出勤天数',
-                                numericValue: totalWorkDays,
-                                formatter: (v) => '${v.round()}',
-                                unit: '天',
-                                color: colors.text,
-                              ),
-                              if (!kHoursOnly)
-                                _YearMetric(
-                                  label: '全年工资',
-                                  numericValue: summary.totalPay,
-                                  formatter: (v) => formatAmount(
-                                    v.toDouble(),
-                                    withSymbol: true,
+                    Container(
+                      decoration: studioHeroDecoration(
+                        colors,
+                        radius: Radii.hero,
+                      ),
+                      child: ClipPath(
+                        clipper: ShapeBorderClipper(
+                          shape: Radii.shape(Radii.hero),
+                        ),
+                        child: Stack(
+                          children: [
+                            Positioned(
+                              top: -48,
+                              right: -28,
+                              width: 190,
+                              height: 190,
+                              child: IgnorePointer(
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    gradient: RadialGradient(
+                                      colors: [
+                                        colors.primary.withValues(alpha: 0.30),
+                                        colors.primary.withValues(alpha: 0.0),
+                                      ],
+                                    ),
                                   ),
-                                  unit: '',
-                                  color: colors.income,
                                 ),
-                            ],
-                          ),
-                          if (!kHoursOnly) ...[
-                            const SizedBox(height: 12),
-                            Divider(
-                              height: 1,
-                              thickness: 0.7,
-                              color: colors.divider,
+                              ),
                             ),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                _YearMetric(
-                                  label: '全年收入',
-                                  numericValue: summary.totalIncome,
-                                  formatter: (v) => formatAmount(
-                                    v.toDouble(),
-                                    withSymbol: true,
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(
+                                18,
+                                16,
+                                18,
+                                16,
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              '全年${context.unit.quantity}',
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w500,
+                                                color: Color(0xFFA8B5CE),
+                                              ),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Row(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.baseline,
+                                              textBaseline:
+                                                  TextBaseline.alphabetic,
+                                              children: [
+                                                Flexible(
+                                                  child: FittedBox(
+                                                    fit: BoxFit.scaleDown,
+                                                    alignment:
+                                                        Alignment.centerLeft,
+                                                    child: AnimatedNumericText(
+                                                      value: summary.totalHours,
+                                                      formatter: (v) =>
+                                                          formatHoursValue(
+                                                            v.toDouble(),
+                                                          ),
+                                                      style: const TextStyle(
+                                                        fontSize: 44,
+                                                        height: 0.98,
+                                                        fontWeight:
+                                                            FontWeight.w700,
+                                                        letterSpacing: -1.6,
+                                                        color: Color(
+                                                          0xFFF8FAFC,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 5),
+                                                Text(
+                                                  context.unit.short,
+                                                  style: const TextStyle(
+                                                    fontSize: 13.5,
+                                                    fontWeight: FontWeight.w500,
+                                                    color: Color(0xFFA8B5CE),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 6),
+                                            Text(
+                                              '出勤 $totalWorkDays 天'
+                                              '${!kHoursOnly && summary.totalPay > 0 ? ' · 工资 ${formatAmount(summary.totalPay, withSymbol: true)}' : ''}',
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w500,
+                                                color: Color(0xFF94A3B8),
+                                                fontFeatures: tabularFigures,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      _YearActivityMatrix(
+                                        values: [
+                                          for (final point in hoursTrend)
+                                            point.hours,
+                                        ],
+                                        year: _year,
+                                      ),
+                                    ],
                                   ),
-                                  unit: '',
-                                  color: colors.income,
-                                  compact: true,
-                                ),
-                                _YearMetric(
-                                  label: '全年支出',
-                                  numericValue: summary.totalExpense,
-                                  formatter: (v) => formatAmount(
-                                    v.toDouble(),
-                                    withSymbol: true,
-                                  ),
-                                  unit: '',
-                                  color: colors.expense,
-                                  compact: true,
-                                ),
-                                _YearMetric(
-                                  label: '年度净结余',
-                                  numericValue:
-                                      summary.totalIncome -
-                                      summary.totalExpense,
-                                  formatter: (v) => formatAmount(
-                                    v.toDouble(),
-                                    withSymbol: true,
-                                  ),
-                                  unit: '',
-                                  color:
-                                      summary.totalIncome >=
-                                          summary.totalExpense
-                                      ? colors.text
-                                      : colors.expense,
-                                  compact: true,
-                                ),
-                              ],
+                                  if (!kHoursOnly) ...[
+                                    const SizedBox(height: 14),
+                                    Divider(
+                                      height: 1,
+                                      thickness: 0.7,
+                                      color: Colors.white.withValues(
+                                        alpha: 0.11,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Row(
+                                      children: [
+                                        _YearMetric(
+                                          label: '全年收入',
+                                          numericValue: summary.totalIncome,
+                                          formatter: (v) => formatAmount(
+                                            v.toDouble(),
+                                            withSymbol: true,
+                                          ),
+                                          unit: '',
+                                          color: const Color(0xFF34D399),
+                                          labelColor: const Color(0xFF94A3B8),
+                                          compact: true,
+                                        ),
+                                        _YearMetric(
+                                          label: '全年支出',
+                                          numericValue: summary.totalExpense,
+                                          formatter: (v) => formatAmount(
+                                            v.toDouble(),
+                                            withSymbol: true,
+                                          ),
+                                          unit: '',
+                                          color: const Color(0xFFF87171),
+                                          labelColor: const Color(0xFF94A3B8),
+                                          compact: true,
+                                        ),
+                                        _YearMetric(
+                                          label: '年度净结余',
+                                          numericValue:
+                                              summary.totalIncome -
+                                              summary.totalExpense,
+                                          formatter: (v) => formatAmount(
+                                            v.toDouble(),
+                                            withSymbol: true,
+                                          ),
+                                          unit: '',
+                                          color:
+                                              summary.totalIncome >=
+                                                  summary.totalExpense
+                                              ? const Color(0xFFF8FAFC)
+                                              : const Color(0xFFF87171),
+                                          labelColor: const Color(0xFF94A3B8),
+                                          compact: true,
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ],
+                              ),
                             ),
                           ],
-                        ],
+                        ),
                       ),
                     ),
                     const SizedBox(height: Gaps.cardGap),
@@ -731,6 +829,7 @@ class _YearMetric extends StatelessWidget {
     required this.formatter,
     required this.unit,
     required this.color,
+    this.labelColor,
     this.compact = false,
   });
 
@@ -739,6 +838,7 @@ class _YearMetric extends StatelessWidget {
   final String Function(num value) formatter;
   final String unit;
   final Color color;
+  final Color? labelColor;
   final bool compact;
 
   @override
@@ -748,44 +848,121 @@ class _YearMetric extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: TextStyle(fontSize: 11.5, color: colors.text3)),
-          const SizedBox(height: 4),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                AnimatedNumericText(
-                  value: numericValue,
-                  formatter: formatter,
-                  style: TextStyle(
-                    fontSize: compact ? TypeScale.body : 21,
-                    height: 1.05,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.3,
-                    color: color,
-                  ),
-                ),
-                if (unit.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(left: 2, bottom: 1),
-                    child: Text(
-                      unit,
-                      style: TextStyle(
-                        fontSize: TypeScale.micro,
-                        color: colors.text2,
-                      ),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11.5,
+              color: labelColor ?? colors.text3,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: AnimatedNumericText(
+                    value: numericValue,
+                    formatter: formatter,
+                    style: TextStyle(
+                      fontSize: compact ? 16 : 20,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.4,
+                      color: color,
                     ),
                   ),
+                ),
+              ),
+              if (unit.isNotEmpty) ...[
+                const SizedBox(width: 2),
+                Text(unit, style: TextStyle(fontSize: 11, color: colors.text3)),
               ],
-            ),
+            ],
           ),
         ],
       ),
     );
   }
 }
+
+/// 12 个月垂直微光律动条：像精密音频电平一样呈现全年投入节律，单月数据同样利落。
+class _YearActivityMatrix extends StatelessWidget {
+  const _YearActivityMatrix({required this.values, required this.year});
+
+  final List<double> values;
+  final int year;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    var maxVal = 0.0;
+    for (final v in values) {
+      if (v > maxVal) maxVal = v;
+    }
+    final barAccent = Color.lerp(colors.primary, Colors.white, 0.36)!;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Text(
+          '$year · 12M',
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 1.0,
+            color: const Color(0xFF94A3B8),
+            fontFeatures: tabularFigures,
+          ),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 36,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              for (var i = 0; i < 12; i++) ...[
+                if (i > 0) const SizedBox(width: 3.5),
+                () {
+                  final value = i < values.length ? values[i] : 0.0;
+                  final ratio = maxVal > 0
+                      ? (value / maxVal).clamp(0.0, 1.0)
+                      : 0.0;
+                  final h = value <= 0 ? 7.0 : (10.0 + ratio * 26.0);
+                  return Container(
+                    width: 5.5,
+                    height: h,
+                    decoration: BoxDecoration(
+                      color: value <= 0
+                          ? Colors.white.withValues(alpha: 0.14)
+                          : Color.lerp(
+                              barAccent.withValues(alpha: 0.55),
+                              barAccent,
+                              ratio,
+                            ),
+                      borderRadius: BorderRadius.circular(999),
+                      boxShadow: value > 0 && ratio > 0.7
+                          ? [
+                              BoxShadow(
+                                color: barAccent.withValues(alpha: 0.45),
+                                blurRadius: 6,
+                              ),
+                            ]
+                          : null,
+                    ),
+                  );
+                }(),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 
 class _Legend extends StatelessWidget {
   const _Legend({required this.color, required this.label});

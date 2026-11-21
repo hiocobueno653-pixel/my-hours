@@ -4,6 +4,7 @@
 // 用法：
 //   CAPTURE_SHOTS=1 flutter test test/_shots_test.dart
 // 产物：flutter_app/shots/*.png（已在 .gitignore 之外，评审后删除）
+import 'dart:async';
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -20,10 +21,12 @@ import 'package:my_hours/data/constants.dart';
 import 'package:my_hours/data/models.dart';
 import 'package:my_hours/data/persistence.dart';
 import 'package:my_hours/features/mine/backup_page.dart';
+import 'package:my_hours/features/mine/custom_color_sheet.dart';
 import 'package:my_hours/features/mine/settings_page.dart';
 import 'package:my_hours/features/mine/theme_page.dart';
 import 'package:my_hours/features/onboarding/welcome_screen.dart';
 import 'package:my_hours/state/app_controller.dart';
+import 'package:my_hours/ui/glass_menu.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const String _family = 'CaptureSans';
@@ -37,12 +40,27 @@ Future<ByteData> _readFont(String path) async {
 }
 
 Future<void> _loadFonts() async {
-  final loader = FontLoader(_family);
-  if (File('C:/Windows/Fonts/Deng.ttf').existsSync()) {
-    loader.addFont(_readFont('C:/Windows/Fonts/Deng.ttf'));
+  final outfitLoader = FontLoader(kDisplayFont);
+  for (final path in const [
+    'assets/fonts/Outfit-Regular.ttf',
+    'assets/fonts/Outfit-Medium.ttf',
+    'assets/fonts/Outfit-SemiBold.ttf',
+    'assets/fonts/Outfit-Bold.ttf',
+  ]) {
+    if (File(path).existsSync()) {
+      outfitLoader.addFont(_readFont(path));
+    }
   }
-  if (File('C:/Windows/Fonts/Dengb.ttf').existsSync()) {
-    loader.addFont(_readFont('C:/Windows/Fonts/Dengb.ttf'));
+  await outfitLoader.load();
+
+  final loader = FontLoader(_family);
+  if (File('C:/Windows/Fonts/NotoSansSC-VF.ttf').existsSync()) {
+    loader.addFont(_readFont('C:/Windows/Fonts/NotoSansSC-VF.ttf'));
+  } else if (File('C:/Windows/Fonts/Deng.ttf').existsSync()) {
+    loader.addFont(_readFont('C:/Windows/Fonts/Deng.ttf'));
+    if (File('C:/Windows/Fonts/Dengb.ttf').existsSync()) {
+      loader.addFont(_readFont('C:/Windows/Fonts/Dengb.ttf'));
+    }
   }
   await loader.load();
 
@@ -135,7 +153,7 @@ void _seed(ProviderContainer container) {
 Widget _app({required Widget child, required bool dark}) {
   final colors = dark ? AppColors.dark : AppColors.light;
   final tokens = dark ? AppTokens.darkTokens : AppTokens.lightTokens;
-  final theme = buildAppTheme(colors, tokens);
+  final theme = buildAppTheme(colors, tokens, fontFamily: _family);
   return RepaintBoundary(
     key: const ValueKey(_shotKey),
     child: LiquidGlassTheme(
@@ -154,11 +172,12 @@ Widget _app({required Widget child, required bool dark}) {
             ),
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
-        theme: theme.copyWith(
-          textTheme: theme.textTheme.apply(fontFamily: _family),
-        ),
+        theme: theme,
         builder: (context, widget) => DefaultTextStyle.merge(
-          style: const TextStyle(fontFamily: _family),
+          style: const TextStyle(
+            fontFamily: kDisplayFont,
+            fontFamilyFallback: [_family],
+          ),
           child: widget ?? const SizedBox.shrink(),
         ),
         home: child,
@@ -411,5 +430,66 @@ void main() {
     });
     await tester.pumpAndSettle();
     await _capture(tester, 'welcome-dark');
+  });
+
+  testWidgets('自定义主题色滑块 · 亮色', (tester) async {
+    tester.view.physicalSize = const Size(390 * 2, 844 * 2);
+    tester.view.devicePixelRatio = 2;
+    addTearDown(tester.view.reset);
+    await _boot(tester, ThemePage(onBack: () {}));
+    final ctx = tester.element(find.byType(ThemePage));
+    unawaited(
+      showCustomColorSheet(
+      ctx,
+      initialColor: AppColors.light.primary,
+      colorStyle: AppColorStyle.vivid,
+      pureBlack: false,
+      floatingDock: true,
+      onConfirmed: (_) {},
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('滑块'));
+    await tester.pumpAndSettle();
+    await _capture(tester, 'color-sliders-light');
+  });
+
+  testWidgets('液态水滴形变动效关键帧', (tester) async {
+    tester.view.physicalSize = const Size(390 * 2, 844 * 2);
+    tester.view.devicePixelRatio = 2;
+    addTearDown(tester.view.reset);
+    await _boot(tester, ThemePage(onBack: () {}));
+    final ctx = tester.element(find.byType(ThemePage));
+    unawaited(
+      showDropletGlassMenu(
+      ctx,
+      anchorRect: const Rect.fromLTWH(286, 360, 74, 34),
+      panelWidth: 162,
+      preferRightAlign: true,
+      items: [
+        GlassMenuAction(label: '鲜明', selected: true, onSelected: () {}),
+        GlassMenuAction(label: '氛围', onSelected: () {}),
+        GlassMenuAction(label: '柔和', onSelected: () {}),
+        GlassMenuAction(label: '单色', onSelected: () {}),
+      ],
+      ),
+    );
+    Future<void> snapAt(String name, int ms) async {
+      await tester.pump(Duration(milliseconds: ms));
+      final boundary =
+          tester.renderObject(find.byKey(const ValueKey(_shotKey)))
+              as RenderRepaintBoundary;
+      final bytes = await tester.runAsync(() async {
+        final image = await boundary.toImage(pixelRatio: 2);
+        final data = await image.toByteData(format: ui.ImageByteFormat.png);
+        return data!.buffer.asUint8List();
+      });
+      File('shots/$name.png').writeAsBytesSync(bytes!);
+    }
+
+    await snapAt('droplet-1', 45);
+    await snapAt('droplet-2', 65);
+    await snapAt('droplet-3', 65);
+    await snapAt('droplet-4', 320);
   });
 }

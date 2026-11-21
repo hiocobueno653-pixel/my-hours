@@ -292,11 +292,15 @@ class _BarPairPainter extends CustomPainter {
     final scale = scaleMax <= 0 ? 1.0 : chartHeight / (scaleMax * 1.15);
 
     final gridPaint = Paint()
-      ..color = gridColor
-      ..strokeWidth = 1;
+      ..color = gridColor.withValues(alpha: 0.65)
+      ..strokeWidth = 0.8;
     for (var i = 0; i <= 3; i++) {
       final y = chartHeight * i / 3;
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
+      if (i == 3) {
+        canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
+      } else {
+        _drawDashedLine(canvas, Offset(0, y), Offset(size.width, y), gridPaint);
+      }
     }
 
     if (labelMax > 0) {
@@ -306,19 +310,30 @@ class _BarPairPainter extends CustomPainter {
           style: TextStyle(
             fontSize: 10,
             fontWeight: FontWeight.w600,
-            color: labelColor.withValues(alpha: 0.82),
+            color: labelColor.withValues(alpha: 0.90),
             fontFamily: fontFamily,
             fontFeatures: tabularFigures,
           ),
         ),
         textDirection: TextDirection.ltr,
       )..layout();
-      maxTp.paint(canvas, Offset(size.width - maxTp.width, 2));
+      final pillRect = Rect.fromLTWH(
+        size.width - maxTp.width - 10,
+        0,
+        maxTp.width + 10,
+        maxTp.height + 4,
+      );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(pillRect, const Radius.circular(6)),
+        Paint()..color = gridColor.withValues(alpha: 0.65),
+      );
+      maxTp.paint(canvas, Offset(pillRect.left + 5, pillRect.top + 2));
     }
 
     final slot = size.width / labels.length;
-    final barWidth = math.min(9.0, slot * 0.26);
+    final barWidth = math.min(8.5, slot * 0.26);
     final radius = Radius.circular(barWidth / 2);
+    final trackPaint = Paint()..color = gridColor.withValues(alpha: 0.36);
 
     if (selectedSlot != null &&
         selectedSlot! >= -0.5 &&
@@ -335,28 +350,64 @@ class _BarPairPainter extends CustomPainter {
       );
     }
 
-    final paintA = Paint()..color = colorA;
-    final paintB = Paint()..color = colorB;
     for (var i = 0; i < labels.length; i++) {
       final cx = slot * i + slot / 2;
+      const trackTop = 10.0;
+      final trackHeight = math.max(0.0, chartHeight - trackTop);
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(
+            cx - barWidth - 1.5,
+            trackTop,
+            barWidth,
+            trackHeight,
+          ),
+          radius,
+        ),
+        trackPaint,
+      );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(cx + 1.5, trackTop, barWidth, trackHeight),
+          radius,
+        ),
+        trackPaint,
+      );
       final a = (i < seriesA.length ? seriesA[i] : 0.0) * scale;
       final b = (i < seriesB.length ? seriesB[i] : 0.0) * scale;
       if (a > 0) {
+        final rectA = Rect.fromLTWH(
+          cx - barWidth - 1.5,
+          chartHeight - a,
+          barWidth,
+          a,
+        );
         canvas.drawRRect(
-          RRect.fromRectAndRadius(
-            Rect.fromLTWH(cx - barWidth - 1.5, chartHeight - a, barWidth, a),
-            radius,
-          ),
-          paintA,
+          RRect.fromRectAndRadius(rectA, radius),
+          Paint()
+            ..shader = LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Color.lerp(colorA, Colors.white, 0.14)!,
+                colorA,
+              ],
+            ).createShader(rectA),
         );
       }
       if (b > 0) {
+        final rectB = Rect.fromLTWH(cx + 1.5, chartHeight - b, barWidth, b);
         canvas.drawRRect(
-          RRect.fromRectAndRadius(
-            Rect.fromLTWH(cx + 1.5, chartHeight - b, barWidth, b),
-            radius,
-          ),
-          paintB,
+          RRect.fromRectAndRadius(rectB, radius),
+          Paint()
+            ..shader = LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Color.lerp(colorB, Colors.white, 0.14)!,
+                colorB,
+              ],
+            ).createShader(rectB),
         );
       }
       final tp = TextPainter(
@@ -872,11 +923,15 @@ class _TrendPainter extends CustomPainter {
       ..close();
 
     final gridPaint = Paint()
-      ..color = gridColor.withValues(alpha: 0.72)
+      ..color = gridColor.withValues(alpha: 0.65)
       ..strokeWidth = 0.8;
     for (var i = 0; i <= 2; i++) {
       final y = chartHeight * i / 2;
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
+      if (i == 2) {
+        canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
+      } else {
+        _drawDashedLine(canvas, Offset(0, y), Offset(size.width, y), gridPaint);
+      }
     }
 
     final areaPaint = Paint()
@@ -884,9 +939,11 @@ class _TrendPainter extends CustomPainter {
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: [
-          color.withValues(alpha: 0.24),
+          color.withValues(alpha: 0.26),
+          color.withValues(alpha: 0.06),
           color.withValues(alpha: 0.01),
         ],
+        stops: const [0.0, 0.62, 1.0],
       ).createShader(Rect.fromLTWH(0, 0, size.width, chartHeight));
 
     canvas
@@ -896,13 +953,29 @@ class _TrendPainter extends CustomPainter {
       ..drawPath(
         path,
         Paint()
+          ..color = color.withValues(alpha: 0.22)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 6.0
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round,
+      )
+      ..drawPath(
+        path,
+        Paint()
           ..color = color
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 2.2
+          ..strokeWidth = 2.4
           ..strokeCap = StrokeCap.round
           ..strokeJoin = StrokeJoin.round,
       )
       ..restore();
+
+    final nodePaint = Paint()..color = gridColor.withValues(alpha: 0.85);
+    for (var i = 0; i < points.length; i++) {
+      if (values[i] <= 0) {
+        canvas.drawCircle(Offset(points[i].dx, chartHeight), 1.8, nodePaint);
+      }
+    }
 
     if (labelMax > 0) {
       var peakIndex = 0;
@@ -911,14 +984,22 @@ class _TrendPainter extends CustomPainter {
       }
       final peak = points[peakIndex];
       final alpha = peakOpacity.clamp(0.0, 1.0);
-      canvas.drawCircle(
-        peak,
-        7.5,
-        Paint()..color = color.withValues(alpha: 0.18 * alpha),
+      _drawDashedLine(
+        canvas,
+        Offset(peak.dx, peak.dy + 6),
+        Offset(peak.dx, chartHeight),
+        Paint()
+          ..color = color.withValues(alpha: 0.34 * alpha)
+          ..strokeWidth = 1.0,
       );
       canvas.drawCircle(
         peak,
-        4.2,
+        8.5,
+        Paint()..color = color.withValues(alpha: 0.20 * alpha),
+      );
+      canvas.drawCircle(
+        peak,
+        4.4,
         Paint()..color = color.withValues(alpha: alpha),
       );
       canvas.drawCircle(
@@ -932,17 +1013,25 @@ class _TrendPainter extends CustomPainter {
           style: TextStyle(
             fontSize: 10.5,
             fontWeight: FontWeight.w700,
-            color: color.withValues(alpha: alpha),
+            color: Colors.white.withValues(alpha: alpha),
             fontFamily: fontFamily,
             fontFeatures: tabularFigures,
           ),
         ),
         textDirection: TextDirection.ltr,
       )..layout();
-      final px = (peak.dx - peakTp.width / 2)
-          .clamp(0.0, size.width - peakTp.width);
-      final py = math.max(0.0, peak.dy - peakTp.height - 7);
-      peakTp.paint(canvas, Offset(px, py));
+      final pillW = peakTp.width + 12;
+      final pillH = peakTp.height + 5;
+      final px = (peak.dx - pillW / 2).clamp(0.0, size.width - pillW);
+      final py = math.max(0.0, peak.dy - pillH - 9);
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(px, py, pillW, pillH),
+          const Radius.circular(999),
+        ),
+        Paint()..color = color.withValues(alpha: alpha),
+      );
+      peakTp.paint(canvas, Offset(px + 6, py + 2.5));
     }
 
     for (var i = 0; i < labels.length; i++) {
@@ -973,4 +1062,30 @@ class _TrendPainter extends CustomPainter {
       old.gridColor != gridColor ||
       old.labelColor != labelColor ||
       old.fontFamily != fontFamily;
+}
+
+void _drawDashedLine(
+  Canvas canvas,
+  Offset start,
+  Offset end,
+  Paint paint, {
+  double dash = 3.5,
+  double gap = 3.5,
+}) {
+  final dx = end.dx - start.dx;
+  final dy = end.dy - start.dy;
+  final total = math.sqrt(dx * dx + dy * dy);
+  if (total <= 0) return;
+  final ux = dx / total;
+  final uy = dy / total;
+  var distance = 0.0;
+  while (distance < total) {
+    final next = math.min(distance + dash, total);
+    canvas.drawLine(
+      Offset(start.dx + ux * distance, start.dy + uy * distance),
+      Offset(start.dx + ux * next, start.dy + uy * next),
+      paint,
+    );
+    distance += dash + gap;
+  }
 }

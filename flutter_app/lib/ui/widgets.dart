@@ -97,15 +97,15 @@ class LiquidGlassSurface extends StatelessWidget {
             : colors.isDark
             ? Color.lerp(colors.card, Colors.white, bright ? 0.05 : 0.02)!
                 .withValues(alpha: highContrast ? 1.0 : (bright ? 0.88 : 0.80))
-            : Colors.white.withValues(
-                alpha: highContrast ? 1.0 : (bright ? 0.92 : 0.84),
+            : colors.card.withValues(
+                alpha: highContrast ? 1.0 : (bright ? 0.92 : 0.86),
               ));
 
     final outerBorder = selected
         ? colors.primary.withValues(alpha: 0.30)
         : colors.isDark
         ? Colors.white.withValues(alpha: 0.09)
-        : const Color(0xFF0F172A).withValues(alpha: bright ? 0.065 : 0.075);
+        : const Color(0xFF1C160C).withValues(alpha: bright ? 0.075 : 0.085);
 
     final shape = radius >= Radii.pill
         ? Radii.pillShape
@@ -213,9 +213,9 @@ class GlassCard extends StatelessWidget {
     final borderColor = bordered
         ? colors.cardBorder
         : pureBlack
-        ? Colors.white.withValues(alpha: 0.09)
+        ? Colors.white.withValues(alpha: 0.10)
         : colors.isDark
-        ? Colors.white.withValues(alpha: 0.068)
+        ? Colors.white.withValues(alpha: 0.075)
         : const Color(0xFF0F172A).withValues(alpha: 0.055);
     final shape = base.copyWith(
       side: BorderSide(color: borderColor, width: bordered ? 0.9 : 0.75),
@@ -1263,24 +1263,85 @@ class AppIconBadge extends StatelessWidget {
     required this.color,
     this.size = 32,
     this.iconSize = 17,
+    this.tinted = false,
   });
 
   final IconData icon;
   final Color color;
   final double size;
   final double iconSize;
+  final bool tinted;
 
   @override
   Widget build(BuildContext context) {
-    final isDark = context.colors.isDark;
+    final colors = context.colors;
+    final isDanger = color == colors.expense;
+    final useTint = tinted || isDanger;
     return Container(
       width: size,
       height: size,
       decoration: ShapeDecoration(
-        color: color.withValues(alpha: isDark ? 0.18 : 0.09),
-        shape: Radii.shape(size * 0.28),
+        color: useTint
+            ? color.withValues(alpha: colors.isDark ? 0.20 : 0.11)
+            : colors.block.withValues(alpha: colors.isDark ? 0.80 : 0.85),
+        shape: Radii.shape(size * 0.32).copyWith(
+          side: BorderSide(
+            color: useTint
+                ? color.withValues(alpha: colors.isDark ? 0.22 : 0.14)
+                : colors.divider.withValues(alpha: 0.75),
+            width: 0.7,
+          ),
+        ),
       ),
-      child: Icon(icon, size: iconSize, color: color),
+      child: Icon(
+        icon,
+        size: iconSize,
+        color: useTint ? color : colors.text,
+      ),
+    );
+  }
+}
+
+/// 页面顶部主题氛围微光：给浅/深画布顶部一层极轻的主题色径向光晕，
+/// 让内容界面与「时页」品牌光感自然衔接，不再是单调死板的纯灰底。
+class AmbientPageGlow extends StatelessWidget {
+  const AmbientPageGlow({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final pureBlack = colors.isDark && colors.page.toARGB32() == 0xFF000000;
+    final highContrast = MediaQuery.maybeOf(context)?.highContrast ?? false;
+    if (pureBlack || highContrast) return child;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Positioned(
+          top: -80,
+          left: -40,
+          right: -40,
+          height: 310,
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  center: const Alignment(0.32, -0.55),
+                  radius: 1.05,
+                  colors: [
+                    colors.primary.withValues(alpha: colors.isDark ? 0.16 : 0.085),
+                    colors.primary.withValues(alpha: colors.isDark ? 0.05 : 0.025),
+                    colors.primary.withValues(alpha: 0.0),
+                  ],
+                  stops: const [0.0, 0.48, 1.0],
+                ),
+              ),
+            ),
+          ),
+        ),
+        child,
+      ],
     );
   }
 }

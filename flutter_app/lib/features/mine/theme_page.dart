@@ -173,28 +173,35 @@ class ThemePage extends ConsumerWidget {
                                 ),
                               ),
                               const SizedBox(height: Gaps.lg),
-                              Text(
-                                '配色风格',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: colors.text2,
-                                ),
+                              Divider(
+                                height: 1,
+                                thickness: 0.7,
+                                color: colors.divider,
                               ),
-                              const SizedBox(height: Gaps.sm),
-                              Align(
-                                alignment: Alignment.centerLeft,
-                                child: GlassSelectMenu<AppColorStyle>(
-                                  values: AppColorStyle.values,
-                                  selected: settings.colorStyle,
-                                  labelOf: (style) => switch (style) {
-                                    AppColorStyle.vivid => '鲜明',
-                                    AppColorStyle.atmospheric => '氛围',
-                                    AppColorStyle.soft => '柔和',
-                                    AppColorStyle.monochrome => '单色',
-                                  },
-                                  onChanged: settings.setColorStyle,
-                                ),
+                              const SizedBox(height: Gaps.md),
+                              Row(
+                                children: [
+                                  Text(
+                                    '配色风格',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: colors.text,
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  GlassSelectMenu<AppColorStyle>(
+                                    values: AppColorStyle.values,
+                                    selected: settings.colorStyle,
+                                    labelOf: (style) => switch (style) {
+                                      AppColorStyle.vivid => '鲜明',
+                                      AppColorStyle.atmospheric => '氛围',
+                                      AppColorStyle.soft => '柔和',
+                                      AppColorStyle.monochrome => '单色',
+                                    },
+                                    onChanged: settings.setColorStyle,
+                                  ),
+                                ],
                               ),
                             ],
                           ),
@@ -757,10 +764,7 @@ class _ThemePreviewState extends State<_ThemePreview> {
         Container(
           height: 70,
           padding: const EdgeInsets.fromLTRB(12, 9, 12, 8),
-          decoration: ShapeDecoration(
-            color: colors.card,
-            shape: Radii.shape(Radii.md),
-          ),
+          decoration: studioHeroDecoration(colors, radius: Radii.md),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -770,7 +774,7 @@ class _ThemePreviewState extends State<_ThemePreview> {
                     width: 6,
                     height: 6,
                     decoration: BoxDecoration(
-                      color: accent,
+                      color: Color.lerp(accent, Colors.white, 0.35),
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -779,7 +783,7 @@ class _ThemePreviewState extends State<_ThemePreview> {
                     width: 52,
                     height: 6,
                     decoration: BoxDecoration(
-                      color: colors.inset,
+                      color: Colors.white.withValues(alpha: 0.24),
                       borderRadius: BorderRadius.circular(4),
                     ),
                   ),
@@ -788,7 +792,7 @@ class _ThemePreviewState extends State<_ThemePreview> {
                     width: 30,
                     height: 6,
                     decoration: BoxDecoration(
-                      color: accent.withValues(alpha: 0.5),
+                      color: const Color(0xFF34D399).withValues(alpha: 0.72),
                       borderRadius: BorderRadius.circular(4),
                     ),
                   ),

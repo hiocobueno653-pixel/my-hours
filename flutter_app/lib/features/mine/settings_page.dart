@@ -225,7 +225,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
                           const SizedBox(height: Gaps.xl),
                           Center(
                             child: Text(
-                              '时页 TIMEPAGE · 1.7.7 · 数据全部保存在本机',
+                              '时页 TIMEPAGE · 1.7.8 · 数据全部保存在本机',
                               style: TextStyle(
                                 fontSize: 11.5,
                                 color: colors.text3,

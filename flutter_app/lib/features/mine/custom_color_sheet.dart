@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
-import 'package:flutter/foundation.dart' show clampDouble;
+import 'package:flutter/foundation.dart' show clampDouble, listEquals;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -66,6 +66,7 @@ class _CustomColorSheetState extends State<_CustomColorSheet> {
     Color(widget.initialColor.toARGB32() | 0xFF000000),
   );
   late HSVColor _hsv = HSVColor.fromColor(_color.value);
+  bool _updatingFromHsv = false;
   _PaletteMode _mode = _PaletteMode.grid;
 
   @override
@@ -75,6 +76,7 @@ class _CustomColorSheetState extends State<_CustomColorSheet> {
   }
 
   void _syncHsv() {
+    if (_updatingFromHsv) return;
     if (_hsv.toColor().toARGB32() != _color.value.toARGB32()) {
       setState(() => _hsv = HSVColor.fromColor(_color.value));
     }
@@ -87,8 +89,13 @@ class _CustomColorSheetState extends State<_CustomColorSheet> {
   }
 
   void _pickHsv(HSVColor hsv) {
-    setState(() => _hsv = hsv);
-    _color.value = Color(hsv.toColor().toARGB32() | 0xFF000000);
+    _updatingFromHsv = true;
+    try {
+      setState(() => _hsv = hsv);
+      _color.value = Color(hsv.toColor().toARGB32() | 0xFF000000);
+    } finally {
+      _updatingFromHsv = false;
+    }
   }
 
   void _confirm() {
@@ -843,6 +850,7 @@ class _GradientSliderRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Row(
           children: [
@@ -868,7 +876,8 @@ class _GradientSliderRow extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         SizedBox(
-          height: 32,
+          width: double.infinity,
+          height: 34,
           child: _ImmediatePickArea(
             onPicked: (pos, size) {
               final usable = math.max(1.0, size.width - _thumbRadius * 2);
@@ -880,6 +889,9 @@ class _GradientSliderRow extends StatelessWidget {
                 fraction: fraction,
                 colors: gradientColors,
                 thumbColor: thumbColor,
+                borderColor: colors.isDark
+                    ? Colors.white.withValues(alpha: 0.14)
+                    : Colors.black.withValues(alpha: 0.08),
               ),
             ),
           ),
@@ -894,25 +906,40 @@ class _GradientTrackPainter extends CustomPainter {
     required this.fraction,
     required this.colors,
     required this.thumbColor,
+    required this.borderColor,
   });
 
   final double fraction;
   final List<Color> colors;
   final Color thumbColor;
+  final Color borderColor;
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (size.width <= 0 || size.height <= 0) return;
     const trackHeight = 20.0;
     final trackRect = Rect.fromCenter(
       center: Offset(size.width / 2, size.height / 2),
       width: size.width,
       height: trackHeight,
     );
+    final trackRRect = RRect.fromRectAndRadius(
+      trackRect,
+      const Radius.circular(trackHeight / 2),
+    );
     canvas.drawRRect(
-      RRect.fromRectAndRadius(trackRect, const Radius.circular(trackHeight / 2)),
+      trackRRect,
       Paint()..shader = LinearGradient(colors: colors).createShader(trackRect),
     );
-    final cx = _thumbRadius + (size.width - _thumbRadius * 2) * fraction.clamp(0.0, 1.0);
+    canvas.drawRRect(
+      trackRRect.deflate(0.4),
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 0.8
+        ..color = borderColor,
+    );
+    final usable = math.max(0.0, size.width - _thumbRadius * 2);
+    final cx = _thumbRadius + usable * fraction.clamp(0.0, 1.0);
     _paintThumb(canvas, Offset(cx, size.height / 2), _thumbRadius, thumbColor);
   }
 
@@ -920,8 +947,8 @@ class _GradientTrackPainter extends CustomPainter {
   bool shouldRepaint(_GradientTrackPainter oldDelegate) =>
       oldDelegate.fraction != fraction ||
       oldDelegate.thumbColor != thumbColor ||
-      oldDelegate.colors.first != colors.first ||
-      oldDelegate.colors.last != colors.last;
+      oldDelegate.borderColor != borderColor ||
+      !listEquals(oldDelegate.colors, colors);
 }
 
 class _ImmediatePanRecognizer extends PanGestureRecognizer {
@@ -963,7 +990,7 @@ class _ImmediatePickArea extends StatelessWidget {
                     ..onUpdate = ((details) => pick(details.localPosition)),
                 ),
           },
-          child: child,
+          child: SizedBox.expand(child: child),
         );
       },
     );

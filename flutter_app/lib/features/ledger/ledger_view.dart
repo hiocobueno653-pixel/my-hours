@@ -453,16 +453,14 @@ class _LedgerViewState extends ConsumerState<LedgerView> {
                       itemCount: groupedDates.length,
                       itemBuilder: (context, index) {
                         final date = groupedDates[index];
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: Gaps.cardGap),
-                          child: _DateGroupSection(
-                            date: date,
-                            today: today,
-                            yesterday: yesterday,
-                            entries: entriesByDate[date]!,
-                            buildRow: (entry) =>
-                                _entryRow(entry, state.records),
-                          ),
+                        return _DateGroupSection(
+                          date: date,
+                          today: today,
+                          yesterday: yesterday,
+                          entries: entriesByDate[date]!,
+                          isFirst: index == 0,
+                          isLast: index == groupedDates.length - 1,
+                          buildRow: (entry) => _entryRow(entry, state.records),
                         );
                       },
                     ),
@@ -681,25 +679,44 @@ class _BalanceSummaryCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           FittedBox(
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerLeft,
-            child: AnimatedNumericText(
-              value: summary.balance,
-              formatter: (value) =>
-                  formatAmount(value.toDouble(), withSymbol: true),
-              style: TextStyle(
-                fontSize: TypeScale.display,
-                height: 1.06,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -0.9,
-                color: summary.balance >= 0 ? colors.text : colors.expense,
-              ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Text(
+                  summary.balance < 0 ? '-¥' : '¥',
+                  style: TextStyle(
+                    fontSize: 22,
+                    height: 1.0,
+                    fontWeight: FontWeight.w600,
+                    color: summary.balance < 0 ? colors.expense : colors.text2,
+                  ),
+                ),
+                const SizedBox(width: 2),
+                AnimatedNumericText(
+                  value: summary.balance.abs(),
+                  formatter: (value) =>
+                      formatAmount(value.toDouble(), withSymbol: false),
+                  style: TextStyle(
+                    fontSize: 42,
+                    height: 1.0,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -1.6,
+                    color: summary.balance >= 0 ? colors.text : colors.expense,
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 14),
-          Divider(height: 1, thickness: 0.7, color: colors.divider),
+          const SizedBox(height: 12),
+          _CashflowRatioBar(
+            income: summary.income,
+            expense: summary.expense,
+          ),
           const SizedBox(height: 12),
           IntrinsicHeight(
             child: Row(
@@ -807,6 +824,59 @@ class _BalanceSummaryCard extends StatelessWidget {
   }
 }
 
+/// 收支双段比例条：一眼读懂本月流入与流出结构，零数据时保持克制细轨。
+class _CashflowRatioBar extends StatelessWidget {
+  const _CashflowRatioBar({required this.income, required this.expense});
+
+  final double income;
+  final double expense;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final total = income + expense;
+    if (total <= 0) {
+      return Container(
+        height: 4,
+        decoration: BoxDecoration(
+          color: colors.block,
+          borderRadius: BorderRadius.circular(999),
+        ),
+      );
+    }
+    final incomeFlex = (income / total * 1000).round().clamp(0, 1000);
+    final expenseFlex = (expense / total * 1000).round().clamp(0, 1000);
+    return SizedBox(
+      height: 7,
+      child: Row(
+        children: [
+          if (incomeFlex > 0)
+            Expanded(
+              flex: incomeFlex,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: colors.income,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ),
+          if (incomeFlex > 0 && expenseFlex > 0) const SizedBox(width: 4),
+          if (expenseFlex > 0)
+            Expanded(
+              flex: expenseFlex,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: colors.expense,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 class _SideMetric extends StatelessWidget {
   const _SideMetric({
     required this.label,
@@ -898,7 +968,7 @@ class _FilterChipPill extends StatelessWidget {
           curve: Curves2.out,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6.5),
           decoration: ShapeDecoration(
-            color: selected ? colors.text : colors.card,
+            color: selected ? colors.heroHighlight : colors.card,
             shape: Radii.pillShape.copyWith(
               side: selected
                   ? BorderSide.none
@@ -917,7 +987,7 @@ class _FilterChipPill extends StatelessWidget {
                 Icon(
                   icon,
                   size: 14,
-                  color: selected ? colors.card : colors.text2,
+                  color: selected ? Colors.white : colors.text2,
                 ),
                 const SizedBox(width: 5),
               ],
@@ -926,7 +996,7 @@ class _FilterChipPill extends StatelessWidget {
                 style: TextStyle(
                   fontSize: TypeScale.label,
                   fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-                  color: selected ? colors.card : colors.text2,
+                  color: selected ? Colors.white : colors.text2,
                 ),
               ),
             ],
@@ -943,6 +1013,8 @@ class _DateGroupSection extends StatelessWidget {
     required this.today,
     required this.yesterday,
     required this.entries,
+    required this.isFirst,
+    required this.isLast,
     required this.buildRow,
   });
 
@@ -950,6 +1022,8 @@ class _DateGroupSection extends StatelessWidget {
   final String today;
   final String yesterday;
   final List<LedgerEntry> entries;
+  final bool isFirst;
+  final bool isLast;
   final Widget Function(LedgerEntry entry) buildRow;
 
   @override
@@ -976,76 +1050,78 @@ class _DateGroupSection extends StatelessWidget {
       if (dayExpense > 0) '支 ${formatAmount(dayExpense, withSymbol: true)}',
     ];
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 4, right: 4, top: 2, bottom: 6),
-          child: Row(
-            children: [
-              if (relativeTag != null) ...[
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 1.5,
-                  ),
-                  decoration: ShapeDecoration(
-                    color: date == today
-                        ? colors.primaryContainer
-                        : colors.block,
-                    shape: Radii.shape(6),
-                  ),
-                  child: Text(
-                    relativeTag,
-                    style: TextStyle(
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w600,
-                      color: date == today
-                          ? colors.onPrimaryContainer
-                          : colors.text2,
+    return Padding(
+      padding: EdgeInsets.only(top: isFirst ? 2 : 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 0, 4, 6),
+            child: Row(
+              children: [
+                if (relativeTag != null) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6.5,
+                      vertical: 2,
+                    ),
+                    decoration: ShapeDecoration(
+                      color: date == today ? colors.primary : colors.block,
+                      shape: Radii.shape(6),
+                    ),
+                    child: Text(
+                      relativeTag,
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w600,
+                        color: date == today ? colors.onPrimary : colors.text2,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 6),
-              ],
-              Text(
-                '${formatDateLabel(date)} $weekday',
-                style: TextStyle(
-                  fontSize: TypeScale.caption,
-                  fontWeight: FontWeight.w500,
-                  color: colors.text3,
-                ),
-              ),
-              const Spacer(),
-              Text(
-                summaryParts.join(' · '),
-                style: TextStyle(
-                  fontSize: TypeScale.caption,
-                  color: colors.text3,
-                  fontFeatures: tabularFigures,
-                ),
-              ),
-            ],
-          ),
-        ),
-        GlassCard(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
-          child: Column(
-            children: [
-              for (var i = 0; i < entries.length; i++) ...[
-                if (i > 0)
-                  Divider(
-                    height: 1,
-                    thickness: 0.6,
-                    indent: 48,
-                    color: colors.divider,
+                  const SizedBox(width: 6),
+                ],
+                Text(
+                  '${formatDateLabel(date)} · $weekday',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: colors.text2,
+                    letterSpacing: 0.1,
                   ),
-                buildRow(entries[i]),
+                ),
+                const Spacer(),
+                Text(
+                  summaryParts.join(' · '),
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w500,
+                    color: colors.text3,
+                    fontFeatures: tabularFigures,
+                  ),
+                ),
               ],
-            ],
+            ),
           ),
-        ),
-      ],
+          GlassCard(
+            radius: Radii.card,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 3),
+            child: Column(
+              children: [
+                for (var i = 0; i < entries.length; i++) ...[
+                  if (i > 0)
+                    Divider(
+                      height: 1,
+                      thickness: 0.6,
+                      indent: 48,
+                      color: colors.divider,
+                    ),
+                  buildRow(entries[i]),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1267,13 +1343,28 @@ class _EntryRow extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 10),
-                  Text(
-                    '${isIncome ? '+' : '-'}${formatAmount(entry.amount, withSymbol: true)}',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: isIncome ? colors.income : colors.expense,
-                      fontFeatures: tabularFigures,
+                  Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(
+                          text: isIncome ? '+¥' : '-¥',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: (isIncome ? colors.income : colors.expense)
+                                .withValues(alpha: 0.80),
+                          ),
+                        ),
+                        TextSpan(
+                          text: formatAmount(entry.amount, withSymbol: false),
+                          style: TextStyle(
+                            fontSize: 15.5,
+                            fontWeight: FontWeight.w700,
+                            color: isIncome ? colors.income : colors.expense,
+                            fontFeatures: tabularFigures,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -1316,15 +1407,15 @@ class _AddLedgerFab extends StatelessWidget {
             shape: Radii.pillShape,
             shadows: [
               BoxShadow(
-                color: const Color(0xFF0F172A).withValues(
-                  alpha: colors.isDark ? 0.38 : 0.18,
+                color: colors.primary.withValues(
+                  alpha: colors.isDark ? 0.42 : 0.32,
                 ),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
               ),
               BoxShadow(
                 color: const Color(0xFF0F172A).withValues(
-                  alpha: colors.isDark ? 0.22 : 0.06,
+                  alpha: colors.isDark ? 0.24 : 0.08,
                 ),
                 blurRadius: 3,
                 offset: const Offset(0, 1),

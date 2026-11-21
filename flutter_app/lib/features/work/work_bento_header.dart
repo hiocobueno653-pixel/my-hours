@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -135,28 +136,56 @@ class WorkBentoHeader extends StatelessWidget {
     final metricWidgets = <Widget>[];
     if (canPair) {
       for (var i = 0; i < activeIds.length; i += 2) {
-        if (i > 0) metricWidgets.add(const SizedBox(height: Gaps.cardGap));
+        if (i > 0) {
+          metricWidgets.add(const SizedBox(height: Gaps.cardGap));
+        }
         if (i + 1 < activeIds.length) {
           metricWidgets.add(
             IntrinsicHeight(
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Expanded(child: buildMetricCard(activeIds[i])),
+                  Expanded(
+                    child: GlassCard(
+                      padding: EdgeInsets.zero,
+                      radius: Radii.card,
+                      child: buildMetricCard(activeIds[i]),
+                    ),
+                  ),
                   const SizedBox(width: Gaps.cardGap),
-                  Expanded(child: buildMetricCard(activeIds[i + 1])),
+                  Expanded(
+                    child: GlassCard(
+                      padding: EdgeInsets.zero,
+                      radius: Radii.card,
+                      child: buildMetricCard(activeIds[i + 1]),
+                    ),
+                  ),
                 ],
               ),
             ),
           );
         } else {
-          metricWidgets.add(buildFullWidthMetricStrip(activeIds[i]));
+          metricWidgets.add(
+            GlassCard(
+              padding: EdgeInsets.zero,
+              radius: Radii.lg,
+              child: buildFullWidthMetricStrip(activeIds[i]),
+            ),
+          );
         }
       }
     } else {
       for (var i = 0; i < activeIds.length; i++) {
-        if (i > 0) metricWidgets.add(const SizedBox(height: Gaps.cardGap));
-        metricWidgets.add(buildMetricCard(activeIds[i]));
+        if (i > 0) {
+          metricWidgets.add(const SizedBox(height: Gaps.cardGap));
+        }
+        metricWidgets.add(
+          GlassCard(
+            padding: EdgeInsets.zero,
+            radius: Radii.card,
+            child: buildMetricCard(activeIds[i]),
+          ),
+        );
       }
     }
 
@@ -361,6 +390,14 @@ class _TodayWorkspaceCardState extends ConsumerState<_TodayWorkspaceCard> {
 
     final dateLabel =
         '今天 · 周${weekdayName(DateTime.parse(widget.date).weekday % 7)}';
+    const inkIvory = Color(0xFFF8FAFC);
+    const inkMuted = Color(0xFFA8B5CE);
+    const inkFaint = Color(0xFF72819E);
+    const inkEmerald = Color(0xFF34D399);
+    const inkAmber = Color(0xFFFBBF24);
+    final accentGlow = Color.lerp(colors.primary, Colors.white, 0.34)!;
+    final consoleDivider = Colors.white.withValues(alpha: 0.11);
+
     final statusText = active
         ? (running ? '计时中' : '已暂停')
         : settled
@@ -371,402 +408,487 @@ class _TodayWorkspaceCardState extends ConsumerState<_TodayWorkspaceCard> {
         ? '已记录'
         : '休息';
     final statusColor = active
-        ? (running ? colors.primary : colors.warning)
+        ? (running ? accentGlow : inkAmber)
         : settled
-        ? colors.income
+        ? inkEmerald
         : current == null
-        ? colors.text3
-        : colors.primary;
+        ? inkFaint
+        : inkEmerald;
     final statusBg = active
-        ? (running ? colors.primaryContainer : colors.warningSoft)
+        ? (running
+              ? accentGlow.withValues(alpha: 0.20)
+              : inkAmber.withValues(alpha: 0.18))
+        : Colors.transparent;
+    final consoleShape = Radii.shape(Radii.hero);
+    final loggedHours = current?.hours ?? 0.0;
+    final dialArcColor = active && running
+        ? accentGlow
         : settled
-        ? colors.incomeSoft
-        : current == null
-        ? colors.block
-        : colors.primaryContainer;
+        ? inkEmerald
+        : loggedHours > 8.0
+        ? inkAmber
+        : accentGlow;
+    final progressPct = ((loggedHours / 8.0) * 100).round().clamp(0, 999);
 
-    return GlassCard(
+    return Container(
       key: const ValueKey('today-bento-card'),
-      radius: Radii.hero,
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 13),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Flexible(
-                      child: Text(
-                        dateLabel,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: colors.text2,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    AnimatedContainer(
-                      duration: motionDuration(
-                        Timings.fast,
-                        disableAnimations: disable,
-                      ),
-                      curve: Curves2.soft,
-                      padding: active
-                          ? const EdgeInsets.symmetric(
-                              horizontal: 7,
-                              vertical: 2.5,
-                            )
-                          : EdgeInsets.zero,
-                      decoration: active
-                          ? ShapeDecoration(
-                              color: statusBg,
-                              shape: Radii.pillShape,
-                            )
-                          : null,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          _LiveStatusDot(
-                            color: statusColor,
-                            pulsing: active && running,
-                          ),
-                          const SizedBox(width: 4),
-                          AnimatedSwitcher(
-                            duration: motionDuration(
-                              Timings.fast,
-                              disableAnimations: disable,
-                            ),
-                            switchInCurve: Curves2.out,
-                            switchOutCurve: Curves2.out,
-                            child: Text(
-                              statusText,
-                              key: ValueKey(statusText),
-                              style: TextStyle(
-                                color: active ? statusColor : colors.text3,
-                                fontSize: 11.5,
-                                fontWeight: active
-                                    ? FontWeight.w600
-                                    : FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (crossDay) ...[
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3,
-                        ),
-                        decoration: ShapeDecoration(
-                          color: colors.warningSoft,
-                          shape: Radii.pillShape,
-                        ),
-                        child: Text(
-                          '跨日',
-                          style: TextStyle(
-                            color: colors.warning,
-                            fontSize: TypeScale.micro,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              if (!kHoursOnly && activeProfile != null)
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 168),
-                  child: Pressable(
-                    onTap: widget.onOpenWorkManager,
-                    shape: Radii.shape(8),
-                    child: Container(
-                      padding: activeRate <= 0
-                          ? const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 3.5,
-                            )
-                          : const EdgeInsets.symmetric(
-                              horizontal: 4,
-                              vertical: 3,
-                            ),
-                      decoration: activeRate <= 0
-                          ? ShapeDecoration(
-                              color: colors.primaryContainer,
-                              shape: Radii.shape(8),
-                            )
-                          : null,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Flexible(
-                            child: Text(
-                              activeRate <= 0
-                                  ? '设置${context.unit.rateName}'
-                                  : '${activeProfile.name} · ¥${formatRate(activeRate)}/${context.unit.rateShort}',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                                color: activeRate <= 0
-                                    ? colors.onPrimaryContainer
-                                    : colors.text3,
-                                fontFeatures: tabularFigures,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 1),
-                          Icon(
-                            Icons.chevron_right_rounded,
-                            size: 14,
-                            color: activeRate <= 0
-                                ? colors.onPrimaryContainer
-                                : colors.text3,
-                          ),
-                        ],
-                      ),
+      decoration: studioHeroDecoration(colors, radius: Radii.hero),
+      child: ClipPath(
+        clipper: ShapeBorderClipper(shape: consoleShape),
+        child: Stack(
+          children: [
+            Positioned(
+              top: -56,
+              right: -36,
+              width: 215,
+              height: 215,
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: RadialGradient(
+                      colors: [
+                        colors.primary.withValues(alpha: 0.34),
+                        colors.primary.withValues(alpha: 0.08),
+                        colors.primary.withValues(alpha: 0.0),
+                      ],
+                      stops: const [0.0, 0.55, 1.0],
                     ),
                   ),
                 ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Expanded(
-                child: Pressable(
-                  onTap: widget.onOpenToday,
-                  shape: Radii.shape(10),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 2),
-                    child: AnimatedSwitcher(
-                      duration: motionDuration(
-                        Timings.base,
-                        disableAnimations: disable,
-                      ),
-                      switchInCurve: Curves2.out,
-                      switchOutCurve: Curves2.out,
-                      layoutBuilder: (currentChild, previousChildren) => Stack(
-                        alignment: Alignment.centerLeft,
-                        children: [...previousChildren, ?currentChild],
-                      ),
-                      transitionBuilder: (child, animation) => FadeTransition(
-                        opacity: animation,
-                        child: SlideTransition(
-                          position: Tween<Offset>(
-                            begin: const Offset(0, 0.08),
-                            end: Offset.zero,
-                          ).animate(animation),
-                          child: child,
-                        ),
-                      ),
-                      child: active
-                          ? KeyedSubtree(
-                              key: const ValueKey('today-readout-timer'),
-                              child: _LiveTimerReadout(
-                                timer: timer,
-                                currentHours: current?.hours ?? 0,
-                                activeRate: activeRate,
-                                crossDay: crossDay,
-                              ),
-                            )
-                          : Column(
-                              key: const ValueKey('today-readout-hours'),
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.baseline,
-                                  textBaseline: TextBaseline.alphabetic,
-                                  children: [
-                                    if (current == null)
-                                      Text(
-                                        '—',
-                                        style: TextStyle(
-                                          color: colors.text3,
-                                          fontSize: 36,
-                                          height: 1.02,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      )
-                                    else
-                                      AnimatedNumericText(
-                                        value: current.hours,
-                                        formatter: (value) =>
-                                            formatHoursValue(value.toDouble()),
-                                        style: TextStyle(
-                                          color: colors.text,
-                                          fontSize: 36,
-                                          height: 1.02,
-                                          fontWeight: FontWeight.w700,
-                                          letterSpacing: -1.0,
-                                        ),
-                                      ),
-                                    const SizedBox(width: 5),
-                                    Text(
-                                      context.unit.name,
-                                      style: TextStyle(
-                                        color: colors.text3,
-                                        fontSize: 13.5,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 15, 18, 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                dateLabel,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: inkIvory.withValues(alpha: 0.90),
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 0.2,
                                 ),
-                                if (!kHoursOnly) ...[
-                                  const SizedBox(height: 5),
-                                  AnimatedNumericText(
-                                    value: pay,
-                                    formatter: (value) =>
-                                        '今日工资 ${formatAmount(value.toDouble(), withSymbol: true)}',
-                                    style: TextStyle(
-                                      color: pay > 0
-                                          ? colors.income
-                                          : colors.text3,
-                                      fontSize: 12.5,
-                                      fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            AnimatedContainer(
+                              duration: motionDuration(
+                                Timings.fast,
+                                disableAnimations: disable,
+                              ),
+                              curve: Curves2.soft,
+                              padding: active
+                                  ? const EdgeInsets.symmetric(
+                                      horizontal: 7,
+                                      vertical: 2.5,
+                                    )
+                                  : EdgeInsets.zero,
+                              decoration: active
+                                  ? ShapeDecoration(
+                                      color: statusBg,
+                                      shape: Radii.pillShape,
+                                    )
+                                  : null,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  _LiveStatusDot(
+                                    color: statusColor,
+                                    pulsing: active && running,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  AnimatedSwitcher(
+                                    duration: motionDuration(
+                                      Timings.fast,
+                                      disableAnimations: disable,
+                                    ),
+                                    switchInCurve: Curves2.out,
+                                    switchOutCurve: Curves2.out,
+                                    child: Text(
+                                      statusText,
+                                      key: ValueKey(statusText),
+                                      style: TextStyle(
+                                        color: active ? statusColor : inkMuted,
+                                        fontSize: 11.5,
+                                        fontWeight: active
+                                            ? FontWeight.w600
+                                            : FontWeight.w500,
+                                      ),
                                     ),
                                   ),
                                 ],
-                              ],
+                              ),
                             ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              AnimatedSize(
-                duration: motionDuration(
-                  Timings.base,
-                  disableAnimations: disable,
-                ),
-                curve: Curves2.out,
-                alignment: Alignment.centerRight,
-                child: AnimatedSwitcher(
-                  duration: motionDuration(
-                    Timings.base,
-                    disableAnimations: disable,
-                  ),
-                  switchInCurve: Curves2.out,
-                  switchOutCurve: Curves2.out,
-                  layoutBuilder: (currentChild, previousChildren) => Stack(
-                    alignment: Alignment.centerRight,
-                    children: [...previousChildren, ?currentChild],
-                  ),
-                  transitionBuilder: (child, animation) => FadeTransition(
-                    opacity: animation,
-                    child: ScaleTransition(
-                      scale: Tween<double>(
-                        begin: 0.94,
-                        end: 1.0,
-                      ).animate(animation),
-                      alignment: Alignment.centerRight,
-                      child: child,
-                    ),
-                  ),
-                  child: !active
-                      ? _TimerCompactButton(
-                          key: ValueKey('timer-idle-$timerDisabled-$readOnly'),
-                          label: timerDisabled
-                              ? (readOnly ? '只读' : '已锁定')
-                              : '开始计时',
-                          icon: timerDisabled
-                              ? Icons.lock_outline_rounded
-                              : Icons.play_arrow_rounded,
-                          primary: !timerDisabled,
-                          disabled: timerDisabled,
-                          onTap: timerDisabled ? null : _startOrResume,
-                        )
-                      : Row(
-                          key: const ValueKey('timer-active-controls'),
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            _TimerCompactButton(
-                              label: canFinish ? '完成' : '放弃',
-                              icon: canFinish
-                                  ? Icons.check_rounded
-                                  : Icons.close_rounded,
-                              primary: false,
-                              positive: canFinish,
-                              onTap: canFinish ? _stop : _discardTimer,
-                            ),
-                            const SizedBox(width: 6),
-                            _TimerCompactButton(
-                              label: running ? '暂停' : '继续',
-                              icon: running
-                                  ? Icons.pause_rounded
-                                  : Icons.play_arrow_rounded,
-                              primary: true,
-                              onTap: running ? _pause : _startOrResume,
-                            ),
+                            if (crossDay) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 3,
+                                ),
+                                decoration: ShapeDecoration(
+                                  color: inkAmber.withValues(alpha: 0.18),
+                                  shape: Radii.pillShape,
+                                ),
+                                child: Text(
+                                  '跨日',
+                                  style: TextStyle(
+                                    color: inkAmber,
+                                    fontSize: TypeScale.micro,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ],
                         ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Divider(height: 1, thickness: 0.7, color: colors.divider),
-          const SizedBox(height: 9),
-          Row(
-            children: [
-              Expanded(
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      for (var i = 0; i < quickSteps.length; i++) ...[
-                        if (i > 0) const SizedBox(width: 6),
-                        _QuickStepChip(
-                          label:
-                              '${i == quickSteps.length - 1 ? '' : '＋'}'
-                              '${formatHoursValue(quickSteps[i])}'
-                              '${context.unit.short}',
-                          enabled: canQuickEdit,
-                          onTap: () {
-                            HapticFeedback.lightImpact();
-                            widget.onQuickAmount(
-                              quickSteps[i],
-                              replace: i == quickSteps.length - 1,
-                            );
-                          },
+                      ),
+                      if (!kHoursOnly && activeProfile != null)
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 168),
+                          child: Pressable(
+                            onTap: widget.onOpenWorkManager,
+                            shape: Radii.pillShape,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 9,
+                                vertical: 4,
+                              ),
+                              decoration: ShapeDecoration(
+                                color: Colors.white.withValues(alpha: 0.08),
+                                shape: Radii.pillShape.copyWith(
+                                  side: BorderSide(
+                                    color: Colors.white.withValues(alpha: 0.10),
+                                    width: 0.6,
+                                  ),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      activeRate <= 0
+                                          ? '设置${context.unit.rateName}'
+                                          : '${activeProfile.name} · ¥${formatRate(activeRate)}/${context.unit.rateShort}',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.w500,
+                                        color: inkIvory.withValues(alpha: 0.88),
+                                        fontFeatures: tabularFigures,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 2),
+                                  Icon(
+                                    Icons.chevron_right_rounded,
+                                    size: 13.5,
+                                    color: inkMuted,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
                         ),
-                      ],
                     ],
                   ),
-                ),
+                  const SizedBox(height: 12),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Expanded(
+                        child: Pressable(
+                          onTap: widget.onOpenToday,
+                          shape: Radii.shape(10),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 2),
+                            child: AnimatedSwitcher(
+                              duration: motionDuration(
+                                Timings.base,
+                                disableAnimations: disable,
+                              ),
+                              switchInCurve: Curves2.out,
+                              switchOutCurve: Curves2.out,
+                              layoutBuilder: (currentChild, previousChildren) =>
+                                  Stack(
+                                    alignment: Alignment.centerLeft,
+                                    children: [
+                                      ...previousChildren,
+                                      ?currentChild,
+                                    ],
+                                  ),
+                              transitionBuilder: (child, animation) =>
+                                  FadeTransition(
+                                    opacity: animation,
+                                    child: SlideTransition(
+                                      position: Tween<Offset>(
+                                        begin: const Offset(0, 0.08),
+                                        end: Offset.zero,
+                                      ).animate(animation),
+                                      child: child,
+                                    ),
+                                  ),
+                              child: active
+                                  ? KeyedSubtree(
+                                      key: const ValueKey('today-readout-timer'),
+                                      child: _LiveTimerReadout(
+                                        timer: timer,
+                                        currentHours: current?.hours ?? 0,
+                                        activeRate: activeRate,
+                                        crossDay: crossDay,
+                                      ),
+                                    )
+                                  : Column(
+                                      key: const ValueKey('today-readout-hours'),
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.baseline,
+                                          textBaseline: TextBaseline.alphabetic,
+                                          children: [
+                                            if (current == null)
+                                              Text(
+                                                '—',
+                                                style: TextStyle(
+                                                  color: inkFaint,
+                                                  fontSize: 48,
+                                                  height: 0.96,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              )
+                                            else
+                                              AnimatedNumericText(
+                                                value: current.hours,
+                                                formatter: (value) =>
+                                                    formatHoursValue(
+                                                      value.toDouble(),
+                                                    ),
+                                                style: const TextStyle(
+                                                  color: inkIvory,
+                                                  fontSize: 48,
+                                                  height: 0.96,
+                                                  fontWeight: FontWeight.w700,
+                                                  letterSpacing: -1.8,
+                                                ),
+                                              ),
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              context.unit.name,
+                                              style: TextStyle(
+                                                color: inkMuted,
+                                                fontSize: 13.5,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 9),
+                                        Wrap(
+                                          spacing: 7,
+                                          runSpacing: 4,
+                                          crossAxisAlignment:
+                                              WrapCrossAlignment.center,
+                                          children: [
+                                            if (!kHoursOnly)
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 8,
+                                                      vertical: 3,
+                                                    ),
+                                                decoration: ShapeDecoration(
+                                                  color: pay > 0
+                                                      ? inkEmerald.withValues(
+                                                          alpha: 0.16,
+                                                        )
+                                                      : Colors.white.withValues(
+                                                          alpha: 0.06,
+                                                        ),
+                                                  shape: Radii.pillShape.copyWith(
+                                                    side: BorderSide(
+                                                      color: pay > 0
+                                                          ? inkEmerald
+                                                                .withValues(
+                                                                  alpha: 0.26,
+                                                                )
+                                                          : Colors.white
+                                                                .withValues(
+                                                                  alpha: 0.08,
+                                                                ),
+                                                      width: 0.6,
+                                                    ),
+                                                  ),
+                                                ),
+                                                child: AnimatedNumericText(
+                                                  value: pay,
+                                                  formatter: (value) =>
+                                                      '今日工资 ${formatAmount(value.toDouble(), withSymbol: true)}',
+                                                  style: TextStyle(
+                                                    color: pay > 0
+                                                        ? inkEmerald
+                                                        : inkFaint,
+                                                    fontSize: 11.5,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                              ),
+                                            Text(
+                                              loggedHours > 8
+                                                  ? '加班 +${formatHoursValue(loggedHours - 8)}${context.unit.short}'
+                                                  : '日标 $progressPct%',
+                                              style: TextStyle(
+                                                color: loggedHours > 8
+                                                    ? inkAmber
+                                                    : inkMuted.withValues(
+                                                        alpha: 0.85,
+                                                      ),
+                                                fontSize: 11.5,
+                                                fontWeight: FontWeight.w500,
+                                                fontFeatures: tabularFigures,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      AnimatedSize(
+                        duration: motionDuration(
+                          Timings.base,
+                          disableAnimations: disable,
+                        ),
+                        curve: Curves2.out,
+                        alignment: Alignment.centerRight,
+                        child: AnimatedSwitcher(
+                          duration: motionDuration(
+                            Timings.base,
+                            disableAnimations: disable,
+                          ),
+                          switchInCurve: Curves2.out,
+                          switchOutCurve: Curves2.out,
+                          child: !active
+                              ? _ChronographDialTrigger(
+                                  key: ValueKey(
+                                    'dial-idle-$timerDisabled-$readOnly',
+                                  ),
+                                  hours: loggedHours,
+                                  arcColor: dialArcColor,
+                                  label: timerDisabled
+                                      ? (readOnly ? '只读' : '已锁定')
+                                      : '开始计时',
+                                  icon: timerDisabled
+                                      ? Icons.lock_outline_rounded
+                                      : Icons.play_arrow_rounded,
+                                  disabled: timerDisabled,
+                                  onTap: timerDisabled ? null : _startOrResume,
+                                )
+                              : Column(
+                                  key: const ValueKey('timer-active-controls'),
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    _TimerCompactButton(
+                                      label: running ? '暂停' : '继续',
+                                      icon: running
+                                          ? Icons.pause_rounded
+                                          : Icons.play_arrow_rounded,
+                                      primary: true,
+                                      onTap: running
+                                          ? _pause
+                                          : _startOrResume,
+                                    ),
+                                    const SizedBox(height: 6),
+                                    _TimerCompactButton(
+                                      label: canFinish ? '完成' : '放弃',
+                                      icon: canFinish
+                                          ? Icons.check_rounded
+                                          : Icons.close_rounded,
+                                      primary: false,
+                                      positive: canFinish,
+                                      onTap: canFinish
+                                          ? _stop
+                                          : _discardTimer,
+                                    ),
+                                  ],
+                                ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Divider(height: 1, thickness: 0.6, color: consoleDivider),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              for (var i = 0; i < quickSteps.length; i++) ...[
+                                if (i > 0) const SizedBox(width: 6),
+                                _QuickStepChip(
+                                  label:
+                                      '${i == quickSteps.length - 1 ? '' : '＋'}'
+                                      '${formatHoursValue(quickSteps[i])}'
+                                      '${context.unit.short}',
+                                  enabled: canQuickEdit,
+                                  onTap: () {
+                                    HapticFeedback.lightImpact();
+                                    widget.onQuickAmount(
+                                      quickSteps[i],
+                                      replace: i == quickSteps.length - 1,
+                                    );
+                                  },
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      if (!kHoursOnly && widget.onOpenLedger != null) ...[
+                        _ToolbarMiniAction(
+                          icon: Icons.add_rounded,
+                          label: widget.entryCount > 0
+                              ? '账目 ${widget.entryCount}'
+                              : '记账',
+                          onTap: widget.onOpenLedger!,
+                        ),
+                        const SizedBox(width: 6),
+                      ],
+                      _ToolbarMiniAction(
+                        icon: Icons.edit_outlined,
+                        label: '编辑',
+                        onTap: widget.onOpenToday,
+                      ),
+                    ],
+                  ),
+                ],
               ),
-              const SizedBox(width: 6),
-              if (!kHoursOnly && widget.onOpenLedger != null) ...[
-                _ToolbarMiniAction(
-                  icon: Icons.add_rounded,
-                  label: widget.entryCount > 0
-                      ? '账目 ${widget.entryCount}'
-                      : '记账',
-                  onTap: widget.onOpenLedger!,
-                ),
-                const SizedBox(width: 6),
-              ],
-              _ToolbarMiniAction(
-                icon: Icons.edit_outlined,
-                label: '编辑',
-                onTap: widget.onOpenToday,
-              ),
-            ],
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -844,7 +966,6 @@ class _LiveTimerReadoutState extends State<_LiveTimerReadout> {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
     final timer = widget.timer;
     final running = timer.running;
     final liveEstimate = widget.activeRate > 0
@@ -868,11 +989,13 @@ class _LiveTimerReadoutState extends State<_LiveTimerReadout> {
           child: RollingDigitsText(
             text: _clock(timer.elapsed),
             style: TextStyle(
-              color: running ? colors.primary : colors.text,
-              fontSize: 34,
-              height: 1.05,
+              color: running
+                  ? const Color(0xFF7AA7FF)
+                  : const Color(0xFFF6F2EA),
+              fontSize: 36,
+              height: 1.0,
               fontWeight: FontWeight.w700,
-              letterSpacing: -0.6,
+              letterSpacing: -1.0,
             ),
           ),
         ),
@@ -882,7 +1005,7 @@ class _LiveTimerReadoutState extends State<_LiveTimerReadout> {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
-            color: colors.text2,
+            color: const Color(0xFFA8A095),
             fontSize: 12,
             fontFeatures: tabularFigures,
           ),
@@ -998,12 +1121,10 @@ class _LiveStatusDotState extends State<_LiveStatusDot>
 
 class _TimerCompactButton extends StatelessWidget {
   const _TimerCompactButton({
-    super.key,
     required this.label,
     required this.icon,
     required this.primary,
     this.positive = false,
-    this.disabled = false,
     this.onTap,
   });
 
@@ -1011,27 +1132,24 @@ class _TimerCompactButton extends StatelessWidget {
   final IconData icon;
   final bool primary;
   final bool positive;
-  final bool disabled;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
     final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
-    final bg = disabled
-        ? colors.block
-        : primary
-        ? colors.primary
+    const ivory = Color(0xFFF8FAFC);
+    const obsidian = Color(0xFF0C1324);
+    const emerald = Color(0xFF34D399);
+    final bg = primary
+        ? ivory
         : positive
-        ? colors.incomeSoft
-        : colors.block;
-    final fg = disabled
-        ? colors.text3
-        : primary
-        ? colors.onPrimary
+        ? emerald.withValues(alpha: 0.16)
+        : Colors.white.withValues(alpha: 0.12);
+    final fg = primary
+        ? obsidian
         : positive
-        ? colors.income
-        : colors.text2;
+        ? emerald
+        : ivory;
     final shape = Radii.shape(Radii.md);
     return Pressable(
       onTap: onTap,
@@ -1039,22 +1157,11 @@ class _TimerCompactButton extends StatelessWidget {
       shape: shape,
       pressedScale: 0.94,
       child: Container(
-        height: 38,
+        height: 40,
         padding: const EdgeInsets.symmetric(horizontal: 14),
         decoration: ShapeDecoration(
           color: bg,
           shape: shape,
-          shadows: primary && !disabled
-              ? [
-                  BoxShadow(
-                    color: const Color(0xFF0F172A).withValues(
-                      alpha: colors.isDark ? 0.26 : 0.10,
-                    ),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
-                  ),
-                ]
-              : null,
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -1107,7 +1214,6 @@ class _QuickStepChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
     final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     final shape = Radii.shape(9);
     return AnimatedOpacity(
@@ -1124,13 +1230,18 @@ class _QuickStepChip extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 10),
           alignment: Alignment.center,
           decoration: ShapeDecoration(
-            color: colors.block.withValues(alpha: colors.isDark ? 0.85 : 0.78),
-            shape: shape,
+            color: Colors.white.withValues(alpha: 0.09),
+            shape: shape.copyWith(
+              side: BorderSide(
+                color: Colors.white.withValues(alpha: 0.08),
+                width: 0.6,
+              ),
+            ),
           ),
           child: Text(
             label,
             style: TextStyle(
-              color: colors.text,
+              color: const Color(0xFFF6F2EA),
               fontSize: 12,
               fontWeight: FontWeight.w500,
               fontFeatures: tabularFigures,
@@ -1155,7 +1266,6 @@ class _ToolbarMiniAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
     return Pressable(
       onTap: onTap,
       shape: Radii.shape(9),
@@ -1167,24 +1277,22 @@ class _ToolbarMiniAction extends StatelessWidget {
           color: Colors.transparent,
           shape: Radii.shape(9).copyWith(
             side: BorderSide(
-              color: colors.isDark
-                  ? Colors.white.withValues(alpha: 0.10)
-                  : const Color(0xFF0F172A).withValues(alpha: 0.08),
-              width: 0.75,
+              color: Colors.white.withValues(alpha: 0.14),
+              width: 0.7,
             ),
           ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 13.5, color: colors.text2),
+            Icon(icon, size: 13.5, color: const Color(0xFFD5CFC5)),
             const SizedBox(width: 3),
             Text(
               label,
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
-                color: colors.text2,
+                color: const Color(0xFFD5CFC5),
               ),
             ),
           ],
@@ -1192,6 +1300,187 @@ class _ToolbarMiniAction extends StatelessWidget {
       ),
     );
   }
+}
+
+/// 270° 精密时计圆盘 + 中心物理按压启停钮：
+/// 用 24 道制表刻度与发光弧线表达今日相对 8h 标准进度的饱满度，超 8h 转琥珀金。
+class _ChronographDialTrigger extends StatelessWidget {
+  const _ChronographDialTrigger({
+    super.key,
+    required this.hours,
+    required this.arcColor,
+    required this.label,
+    required this.icon,
+    required this.disabled,
+    required this.onTap,
+  });
+
+  final double hours;
+  final Color arcColor;
+  final String label;
+  final IconData icon;
+  final bool disabled;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Pressable(
+      onTap: onTap,
+      haptic: false,
+      shape: Radii.shape(16),
+      pressedScale: 0.94,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 82,
+              height: 82,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  CustomPaint(
+                    size: const Size(82, 82),
+                    painter: _ChronographDialPainter(
+                      ratio: (hours / 8.0).clamp(0.0, 1.0),
+                      arcColor: arcColor,
+                    ),
+                  ),
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: disabled
+                          ? Colors.white.withValues(alpha: 0.12)
+                          : Colors.white,
+                      boxShadow: disabled
+                          ? null
+                          : [
+                              BoxShadow(
+                                color: arcColor.withValues(alpha: 0.36),
+                                blurRadius: 14,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                    ),
+                    child: Icon(
+                      icon,
+                      size: 22,
+                      color: disabled
+                          ? const Color(0xFF72819E)
+                          : const Color(0xFF0C1324),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 1),
+            Text(
+              label,
+              style: TextStyle(
+                color: disabled
+                    ? const Color(0xFF72819E)
+                    : const Color(0xFFE2E8F0),
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.2,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ChronographDialPainter extends CustomPainter {
+  const _ChronographDialPainter({
+    required this.ratio,
+    required this.arcColor,
+  });
+
+  final double ratio;
+  final Color arcColor;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final outerRadius = size.width / 2 - 2;
+    final arcRadius = outerRadius - 6.5;
+    const startAngle = math.pi * 0.75;
+    const sweepTotal = math.pi * 1.5;
+    const ticks = 24;
+
+    final filledTicks = ratio <= 0 ? 0 : (ratio * ticks).ceil();
+    for (var i = 0; i <= ticks; i++) {
+      final angle = startAngle + sweepTotal * (i / ticks);
+      final isMajor = i % 6 == 0;
+      final innerR = outerRadius - (isMajor ? 4.8 : 2.8);
+      final p0 = Offset(
+        center.dx + math.cos(angle) * innerR,
+        center.dy + math.sin(angle) * innerR,
+      );
+      final p1 = Offset(
+        center.dx + math.cos(angle) * outerRadius,
+        center.dy + math.sin(angle) * outerRadius,
+      );
+      canvas.drawLine(
+        p0,
+        p1,
+        Paint()
+          ..strokeWidth = isMajor ? 1.4 : 0.95
+          ..strokeCap = StrokeCap.round
+          ..color = i <= filledTicks && ratio > 0
+              ? arcColor.withValues(alpha: isMajor ? 0.95 : 0.65)
+              : Colors.white.withValues(alpha: isMajor ? 0.28 : 0.14),
+      );
+    }
+
+    final arcRect = Rect.fromCircle(center: center, radius: arcRadius);
+    canvas.drawArc(
+      arcRect,
+      startAngle,
+      sweepTotal,
+      false,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3.2
+        ..strokeCap = StrokeCap.round
+        ..color = Colors.white.withValues(alpha: 0.12),
+    );
+
+    if (ratio > 0.005) {
+      final sweep = sweepTotal * ratio;
+      canvas.drawArc(
+        arcRect,
+        startAngle,
+        sweep,
+        false,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 3.6
+          ..strokeCap = StrokeCap.round
+          ..color = arcColor,
+      );
+      final endAngle = startAngle + sweep;
+      final tip = Offset(
+        center.dx + math.cos(endAngle) * arcRadius,
+        center.dy + math.sin(endAngle) * arcRadius,
+      );
+      canvas.drawCircle(
+        tip,
+        5.5,
+        Paint()..color = arcColor.withValues(alpha: 0.32),
+      );
+      canvas.drawCircle(tip, 2.5, Paint()..color = Colors.white);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_ChronographDialPainter old) =>
+      old.ratio != ratio || old.arcColor != arcColor;
 }
 
 class _MonthHoursCard extends StatelessWidget {
@@ -1215,10 +1504,12 @@ class _MonthHoursCard extends StatelessWidget {
     final progress = workdays <= 0
         ? 0.0
         : (summary.workDays / workdays).clamp(0.0, 1.0);
-    return GlassCard(
+    return Pressable(
       onTap: onTap,
-      padding: const EdgeInsets.fromLTRB(15, 13, 13, 13),
-      child: Column(
+      shape: const RoundedRectangleBorder(),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 13, 14, 13),
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
@@ -1255,10 +1546,10 @@ class _MonthHoursCard extends StatelessWidget {
                     formatter: (value) => formatHoursValue(value.toDouble()),
                     style: TextStyle(
                       color: colors.text,
-                      fontSize: 23,
+                      fontSize: 25,
                       height: 1.05,
                       fontWeight: FontWeight.w700,
-                      letterSpacing: -0.6,
+                      letterSpacing: -0.9,
                     ),
                   ),
                 ),
@@ -1271,7 +1562,7 @@ class _MonthHoursCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          ProgressBar(ratio: progress, color: colors.primary, height: 3),
+          ProgressBar(ratio: progress, color: colors.primary, height: 2.5),
           const SizedBox(height: 6),
           Text(
             '${summary.workDays}天 · 日均 ${formatHoursValue(summary.averageHours)}${context.unit.short}',
@@ -1284,6 +1575,7 @@ class _MonthHoursCard extends StatelessWidget {
             ),
           ),
         ],
+        ),
       ),
     );
   }
@@ -1310,10 +1602,12 @@ class _MonthSalaryCard extends StatelessWidget {
     final settleRatio = settlement.total <= 0
         ? 0.0
         : (settlement.settled / settlement.total).clamp(0.0, 1.0);
-    return GlassCard(
+    return Pressable(
       onTap: onTap,
-      padding: const EdgeInsets.fromLTRB(15, 13, 13, 13),
-      child: Column(
+      shape: const RoundedRectangleBorder(),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 13, 14, 13),
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
@@ -1351,16 +1645,16 @@ class _MonthSalaryCard extends StatelessWidget {
                 color: kHoursOnly
                     ? colors.income
                     : (monthPay > 0 ? colors.income : colors.text),
-                fontSize: 23,
+                fontSize: 25,
                 height: 1.05,
                 fontWeight: FontWeight.w700,
-                letterSpacing: -0.6,
+                letterSpacing: -0.9,
               ),
             ),
           ),
           const SizedBox(height: 8),
           if (!kHoursOnly) ...[
-            ProgressBar(ratio: settleRatio, color: colors.income, height: 3),
+            ProgressBar(ratio: settleRatio, color: colors.income, height: 2.5),
             const SizedBox(height: 6),
           ] else
             const Spacer(),
@@ -1380,6 +1674,7 @@ class _MonthSalaryCard extends StatelessWidget {
             ),
           ),
         ],
+        ),
       ),
     );
   }
@@ -1398,10 +1693,12 @@ class _MonthBalanceMiniCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final net = summary.balance;
-    return GlassCard(
+    return Pressable(
       onTap: onTap,
-      padding: const EdgeInsets.fromLTRB(15, 13, 13, 13),
-      child: Column(
+      shape: const RoundedRectangleBorder(),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 13, 14, 13),
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
@@ -1452,6 +1749,7 @@ class _MonthBalanceMiniCard extends StatelessWidget {
             ),
           ),
         ],
+        ),
       ),
     );
   }
@@ -1473,10 +1771,12 @@ class _TodayLedgerMiniCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    return GlassCard(
+    return Pressable(
       onTap: onTap,
-      padding: const EdgeInsets.fromLTRB(15, 13, 13, 13),
-      child: Column(
+      shape: const RoundedRectangleBorder(),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 13, 14, 13),
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
@@ -1524,6 +1824,7 @@ class _TodayLedgerMiniCard extends StatelessWidget {
             ),
           ),
         ],
+        ),
       ),
     );
   }
@@ -1549,10 +1850,12 @@ class _TodayLedgerStrip extends StatelessWidget {
     final detail = entryCount == 0
         ? '暂无收支 · 轻点记一笔'
         : '$entryCount 笔 · 收 ${formatAmount(income, withSymbol: true)} · 支 ${formatAmount(expense, withSymbol: true)}';
-    return GlassCard(
+    return Pressable(
       onTap: onTap,
-      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 11),
-      child: Row(
+      shape: const RoundedRectangleBorder(),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+        child: Row(
         children: [
           Icon(
             Icons.receipt_long_outlined,
@@ -1586,6 +1889,7 @@ class _TodayLedgerStrip extends StatelessWidget {
           const SizedBox(width: 4),
           Icon(Icons.chevron_right_rounded, size: 16, color: colors.text3),
         ],
+        ),
       ),
     );
   }
@@ -1605,10 +1909,12 @@ class _MonthBalanceStrip extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final net = summary.balance;
-    return GlassCard(
+    return Pressable(
       onTap: onTap,
-      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 11),
-      child: Row(
+      shape: const RoundedRectangleBorder(),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+        child: Row(
         children: [
           Icon(
             Icons.account_balance_wallet_outlined,
@@ -1642,6 +1948,7 @@ class _MonthBalanceStrip extends StatelessWidget {
           const SizedBox(width: 4),
           Icon(Icons.chevron_right_rounded, size: 16, color: colors.text3),
         ],
+        ),
       ),
     );
   }

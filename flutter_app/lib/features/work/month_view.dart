@@ -1154,6 +1154,8 @@ class _SwipeableCalendarState extends State<_SwipeableCalendar> {
                 ),
             ],
           ),
+          const SizedBox(height: 6),
+          Divider(height: 1, thickness: 0.6, color: colors.divider),
           const SizedBox(height: 7),
           ListenableBuilder(
             listenable: _pageController,
@@ -1249,7 +1251,6 @@ class _SwipeableCalendarState extends State<_SwipeableCalendar> {
                 color: colors.warning,
                 label: '加班',
                 pill: true,
-                fillColor: colors.warningSoft,
               ),
               const Spacer(),
               Text(
@@ -1269,13 +1270,11 @@ class _CalendarLegendDot extends StatelessWidget {
     required this.color,
     required this.label,
     this.pill = false,
-    this.fillColor,
   });
 
   final Color color;
   final String label;
   final bool pill;
-  final Color? fillColor;
 
   @override
   Widget build(BuildContext context) {
@@ -1286,20 +1285,16 @@ class _CalendarLegendDot extends StatelessWidget {
         if (pill)
           Container(
             width: 12,
-            height: 8,
+            height: 3,
             decoration: BoxDecoration(
-              color: fillColor ?? colors.incomeSoft,
-              border: Border.all(
-                color: color.withValues(alpha: 0.45),
-                width: 1,
-              ),
-              borderRadius: BorderRadius.circular(3),
+              color: color,
+              borderRadius: BorderRadius.circular(999),
             ),
           )
         else
           Container(
-            width: 6,
-            height: 6,
+            width: 5,
+            height: 5,
             decoration: BoxDecoration(
               color: color,
               shape: BoxShape.circle,
@@ -1354,39 +1349,53 @@ class _CalendarCell extends StatelessWidget {
       }
     }
 
-    final cellBg = isSelected
-        ? colors.primary
+    final Color? heatTint = !hasRecord || isRest
+        ? null
         : isSettled
-        ? colors.incomeSoft.withValues(alpha: colors.isDark ? 0.52 : 0.72)
+        ? colors.income.withValues(alpha: colors.isDark ? 0.15 : 0.085)
         : isOvertime
-        ? colors.warningSoft.withValues(alpha: colors.isDark ? 0.56 : 0.76)
-        : isToday
-        ? colors.primaryContainer.withValues(alpha: colors.isDark ? 0.45 : 0.55)
-        : Colors.transparent;
+        ? colors.warning.withValues(alpha: colors.isDark ? 0.16 : 0.10)
+        : colors.primary.withValues(
+            alpha: hours >= 8
+                ? (colors.isDark ? 0.14 : 0.075)
+                : (colors.isDark ? 0.09 : 0.045),
+          );
+    final cellBg =
+        isSelected ? colors.heroHighlight : (heatTint ?? Colors.transparent);
 
     final borderSide = isToday && !isSelected
-        ? BorderSide(color: colors.primary.withValues(alpha: 0.42), width: 1.0)
+        ? BorderSide(color: colors.primary, width: 1.4)
         : BorderSide.none;
 
     final dayColor = isSelected
-        ? colors.onPrimary
+        ? Colors.white
         : isToday
         ? colors.primary
         : isFuture
-        ? colors.text3.withValues(alpha: 0.52)
+        ? colors.text3.withValues(alpha: 0.48)
         : isWeekend
         ? colors.text2
         : colors.text;
 
     final hoursColor = isSelected
-        ? colors.onPrimary.withValues(alpha: 0.92)
+        ? Colors.white.withValues(alpha: 0.84)
         : isRest
         ? colors.text3
         : isSettled
         ? colors.income
         : isOvertime
         ? colors.warning
-        : colors.primary;
+        : colors.text2;
+
+    final indicatorColor = isSelected
+        ? Colors.white.withValues(alpha: 0.65)
+        : isRest
+        ? colors.outline.withValues(alpha: 0.45)
+        : isSettled
+        ? colors.income
+        : isOvertime
+        ? colors.warning
+        : colors.primary.withValues(alpha: 0.65);
 
     return Semantics(
       button: true,
@@ -1413,67 +1422,94 @@ class _CalendarCell extends StatelessWidget {
             decoration: ShapeDecoration(
               color: cellBg,
               shape: Radii.shape(11).copyWith(side: borderSide),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  '${day.day}',
-                  style: TextStyle(
-                    fontSize: 13.5,
-                    height: 1.1,
-                    fontWeight: (isToday || isSelected)
-                        ? FontWeight.w700
-                        : FontWeight.w500,
-                    color: dayColor,
-                    fontFeatures: tabularFigures,
-                  ),
-                ),
-                if (hasRecord) ...[
-                  const SizedBox(height: 2),
-                  SizedBox(
-                    height: 12,
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text(
-                        isRest
-                            ? '休'
-                            : '${formatHoursValue(hours)}${context.unit.short}',
-                        style: TextStyle(
-                          fontSize: 10,
-                          height: 1.0,
-                          fontWeight: FontWeight.w600,
-                          color: hoursColor,
-                          fontFeatures: tabularFigures,
+              shadows: isSelected
+                  ? [
+                      BoxShadow(
+                        color: colors.primary.withValues(
+                          alpha: colors.isDark ? 0.28 : 0.20,
                         ),
+                        blurRadius: 10,
+                        offset: const Offset(0, 3),
                       ),
+                    ]
+                  : null,
+            ),
+            child: Stack(
+              children: [
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 2),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          '${day.day}',
+                          style: TextStyle(
+                            fontSize: 13.5,
+                            height: 1.1,
+                            fontWeight: (isToday || isSelected)
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                            color: dayColor,
+                            fontFeatures: tabularFigures,
+                          ),
+                        ),
+                        if (hasRecord) ...[
+                          const SizedBox(height: 1.5),
+                          SizedBox(
+                            height: 11,
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                isRest
+                                    ? '休'
+                                    : '${formatHoursValue(hours)}${context.unit.short}',
+                                style: TextStyle(
+                                  fontSize: 9.5,
+                                  height: 1.0,
+                                  fontWeight: FontWeight.w600,
+                                  color: hoursColor,
+                                  fontFeatures: tabularFigures,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 2.5),
+                          Container(
+                            width: 14,
+                            height: 2.2,
+                            decoration: BoxDecoration(
+                              color: indicatorColor,
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
-                ],
-                if (income > 0 || expense > 0) ...[
-                  const SizedBox(height: 2),
-                  SizedBox(
-                    height: 4,
+                ),
+                if (income > 0 || expense > 0)
+                  Positioned(
+                    top: 4,
+                    right: 4,
                     child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         if (income > 0)
                           _CellDot(
                             color: isSelected
-                                ? colors.onPrimary.withValues(alpha: 0.90)
+                                ? const Color(0xFF4ADEA8)
                                 : colors.income,
                           ),
                         if (expense > 0)
                           _CellDot(
                             color: isSelected
-                                ? colors.onPrimary.withValues(alpha: 0.72)
+                                ? const Color(0xFFF87171)
                                 : colors.expense,
                           ),
                       ],
                     ),
                   ),
-                ],
               ],
             ),
           ),
@@ -2299,38 +2335,105 @@ class DayDetailSheet extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: _DetailMetric(
-                  label: context.unit.quantity,
-                  value: formatHoursValue(record.hours),
-                  unit: context.unit.name,
-                    color: colors.text,
-                    tint: colors.page,
-                ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: ShapeDecoration(
+              color: colors.page,
+              shape: Radii.shape(Radii.lg).copyWith(
+                side: BorderSide(color: colors.divider, width: 0.7),
               ),
-              if (!kHoursOnly) ...[
-                const SizedBox(width: Gaps.md),
-                Expanded(
-                  child: _DetailMetric(
-                    label: '工资',
-                    value: formatAmount(pay, withSymbol: true),
-                    unit: '',
-                    color: colors.income,
-                      tint: colors.page,
+            ),
+            child: IntrinsicHeight(
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          context.unit.quantity,
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w500,
+                            color: colors.text3,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.baseline,
+                          textBaseline: TextBaseline.alphabetic,
+                          children: [
+                            Text(
+                              formatHoursValue(record.hours),
+                              style: TextStyle(
+                                fontSize: 28,
+                                height: 1.0,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: -0.9,
+                                color: colors.text,
+                                fontFeatures: tabularFigures,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              context.unit.name,
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                color: colors.text2,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            ],
+                  if (!kHoursOnly) ...[
+                    Container(
+                      width: 0.75,
+                      margin: const EdgeInsets.symmetric(horizontal: 14),
+                      color: colors.divider,
+                    ),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '工资',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w500,
+                              color: colors.text3,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            formatAmount(pay, withSymbol: true),
+                            style: TextStyle(
+                              fontSize: 28,
+                              height: 1.0,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.9,
+                              color: colors.income,
+                              fontFeatures: tabularFigures,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
           ),
-          const SizedBox(height: Gaps.lg),
+          const SizedBox(height: Gaps.md),
           if (!kHoursOnly || record.remark.isNotEmpty)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
               decoration: ShapeDecoration(
                 color: colors.page,
-                shape: Radii.shape(Radii.md),
+                shape: Radii.shape(Radii.lg).copyWith(
+                  side: BorderSide(color: colors.divider, width: 0.7),
+                ),
               ),
               child: Column(
                 children: [
@@ -2366,18 +2469,19 @@ class DayDetailSheet extends ConsumerWidget {
                 ],
               ),
             ),
-          const SizedBox(height: Gaps.xl),
+          const SizedBox(height: Gaps.lg),
           Row(
             children: [
               if (!kHoursOnly) ...[
                 Expanded(
-                  child: GhostButton(
+                  child: PrimaryButton(
                     label: record.settled ? '取消结算' : (pay > 0 ? '标记结算' : '无需结算'),
                     icon: record.settled
                         ? Icons.undo_rounded
                         : (pay > 0
-                              ? Icons.check_circle_outline_rounded
+                              ? Icons.check_rounded
                               : Icons.do_not_disturb_on_outlined),
+                    expand: true,
                     onPressed: pay > 0 || record.settled
                         ? () {
                             controller.setRecordSettled(
@@ -2390,138 +2494,77 @@ class DayDetailSheet extends ConsumerWidget {
                         : null,
                   ),
                 ),
-                const SizedBox(width: Gaps.md),
+                const SizedBox(width: Gaps.sm),
               ],
               Expanded(
                 child: GhostButton(
                   label: '编辑',
                   icon: Icons.edit_outlined,
+                  expand: true,
                   onPressed: () {
                     Navigator.of(context).pop(true);
                   },
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: Gaps.md),
-          GhostButton(
-            label: '删除记录',
-            icon: Icons.delete_outline_rounded,
-            danger: true,
-            expand: true,
-            onPressed: () async {
-              final confirmed = await showConfirmDialog(
-                context,
-                title: '删除这天的记录？',
-                description: '删除后 6 秒内可撤销；已结算的工资账目会一并移除。',
-                confirmLabel: '删除',
-                danger: true,
-              );
-              if (confirmed != true || !context.mounted) return;
-              final messenger = ScaffoldMessenger.of(context);
-              controller.deleteDay(record.date);
-              if (context.mounted) {
-                Navigator.of(context).pop();
-                messenger.showSnackBar(
-                  SnackBar(
-                    content: const Text('已删除 · 可撤销'),
-                    behavior: SnackBarBehavior.floating,
-                    duration: const Duration(seconds: 6),
-                    action: SnackBarAction(
-                      label: '撤销',
-                      onPressed: () {
-                        controller.saveDay(
-                          record.date,
-                          record.hours,
-                          record.remark,
-                          workId: record.workId,
-                          rate: record.rate,
-                          fixedPay: record.fixedPay,
-                          settled: record.settled,
-                        );
-                      },
+              const SizedBox(width: Gaps.sm),
+              Semantics(
+                button: true,
+                label: '删除记录',
+                child: Pressable(
+                  onTap: () async {
+                    final confirmed = await showConfirmDialog(
+                      context,
+                      title: '删除这天的记录？',
+                      description: '删除后 6 秒内可撤销；已结算的工资账目会一并移除。',
+                      confirmLabel: '删除',
+                      danger: true,
+                    );
+                    if (confirmed != true || !context.mounted) return;
+                    final messenger = ScaffoldMessenger.of(context);
+                    controller.deleteDay(record.date);
+                    if (context.mounted) {
+                      Navigator.of(context).pop();
+                      messenger.showSnackBar(
+                        SnackBar(
+                          content: const Text('已删除 · 可撤销'),
+                          behavior: SnackBarBehavior.floating,
+                          duration: const Duration(seconds: 6),
+                          action: SnackBarAction(
+                            label: '撤销',
+                            onPressed: () {
+                              controller.saveDay(
+                                record.date,
+                                record.hours,
+                                record.remark,
+                                workId: record.workId,
+                                rate: record.rate,
+                                fixedPay: record.fixedPay,
+                                settled: record.settled,
+                              );
+                            },
+                          ),
+                        ),
+                      );
+                    }
+                  },
+                  shape: Radii.shape(Radii.lg),
+                  pressedScale: 0.94,
+                  child: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: ShapeDecoration(
+                      color: colors.expenseSoft,
+                      shape: Radii.shape(Radii.lg),
                     ),
-                  ),
-                );
-              }
-            },
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DetailMetric extends StatelessWidget {
-  const _DetailMetric({
-    required this.label,
-    required this.value,
-    required this.unit,
-    required this.color,
-    required this.tint,
-  });
-
-  final String label;
-  final String value;
-  final String unit;
-  final Color color;
-  final Color tint;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-      decoration: ShapeDecoration(
-        color: tint,
-        shape: Radii.shape(Radii.md).copyWith(
-          side: BorderSide(color: colors.divider, width: 0.75),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11.5,
-              fontWeight: FontWeight.w600,
-              color: colors.text2,
-            ),
-          ),
-          const SizedBox(height: 6),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.baseline,
-              textBaseline: TextBaseline.alphabetic,
-              children: [
-                Text(
-                  value,
-                  style: TextStyle(
-                    fontSize: 26,
-                    height: 1.05,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.4,
-                    color: color,
-                    fontFeatures: tabularFigures,
+                    child: Icon(
+                      Icons.delete_outline_rounded,
+                      size: 19,
+                      color: colors.expense,
+                    ),
                   ),
                 ),
-                if (unit.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(left: 4),
-                    child: Text(
-                      unit,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: colors.text2,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
+              ),
+            ],
           ),
         ],
       ),
