@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' show lerpDouble;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -41,24 +42,17 @@ class MonthView extends ConsumerStatefulWidget {
 }
 
 class _MonthViewState extends ConsumerState<MonthView> {
-  int _calendarDirection = 1;
   bool _dayFlowOpen = false;
   String? _selectedDate;
   bool _editingLayout = false;
 
-  void _changeMonth(String next, {int? direction}) {
+  void _changeMonth(String next) {
     final current = ref.read(selectedMonthProvider);
     if (next == current) return;
     setState(() {
-      _calendarDirection = direction ?? (next.compareTo(current) < 0 ? -1 : 1);
       _selectedDate = null;
     });
     ref.read(selectedMonthProvider.notifier).setMonth(next);
-  }
-
-  void _shiftMonth(int direction) {
-    final current = ref.read(selectedMonthProvider);
-    _changeMonth(shiftMonth(current, direction), direction: direction);
   }
 
   void _quickSaveToday(double value, {bool replace = false}) {
@@ -266,12 +260,10 @@ class _MonthViewState extends ConsumerState<MonthView> {
                     RepaintBoundary(
                       child: _SwipeableCalendar(
                         month: month,
-                        dates: dates,
-                        records: recordsByDate,
-                        entriesByDate: entriesByDate,
+                        allRecords: records,
+                        allEntries: entries,
                         today: today,
                         selectedDate: activeDate,
-                        direction: _calendarDirection,
                         onTapDate: (date) {
                           HapticFeedback.selectionClick();
                           if (date == activeDate) {
@@ -288,7 +280,7 @@ class _MonthViewState extends ConsumerState<MonthView> {
                               globalPosition: globalPos,
                             ),
                         onOpenDetail: () => showMonthDetail(context, month),
-                        onShift: _shiftMonth,
+                        onSelectMonth: _changeMonth,
                       ),
                     ),
                     const SizedBox(height: Gaps.cardGap),
@@ -554,7 +546,7 @@ class _MonthViewState extends ConsumerState<MonthView> {
       showDropletGlassMenu(
         context,
         anchorOffset: globalPosition,
-        panelWidth: 204,
+        panelWidth: 184,
         preferRightAlign:
             globalPosition.dx > MediaQuery.sizeOf(context).width * 0.48,
         items: items,
@@ -893,226 +885,202 @@ class _InlineAction extends StatelessWidget {
   }
 }
 
+const int _calendarTotalMonths =
+    (maxSupportedYear - minSupportedYear + 1) * 12;
+
+int _monthKeyToIndex(String monthKey) {
+  final parsed = parseMonthKey(monthKey);
+  if (parsed == null) return _monthKeyToIndex(currentMonthKey());
+  final index = (parsed.year - minSupportedYear) * 12 + (parsed.month - 1);
+  return index.clamp(0, _calendarTotalMonths - 1);
+}
+
+String _indexToMonthKey(int index) {
+  final clamped = index.clamp(0, _calendarTotalMonths - 1);
+  final year = minSupportedYear + clamped ~/ 12;
+  final month = (clamped % 12) + 1;
+  return '$year-${pad2(month)}';
+}
+
+/// 原生日历级阻尼弹簧分页物理：轻扫即翻月、无多余回弹过冲、全程可打断。
+class _CalendarPageScrollPhysics extends PageScrollPhysics {
+  const _CalendarPageScrollPhysics({super.parent});
+
+  @override
+  _CalendarPageScrollPhysics applyTo(ScrollPhysics? ancestor) {
+    return _CalendarPageScrollPhysics(parent: buildParent(ancestor));
+  }
+
+  @override
+  SpringDescription get spring => SpringDescription.withDampingRatio(
+        mass: 0.72,
+        stiffness: 270,
+        ratio: 1.04,
+      );
+
+  @override
+  double get minFlingVelocity => 140;
+}
+
+/// 固定外框 + 固定星期行 + 内部真 PageView 丝滑平移月历。
 class _SwipeableCalendar extends StatefulWidget {
   const _SwipeableCalendar({
     required this.month,
-    required this.dates,
-    required this.records,
-    required this.entriesByDate,
+    required this.allRecords,
+    required this.allEntries,
     required this.today,
     required this.selectedDate,
-    required this.direction,
     required this.onTapDate,
     required this.onLongPressDate,
     required this.onOpenDetail,
-    required this.onShift,
+    required this.onSelectMonth,
   });
 
   final String month;
-  final List<MonthDay> dates;
-  final Map<String, WorkDayRecord> records;
-  final Map<String, List<LedgerEntry>> entriesByDate;
+  final List<WorkDayRecord> allRecords;
+  final List<LedgerEntry> allEntries;
   final String today;
   final String selectedDate;
-  final int direction;
   final ValueChanged<String> onTapDate;
   final void Function(String date, Offset globalPosition) onLongPressDate;
   final VoidCallback onOpenDetail;
-  final ValueChanged<int> onShift;
+  final ValueChanged<String> onSelectMonth;
 
   @override
   State<_SwipeableCalendar> createState() => _SwipeableCalendarState();
 }
 
-class _SwipeableCalendarState extends State<_SwipeableCalendar>
-    with SingleTickerProviderStateMixin {
-  double _dragDx = 0;
-  bool _dragging = false;
-  _SwipeableCalendar? _outgoing;
-  int _slideDirection = 1;
-  late final AnimationController _slideController =
-      AnimationController(
-        vsync: this,
-        duration: Timings.slow,
-      )..addStatusListener((status) {
-        if (status == AnimationStatus.completed && mounted) {
-          setState(() => _outgoing = null);
-        }
-      });
+class _SwipeableCalendarState extends State<_SwipeableCalendar> {
+  late int _currentIndex = _monthKeyToIndex(widget.month);
+  late final PageController _pageController = PageController(
+    initialPage: _currentIndex,
+  );
+  int? _programmaticTarget;
+  int _syncToken = 0;
+
+  final Map<String, List<MonthDay>> _datesCache = {};
+  Map<String, Map<String, WorkDayRecord>> _recordsByMonth = const {};
+  Map<String, Map<String, List<LedgerEntry>>> _entriesByMonth = const {};
+
+  @override
+  void initState() {
+    super.initState();
+    _rebuildRecordIndex();
+    _rebuildEntryIndex();
+  }
 
   @override
   void didUpdateWidget(covariant _SwipeableCalendar oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.month == widget.month) return;
-    _outgoing = oldWidget;
-    _slideDirection = widget.direction;
-    final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
-    if (disable) {
-      _outgoing = null;
-      _slideController.value = 1;
-    } else {
-      _slideController.forward(from: 0);
+    if (!identical(oldWidget.allRecords, widget.allRecords)) {
+      _rebuildRecordIndex();
+    }
+    if (!identical(oldWidget.allEntries, widget.allEntries)) {
+      _rebuildEntryIndex();
+    }
+    if (oldWidget.today != widget.today) {
+      _datesCache.clear();
+    }
+    if (oldWidget.month != widget.month) {
+      final target = _monthKeyToIndex(widget.month);
+      if (target != _currentIndex) {
+        _syncExternalPage(target);
+      }
     }
   }
 
   @override
   void dispose() {
-    _slideController.dispose();
+    _pageController.dispose();
     super.dispose();
   }
 
-  void _startDrag(DragStartDetails details) {
-    setState(() {
-      _dragging = true;
-      _dragDx = 0;
-    });
+  void _rebuildRecordIndex() {
+    final grouped = <String, Map<String, WorkDayRecord>>{};
+    for (final record in widget.allRecords) {
+      if (record.date.length < 7) continue;
+      final monthKey = record.date.substring(0, 7);
+      (grouped[monthKey] ??= <String, WorkDayRecord>{})[record.date] = record;
+    }
+    _recordsByMonth = grouped;
   }
 
-  void _updateDrag(DragUpdateDetails details) {
-    if (!_dragging) return;
-    setState(() => _dragDx += details.delta.dx);
+  void _rebuildEntryIndex() {
+    final grouped = <String, Map<String, List<LedgerEntry>>>{};
+    for (final entry in widget.allEntries) {
+      if (entry.date.length < 7) continue;
+      final monthKey = entry.date.substring(0, 7);
+      final byDate = grouped[monthKey] ??= <String, List<LedgerEntry>>{};
+      (byDate[entry.date] ??= <LedgerEntry>[]).add(entry);
+    }
+    _entriesByMonth = grouped;
   }
 
-  void _endDrag(DragEndDetails details) {
-    if (!_dragging) return;
-    final width = context.size?.width ?? MediaQuery.sizeOf(context).width;
-    final velocity = details.velocity.pixelsPerSecond.dx.clamp(-1000.0, 1000.0);
-    final projected = _dragDx + velocity * 0.10;
-    final threshold = width * 0.14 < 48 ? 48.0 : width * 0.14;
-    if (projected.abs() >= threshold) {
-      final direction = projected < 0 ? 1 : -1;
-      HapticFeedback.selectionClick();
-      setState(() {
-        _dragging = false;
-        _dragDx = 0;
-      });
-      widget.onShift(direction);
+  List<MonthDay> _datesFor(String monthKey) {
+    return _datesCache.putIfAbsent(monthKey, () => getMonthDates(monthKey));
+  }
+
+  int _weekRowCount(int index) {
+    final dates = _datesFor(_indexToMonthKey(index));
+    if (dates.isEmpty) return 5;
+    final leadingBlanks = (dates.first.weekday + 6) % 7;
+    return ((leadingBlanks + dates.length) / 7).ceil().clamp(4, 6);
+  }
+
+  double _gridHeightForIndex(int index, double cellExtent, double rowGap) {
+    final rows = _weekRowCount(index);
+    return rows * cellExtent + (rows - 1) * rowGap;
+  }
+
+  void _syncExternalPage(int target) {
+    _currentIndex = target;
+    if (!_pageController.hasClients) return;
+    final currentPage = _pageController.page ?? target.toDouble();
+    final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    final token = ++_syncToken;
+    if (disable || (currentPage - target).abs() > 3) {
+      _programmaticTarget = null;
+      _pageController.jumpToPage(target);
       return;
     }
-    setState(() {
-      _dragging = false;
-      _dragDx = 0;
-    });
-  }
-
-  void _cancelDrag() {
-    if (!_dragging) return;
-    setState(() {
-      _dragging = false;
-      _dragDx = 0;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
-    final currentCard = _CalendarCard(
-      month: widget.month,
-      dates: widget.dates,
-      records: widget.records,
-      entriesByDate: widget.entriesByDate,
-      today: widget.today,
-      selectedDate: widget.selectedDate,
-      onTapDate: widget.onTapDate,
-      onLongPressDate: widget.onLongPressDate,
-      onOpenDetail: widget.onOpenDetail,
-    );
-    final outgoing = _outgoing;
-    final content = outgoing == null
-        ? currentCard
-        : AnimatedBuilder(
-            animation: _slideController,
-            builder: (context, _) {
-              final progress = Curves2.out.transform(_slideController.value);
-              final travel = MediaQuery.sizeOf(context).width * 0.16;
-              return Stack(
-                alignment: Alignment.topCenter,
-                children: [
-                  Opacity(
-                    opacity: 1 - progress,
-                    child: Transform.translate(
-                      offset: Offset(-_slideDirection * travel * progress, 0),
-                      child: _CalendarCard(
-                        month: outgoing.month,
-                        dates: outgoing.dates,
-                        records: outgoing.records,
-                        entriesByDate: outgoing.entriesByDate,
-                        today: outgoing.today,
-                        selectedDate: outgoing.selectedDate,
-                        onTapDate: outgoing.onTapDate,
-                        onLongPressDate: outgoing.onLongPressDate,
-                        onOpenDetail: outgoing.onOpenDetail,
-                      ),
-                    ),
-                  ),
-                  Opacity(
-                    opacity: 0.65 + 0.35 * progress,
-                    child: Transform.translate(
-                      offset: Offset(
-                        _slideDirection * travel * (1 - progress),
-                        0,
-                      ),
-                      child: currentCard,
-                    ),
-                  ),
-                ],
-              );
-            },
-          );
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onHorizontalDragStart: disable ? null : _startDrag,
-      onHorizontalDragUpdate: disable ? null : _updateDrag,
-      onHorizontalDragEnd: disable ? null : _endDrag,
-      onHorizontalDragCancel: disable ? null : _cancelDrag,
-      child: AnimatedContainer(
-        duration: _dragging || disable
-            ? Duration.zero
-            : Timings.base,
-        curve: Curves2.out,
-        transform: Matrix4.translationValues(_dragDx * 0.55, 0, 0),
-        child: ClipRect(
-          child: AnimatedSize(
-            duration: motionDuration(Timings.base, disableAnimations: disable),
+    _programmaticTarget = target;
+    unawaited(
+      _pageController
+          .animateToPage(
+            target,
+            duration: const Duration(milliseconds: 280),
             curve: Curves2.out,
-            alignment: Alignment.topCenter,
-            child: content,
-          ),
-        ),
-      ),
+          )
+          .whenComplete(() {
+            if (mounted && token == _syncToken) {
+              _programmaticTarget = null;
+            }
+          }),
     );
   }
-}
 
-class _CalendarCard extends StatelessWidget {
-  const _CalendarCard({
-    required this.month,
-    required this.dates,
-    required this.records,
-    required this.entriesByDate,
-    required this.today,
-    required this.selectedDate,
-    required this.onTapDate,
-    required this.onLongPressDate,
-    required this.onOpenDetail,
-  });
-
-  final String month;
-  final List<MonthDay> dates;
-  final Map<String, WorkDayRecord> records;
-  final Map<String, List<LedgerEntry>> entriesByDate;
-  final String today;
-  final String selectedDate;
-  final ValueChanged<String> onTapDate;
-  final void Function(String date, Offset globalPosition) onLongPressDate;
-  final VoidCallback onOpenDetail;
+  void _handlePageChanged(int index) {
+    if (_programmaticTarget != null) {
+      if (index == _programmaticTarget) {
+        _programmaticTarget = null;
+      }
+      return;
+    }
+    if (index == _currentIndex) return;
+    _currentIndex = index;
+    HapticFeedback.selectionClick();
+    widget.onSelectMonth(_indexToMonthKey(index));
+  }
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
     final textScale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.3);
-    final leadingBlanks = dates.isEmpty ? 0 : (dates.first.weekday + 6) % 7;
-    final recordedCount = records.values.where((r) => r.hours > 0).length;
+    final cellExtent = 44.0 * textScale;
+    const rowGap = 4.0;
+    final currentRecords = _recordsByMonth[widget.month] ?? const {};
+    final recordedCount = currentRecords.values.where((r) => r.hours > 0).length;
+
     return GlassCard(
       radius: Radii.hero,
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 11),
@@ -1123,36 +1091,27 @@ class _CalendarCard extends StatelessWidget {
               Text(
                 '本月日历',
                 style: TextStyle(
-                  fontSize: 14.5,
-                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
                   color: colors.text,
                 ),
               ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
-                decoration: ShapeDecoration(
-                  color: colors.primaryContainer.withValues(
-                    alpha: colors.isDark ? 0.65 : 0.85,
-                  ),
-                  shape: Radii.pillShape,
-                ),
-                child: Text(
-                  '已记 $recordedCount 天',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: colors.primary,
-                    fontFeatures: tabularFigures,
-                  ),
+              const SizedBox(width: 6),
+              Text(
+                '· 已记 $recordedCount 天',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: colors.text3,
+                  fontFeatures: tabularFigures,
                 ),
               ),
               const Spacer(),
               Pressable(
-                onTap: onOpenDetail,
-                shape: Radii.pillShape,
+                onTap: widget.onOpenDetail,
+                shape: Radii.shape(8),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -1160,7 +1119,7 @@ class _CalendarCard extends StatelessWidget {
                         '月明细',
                         style: TextStyle(
                           fontSize: 12,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.w500,
                           color: colors.primary,
                         ),
                       ),
@@ -1175,55 +1134,102 @@ class _CalendarCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 11),
+          const SizedBox(height: 12),
           Row(
             children: [
-              for (final label in const ['一', '二', '三', '四', '五', '六', '日'])
+              for (var i = 0; i < 7; i++)
                 Expanded(
                   child: Center(
                     child: Text(
-                      label,
+                      const ['一', '二', '三', '四', '五', '六', '日'][i],
                       style: TextStyle(
                         fontSize: 11.5,
-                        fontWeight: FontWeight.w600,
-                        color: colors.text3,
+                        fontWeight: FontWeight.w500,
+                        color: i >= 5
+                            ? colors.text3.withValues(alpha: 0.72)
+                            : colors.text3,
                       ),
                     ),
                   ),
                 ),
             ],
           ),
-          const SizedBox(height: 6),
-          GridView.builder(
-            shrinkWrap: true,
-            primary: false,
-            padding: EdgeInsets.zero,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: leadingBlanks + dates.length,
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 7,
-              mainAxisSpacing: 4,
-              crossAxisSpacing: 3,
-              mainAxisExtent: 46 * textScale,
-            ),
-            itemBuilder: (context, index) {
-              if (index < leadingBlanks) return const SizedBox.shrink();
-              final day = dates[index - leadingBlanks];
-              return _CalendarCell(
-                day: day,
-                record: records[day.date],
-                entries: entriesByDate[day.date] ?? const [],
-                isToday: day.date == today,
-                isSelected: day.date == selectedDate,
-                isFuture: day.date.compareTo(today) > 0,
-                isWeekend: day.weekday == 0 || day.weekday == 6,
-                onTap: () => onTapDate(day.date),
-                onLongPress: (pos) => onLongPressDate(day.date, pos),
-              );
+          const SizedBox(height: 7),
+          ListenableBuilder(
+            listenable: _pageController,
+            builder: (context, child) {
+              double height;
+              if (_pageController.hasClients &&
+                  _pageController.position.hasContentDimensions) {
+                final page = _pageController.page ?? _currentIndex.toDouble();
+                final left = page.floor().clamp(0, _calendarTotalMonths - 1);
+                final right = page.ceil().clamp(0, _calendarTotalMonths - 1);
+                final fraction = (page - left).clamp(0.0, 1.0);
+                height = lerpDouble(
+                  _gridHeightForIndex(left, cellExtent, rowGap),
+                  _gridHeightForIndex(right, cellExtent, rowGap),
+                  fraction,
+                )!;
+              } else {
+                height = _gridHeightForIndex(
+                  _currentIndex,
+                  cellExtent,
+                  rowGap,
+                );
+              }
+              return SizedBox(height: height, child: child);
             },
+            child: PageView.builder(
+              controller: _pageController,
+              physics: const _CalendarPageScrollPhysics(
+                parent: BouncingScrollPhysics(),
+              ),
+              itemCount: _calendarTotalMonths,
+              onPageChanged: _handlePageChanged,
+              itemBuilder: (context, index) {
+                final monthKey = _indexToMonthKey(index);
+                final dates = _datesFor(monthKey);
+                final records = _recordsByMonth[monthKey] ?? const {};
+                final entries = _entriesByMonth[monthKey] ?? const {};
+                final leadingBlanks =
+                    dates.isEmpty ? 0 : (dates.first.weekday + 6) % 7;
+                return GridView.builder(
+                  key: ValueKey('calendar-grid-$monthKey'),
+                  shrinkWrap: true,
+                  primary: false,
+                  padding: EdgeInsets.zero,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: leadingBlanks + dates.length,
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 7,
+                    mainAxisSpacing: rowGap,
+                    crossAxisSpacing: 3,
+                    mainAxisExtent: cellExtent,
+                  ),
+                  itemBuilder: (context, cellIndex) {
+                    if (cellIndex < leadingBlanks) {
+                      return const SizedBox.shrink();
+                    }
+                    final day = dates[cellIndex - leadingBlanks];
+                    return _CalendarCell(
+                      day: day,
+                      record: records[day.date],
+                      entries: entries[day.date] ?? const [],
+                      isToday: day.date == widget.today,
+                      isSelected: day.date == widget.selectedDate,
+                      isFuture: day.date.compareTo(widget.today) > 0,
+                      isWeekend: day.weekday == 0 || day.weekday == 6,
+                      onTap: () => widget.onTapDate(day.date),
+                      onLongPress: (pos) =>
+                          widget.onLongPressDate(day.date, pos),
+                    );
+                  },
+                );
+              },
+            ),
           ),
-          const SizedBox(height: 8),
-          Divider(height: 1, thickness: 1, color: colors.divider),
+          const SizedBox(height: 9),
+          Divider(height: 1, thickness: 0.7, color: colors.divider),
           const SizedBox(height: 8),
           Row(
             children: [
@@ -1247,8 +1253,8 @@ class _CalendarCard extends StatelessWidget {
               ),
               const Spacer(),
               Text(
-                '长按快捷记录',
-                style: TextStyle(fontSize: 11, color: colors.text3),
+                '左右滑动切月 · 长按快记',
+                style: TextStyle(fontSize: 10.5, color: colors.text3),
               ),
             ],
           ),
@@ -1351,24 +1357,15 @@ class _CalendarCell extends StatelessWidget {
     final cellBg = isSelected
         ? colors.primary
         : isSettled
-        ? colors.incomeSoft.withValues(alpha: colors.isDark ? 0.65 : 0.80)
+        ? colors.incomeSoft.withValues(alpha: colors.isDark ? 0.52 : 0.72)
         : isOvertime
-        ? colors.warningSoft.withValues(alpha: colors.isDark ? 0.68 : 0.86)
+        ? colors.warningSoft.withValues(alpha: colors.isDark ? 0.56 : 0.76)
         : isToday
-        ? colors.primaryContainer.withValues(alpha: colors.isDark ? 0.55 : 0.62)
+        ? colors.primaryContainer.withValues(alpha: colors.isDark ? 0.45 : 0.55)
         : Colors.transparent;
 
     final borderSide = isToday && !isSelected
-        ? BorderSide(color: colors.primary.withValues(alpha: 0.55), width: 1.2)
-        : isSelected
-        ? BorderSide(
-            color: Colors.white.withValues(alpha: colors.isDark ? 0.22 : 0.45),
-            width: 1.0,
-          )
-        : isSettled && !isSelected
-        ? BorderSide(color: colors.income.withValues(alpha: 0.20), width: 0.8)
-        : isOvertime && !isSelected
-        ? BorderSide(color: colors.warning.withValues(alpha: 0.22), width: 0.8)
+        ? BorderSide(color: colors.primary.withValues(alpha: 0.42), width: 1.0)
         : BorderSide.none;
 
     final dayColor = isSelected
@@ -1404,7 +1401,7 @@ class _CalendarCell extends StatelessWidget {
         child: Pressable(
           onTap: onTap,
           haptic: false,
-          shape: Radii.shape(14),
+          shape: Radii.shape(11),
           pressedScale: 0.92,
           child: AnimatedContainer(
             duration: motionDuration(
@@ -1414,80 +1411,44 @@ class _CalendarCell extends StatelessWidget {
             ),
             curve: Curves2.out,
             decoration: ShapeDecoration(
-              color: isSelected ? null : cellBg,
-              gradient: isSelected
-                  ? LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Color.lerp(
-                          colors.primary,
-                          Colors.white,
-                          colors.isDark ? 0.08 : 0.14,
-                        )!,
-                        colors.primary,
-                      ],
-                    )
-                  : null,
-              shape: Radii.shape(14).copyWith(side: borderSide),
-              shadows: isSelected
-                  ? [
-                      BoxShadow(
-                        color: colors.primary.withValues(alpha: 0.32),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ]
-                  : null,
+              color: cellBg,
+              shape: Radii.shape(11).copyWith(side: borderSide),
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 3),
+            padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
                   '${day.day}',
                   style: TextStyle(
-                    fontSize: 12.5,
+                    fontSize: 13.5,
                     height: 1.1,
                     fontWeight: (isToday || isSelected)
                         ? FontWeight.w700
-                        : FontWeight.w600,
+                        : FontWeight.w500,
                     color: dayColor,
                     fontFeatures: tabularFigures,
                   ),
                 ),
-                if (hasRecord || !isFuture) ...[
+                if (hasRecord) ...[
                   const SizedBox(height: 2),
                   SizedBox(
-                    height: 13,
-                    child: hasRecord
-                        ? FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Text(
-                              isRest
-                                  ? '休'
-                                  : '${formatHoursValue(hours)}${context.unit.short}',
-                              style: TextStyle(
-                                fontSize: 10.5,
-                                height: 1.0,
-                                fontWeight: FontWeight.w700,
-                                color: hoursColor,
-                                fontFeatures: tabularFigures,
-                              ),
-                            ),
-                          )
-                        : Center(
-                            child: Container(
-                              width: 3,
-                              height: 3,
-                              decoration: BoxDecoration(
-                                color: colors.outline.withValues(
-                                  alpha: colors.isDark ? 0.28 : 0.34,
-                                ),
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                          ),
+                    height: 12,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        isRest
+                            ? '休'
+                            : '${formatHoursValue(hours)}${context.unit.short}',
+                        style: TextStyle(
+                          fontSize: 10,
+                          height: 1.0,
+                          fontWeight: FontWeight.w600,
+                          color: hoursColor,
+                          fontFeatures: tabularFigures,
+                        ),
+                      ),
+                    ),
                   ),
                 ],
                 if (income > 0 || expense > 0) ...[
@@ -2345,10 +2306,8 @@ class DayDetailSheet extends ConsumerWidget {
                   label: context.unit.quantity,
                   value: formatHoursValue(record.hours),
                   unit: context.unit.name,
-                  color: colors.primary,
-                  tint: colors.primaryContainer.withValues(
-                    alpha: colors.isDark ? 0.45 : 0.72,
-                  ),
+                    color: colors.text,
+                    tint: colors.page,
                 ),
               ),
               if (!kHoursOnly) ...[
@@ -2359,9 +2318,7 @@ class DayDetailSheet extends ConsumerWidget {
                     value: formatAmount(pay, withSymbol: true),
                     unit: '',
                     color: colors.income,
-                    tint: colors.incomeSoft.withValues(
-                      alpha: colors.isDark ? 0.50 : 0.78,
-                    ),
+                      tint: colors.page,
                   ),
                 ),
               ],
@@ -2372,9 +2329,7 @@ class DayDetailSheet extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
               decoration: ShapeDecoration(
-                color: colors.block.withValues(
-                  alpha: colors.isDark ? 0.52 : 0.62,
-                ),
+                color: colors.page,
                 shape: Radii.shape(Radii.md),
               ),
               child: Column(
@@ -2519,7 +2474,9 @@ class _DetailMetric extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       decoration: ShapeDecoration(
         color: tint,
-        shape: Radii.shape(16),
+        shape: Radii.shape(Radii.md).copyWith(
+          side: BorderSide(color: colors.divider, width: 0.75),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

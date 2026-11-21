@@ -173,10 +173,10 @@ class _HeaderTitleState extends State<_HeaderTitle> {
   Widget build(BuildContext context) {
     final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     final style = TextStyle(
-      fontSize: widget.compact ? 23 : 26,
-      height: 1.25,
+      fontSize: widget.compact ? 20 : 22,
+      height: 1.22,
       fontWeight: FontWeight.w700,
-      letterSpacing: -0.3,
+      letterSpacing: -0.4,
       color: widget.color,
     );
     final textWidget = widget.animate
@@ -507,10 +507,10 @@ class _MorphingSearchHeaderState extends State<MorphingSearchHeader> {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                fontSize: compact ? 23 : 26,
-                                height: 1.25,
+                            fontSize: compact ? 20 : 22,
+                            height: 1.22,
                                 fontWeight: FontWeight.w700,
-                                letterSpacing: -0.3,
+                            letterSpacing: -0.4,
                                 color: colors.text,
                               ),
                             ),

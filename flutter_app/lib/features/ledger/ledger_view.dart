@@ -183,7 +183,7 @@ class _LedgerViewState extends ConsumerState<LedgerView> {
       showDropletGlassMenu(
         context,
         anchorOffset: globalPosition,
-        panelWidth: 204,
+        panelWidth: 184,
         preferRightAlign:
             globalPosition.dx > MediaQuery.sizeOf(context).width * 0.48,
         items: items,
@@ -310,7 +310,7 @@ class _LedgerViewState extends ConsumerState<LedgerView> {
     final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     final fabBottom = wide
         ? bottomPad + 20.0
-        : math.max(92.0, bottomPad + 84.0);
+        : math.max(86.0, bottomPad + 82.0);
 
     return Stack(
       children: [
@@ -650,7 +650,7 @@ class _BalanceSummaryCard extends StatelessWidget {
 
     return GlassCard(
       radius: Radii.hero,
-      padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 15),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -659,35 +659,23 @@ class _BalanceSummaryCard extends StatelessWidget {
               Text(
                 isCurrent ? '本月结余' : '当月结余',
                 style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w500,
                   color: colors.text2,
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: Align(
-                  alignment: Alignment.centerRight,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 9,
-                      vertical: 3.5,
-                    ),
-                    decoration: ShapeDecoration(
-                      color: colors.block,
-                      shape: Radii.pillShape,
-                    ),
-                    child: Text(
-                      statusText,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: TypeScale.micro,
-                        fontWeight: FontWeight.w500,
-                        color: colors.text2,
-                        fontFeatures: tabularFigures,
-                      ),
-                    ),
+                child: Text(
+                  statusText,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.right,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w400,
+                    color: colors.text3,
+                    fontFeatures: tabularFigures,
                   ),
                 ),
               ),
@@ -705,41 +693,50 @@ class _BalanceSummaryCard extends StatelessWidget {
                 fontSize: TypeScale.display,
                 height: 1.06,
                 fontWeight: FontWeight.w700,
-                letterSpacing: -0.6,
+                letterSpacing: -0.9,
                 color: summary.balance >= 0 ? colors.text : colors.expense,
               ),
             ),
           ),
           const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: _SideMetric(
-                  label: '本月收入',
-                  value: summary.income,
-                  color: colors.income,
+          Divider(height: 1, thickness: 0.7, color: colors.divider),
+          const SizedBox(height: 12),
+          IntrinsicHeight(
+            child: Row(
+              children: [
+                Expanded(
+                  child: _SideMetric(
+                    label: '本月收入',
+                    value: summary.income,
+                    color: colors.income,
+                  ),
                 ),
-              ),
-              const SizedBox(width: Gaps.sm),
-              Expanded(
-                child: _SideMetric(
-                  label: '本月支出',
-                  value: summary.expense,
-                  color: colors.expense,
+                Container(
+                  width: 0.7,
+                  margin: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 2,
+                  ),
+                  color: colors.divider,
                 ),
-              ),
-            ],
+                Expanded(
+                  child: _SideMetric(
+                    label: '本月支出',
+                    value: summary.expense,
+                    color: colors.expense,
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 12),
+          Divider(height: 1, thickness: 0.7, color: colors.divider),
+          const SizedBox(height: 10),
           Pressable(
             onTap: onOpenBudget,
-            shape: Radii.shape(Radii.md),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-              decoration: ShapeDecoration(
-                color: colors.block.withValues(alpha: colors.isDark ? 0.65 : 0.72),
-                shape: Radii.shape(Radii.md),
-              ),
+            shape: Radii.shape(Radii.sm),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
               child: budget > 0
                   ? Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -752,7 +749,7 @@ class _BalanceSummaryCard extends StatelessWidget {
                                   : '支出预算已用 ${((summary.expense / budget) * 100).round()}%',
                               style: TextStyle(
                                 fontSize: 12,
-                                fontWeight: FontWeight.w600,
+                                fontWeight: FontWeight.w500,
                                 color: overBudget
                                     ? colors.expense
                                     : colors.text2,
@@ -774,7 +771,7 @@ class _BalanceSummaryCard extends StatelessWidget {
                         ProgressBar(
                           ratio: ratio,
                           color: budgetColor,
-                          height: 4.5,
+                          height: 3.5,
                         ),
                       ],
                     )
@@ -790,7 +787,7 @@ class _BalanceSummaryCard extends StatelessWidget {
                           '设置本月支出预算与收入目标',
                           style: TextStyle(
                             fontSize: 12.5,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: FontWeight.w500,
                             color: colors.primary,
                           ),
                         ),
@@ -824,50 +821,45 @@ class _SideMetric extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    return Container(
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-      decoration: ShapeDecoration(
-        color: colors.block.withValues(alpha: colors.isDark ? 0.65 : 0.72),
-        shape: Radii.shape(Radii.md),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 6,
-                height: 6,
-                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-              ),
-              const SizedBox(width: 5),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w500,
-                  color: colors.text2,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: AnimatedNumericText(
-              value: value,
-              formatter: (v) => formatAmount(v.toDouble(), withSymbol: true),
+    final valueColor = value == 0 ? colors.text3 : color;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 5,
+              height: 5,
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+            ),
+            const SizedBox(width: 5),
+            Text(
+              label,
               style: TextStyle(
-                fontSize: TypeScale.body,
-                height: 1.15,
-                fontWeight: FontWeight.w700,
-                color: color,
+                fontSize: 11.5,
+                fontWeight: FontWeight.w500,
+                color: colors.text3,
               ),
             ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: AnimatedNumericText(
+            value: value,
+            formatter: (v) => formatAmount(v.toDouble(), withSymbol: true),
+            style: TextStyle(
+              fontSize: 17,
+              height: 1.15,
+              fontWeight: FontWeight.w600,
+              letterSpacing: -0.3,
+              color: valueColor,
+            ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -904,20 +896,19 @@ class _FilterChipPill extends StatelessWidget {
             disableAnimations: MediaQuery.maybeDisableAnimationsOf(context) ?? false,
           ),
           curve: Curves2.out,
-          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7.5),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6.5),
           decoration: ShapeDecoration(
-            color: selected ? colors.primary : colors.card,
+            color: selected ? colors.text : colors.card,
             shape: Radii.pillShape.copyWith(
               side: selected
                   ? BorderSide.none
                   : BorderSide(
                       color: colors.isDark
                           ? Colors.white.withValues(alpha: 0.08)
-                          : Colors.black.withValues(alpha: 0.045),
-                      width: 0.8,
+                          : const Color(0xFF0F172A).withValues(alpha: 0.065),
+                      width: 0.75,
                     ),
             ),
-            shadows: selected ? null : context.shadows,
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -926,7 +917,7 @@ class _FilterChipPill extends StatelessWidget {
                 Icon(
                   icon,
                   size: 14,
-                  color: selected ? colors.onPrimary : colors.text2,
+                  color: selected ? colors.card : colors.text2,
                 ),
                 const SizedBox(width: 5),
               ],
@@ -935,7 +926,7 @@ class _FilterChipPill extends StatelessWidget {
                 style: TextStyle(
                   fontSize: TypeScale.label,
                   fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-                  color: selected ? colors.onPrimary : colors.text2,
+                  color: selected ? colors.card : colors.text2,
                 ),
               ),
             ],
@@ -989,25 +980,25 @@ class _DateGroupSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: const EdgeInsets.only(left: 4, right: 4, bottom: 7),
+          padding: const EdgeInsets.only(left: 4, right: 4, top: 2, bottom: 6),
           child: Row(
             children: [
               if (relativeTag != null) ...[
                 Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 7,
-                    vertical: 2,
+                    horizontal: 6,
+                    vertical: 1.5,
                   ),
                   decoration: ShapeDecoration(
                     color: date == today
                         ? colors.primaryContainer
                         : colors.block,
-                    shape: Radii.pillShape,
+                    shape: Radii.shape(6),
                   ),
                   child: Text(
                     relativeTag,
                     style: TextStyle(
-                      fontSize: TypeScale.micro,
+                      fontSize: 10.5,
                       fontWeight: FontWeight.w600,
                       color: date == today
                           ? colors.onPrimaryContainer
@@ -1021,8 +1012,8 @@ class _DateGroupSection extends StatelessWidget {
                 '${formatDateLabel(date)} $weekday',
                 style: TextStyle(
                   fontSize: TypeScale.caption,
-                  fontWeight: FontWeight.w600,
-                  color: colors.text2,
+                  fontWeight: FontWeight.w500,
+                  color: colors.text3,
                 ),
               ),
               const Spacer(),
@@ -1038,15 +1029,15 @@ class _DateGroupSection extends StatelessWidget {
           ),
         ),
         GlassCard(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
           child: Column(
             children: [
               for (var i = 0; i < entries.length; i++) ...[
                 if (i > 0)
                   Divider(
                     height: 1,
-                    thickness: 1,
-                    indent: 50,
+                    thickness: 0.6,
+                    indent: 48,
                     color: colors.divider,
                   ),
                 buildRow(entries[i]),
@@ -1196,19 +1187,21 @@ class _EntryRow extends StatelessWidget {
             onTap: onTap,
             shape: Radii.shape(Radii.md),
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 11),
+              padding: const EdgeInsets.symmetric(vertical: 10),
               child: Row(
                 children: [
                   Container(
-                    width: 38,
-                    height: 38,
+                    width: 36,
+                    height: 36,
                     decoration: ShapeDecoration(
-                      color: colors.block,
-                      shape: Radii.shape(12),
+                      color: visual.color.withValues(
+                        alpha: colors.isDark ? 0.18 : 0.10,
+                      ),
+                      shape: Radii.shape(10),
                     ),
                     child: Icon(
                       visual.icon,
-                      size: 19,
+                      size: 18,
                       color: visual.color,
                     ),
                   ),
@@ -1225,7 +1218,7 @@ class _EntryRow extends StatelessWidget {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
-                                  fontSize: TypeScale.title,
+                                  fontSize: 14.5,
                                   fontWeight: FontWeight.w600,
                                   color: colors.text,
                                 ),
@@ -1235,19 +1228,19 @@ class _EntryRow extends StatelessWidget {
                               const SizedBox(width: 6),
                               Container(
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 2,
+                                  horizontal: 5,
+                                  vertical: 1.5,
                                 ),
                                 decoration: ShapeDecoration(
                                   color: colors.block,
-                                  shape: Radii.pillShape,
+                                  shape: Radii.shape(5),
                                 ),
                                 child: Text(
                                   '结算同步',
                                   style: TextStyle(
-                                    fontSize: TypeScale.micro,
-                                    fontWeight: FontWeight.w600,
-                                    color: colors.text2,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w500,
+                                    color: colors.text3,
                                   ),
                                 ),
                               ),
@@ -1266,7 +1259,7 @@ class _EntryRow extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontSize: TypeScale.caption,
-                              color: colors.text2,
+                              color: colors.text3,
                             ),
                           ),
                         ],
@@ -1277,8 +1270,8 @@ class _EntryRow extends StatelessWidget {
                   Text(
                     '${isIncome ? '+' : '-'}${formatAmount(entry.amount, withSymbol: true)}',
                     style: TextStyle(
-                      fontSize: TypeScale.title,
-                      fontWeight: FontWeight.w700,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
                       color: isIncome ? colors.income : colors.expense,
                       fontFeatures: tabularFigures,
                     ),
@@ -1313,46 +1306,28 @@ class _AddLedgerFab extends StatelessWidget {
         shape: Radii.pillShape,
         pressedScale: 0.94,
         child: Container(
-          height: 48,
+          height: 44,
           padding: EdgeInsets.only(
-            left: expanded ? 14 : 13,
-            right: expanded ? 18 : 13,
+            left: expanded ? 13 : 12,
+            right: expanded ? 16 : 12,
           ),
           decoration: ShapeDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Color.lerp(
-                  colors.primary,
-                  Colors.white,
-                  colors.isDark ? 0.10 : 0.14,
-                )!,
-                colors.primary,
-              ],
-            ),
-            shape: Radii.pillShape.copyWith(
-              side: BorderSide(
-                color: Colors.white.withValues(
-                  alpha: colors.isDark ? 0.22 : 0.34,
-                ),
-                width: 1.0,
-              ),
-            ),
+            color: colors.primary,
+            shape: Radii.pillShape,
             shadows: [
               BoxShadow(
-                color: colors.primary.withValues(
-                  alpha: colors.isDark ? 0.42 : 0.34,
+                color: const Color(0xFF0F172A).withValues(
+                  alpha: colors.isDark ? 0.38 : 0.18,
                 ),
-                blurRadius: 18,
-                offset: const Offset(0, 6),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
               ),
               BoxShadow(
-                color: Colors.black.withValues(
-                  alpha: colors.isDark ? 0.26 : 0.08,
+                color: const Color(0xFF0F172A).withValues(
+                  alpha: colors.isDark ? 0.22 : 0.06,
                 ),
-                blurRadius: 4,
-                offset: const Offset(0, 2),
+                blurRadius: 3,
+                offset: const Offset(0, 1),
               ),
             ],
           ),
@@ -1365,7 +1340,7 @@ class _AddLedgerFab extends StatelessWidget {
               children: [
                 Icon(
                   Icons.add_rounded,
-                  size: 21,
+                  size: 19.5,
                   color: colors.onPrimary,
                 ),
                 AnimatedSwitcher(
@@ -1382,12 +1357,12 @@ class _AddLedgerFab extends StatelessWidget {
                   child: expanded
                       ? Padding(
                           key: const ValueKey('fab-label'),
-                          padding: const EdgeInsets.only(left: 6),
+                          padding: const EdgeInsets.only(left: 5),
                           child: Text(
                             '记一笔',
                             style: TextStyle(
-                              fontSize: 14.5,
-                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
                               color: colors.onPrimary,
                             ),
                           ),

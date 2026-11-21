@@ -60,7 +60,6 @@ class ThemePage extends ConsumerWidget {
                               ThemeMode.dark,
                             ],
                             selected: settings.themeMode,
-                            accentActive: true,
                             labelOf: (mode) => switch (mode) {
                               ThemeMode.system => '自动',
                               ThemeMode.light => '浅色',
@@ -218,7 +217,6 @@ class ThemePage extends ConsumerWidget {
                               Segmented<AppTabTransition>(
                                 values: AppTabTransition.values,
                                 selected: settings.tabTransition,
-                                accentActive: true,
                                 labelOf: (style) =>
                                     style == AppTabTransition.slide
                                     ? '滑动'
@@ -262,7 +260,6 @@ class ThemePage extends ConsumerWidget {
                               Segmented<bool>(
                                 values: const [true, false],
                                 selected: settings.followSystemText,
-                                accentActive: true,
                                 labelOf: (follow) => follow ? '跟随系统' : '自定义',
                                 onChanged: (follow) {
                                   if (settings.largeText) {
@@ -345,7 +342,6 @@ class ThemePage extends ConsumerWidget {
                               Segmented<AppGlassPreference>(
                                 values: AppGlassPreference.values,
                                 selected: settings.glassPreference,
-                                accentActive: true,
                                 labelOf: (pref) => switch (pref) {
                                   AppGlassPreference.none => '纯色',
                                   AppGlassPreference.standard => '标准',
@@ -359,7 +355,6 @@ class ThemePage extends ConsumerWidget {
                               Segmented<AppDockStyle>(
                                 values: AppDockStyle.values,
                                 selected: settings.dockStyle,
-                                accentActive: true,
                                 labelOf: (style) =>
                                     style == AppDockStyle.floating
                                     ? '悬浮玻璃'

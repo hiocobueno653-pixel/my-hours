@@ -575,8 +575,8 @@ class _BottomNavBar extends StatelessWidget {
     required this.onReselect,
   });
 
-  static const double dockHeight = 64;
-  static const double _maxWidth = 372;
+  static const double dockHeight = 56;
+  static const double _maxWidth = 340;
   static final ImageFilter _fixedBarBlur = ImageFilter.blur(
     sigmaX: 22,
     sigmaY: 22,
@@ -676,10 +676,10 @@ class _BottomNavBar extends StatelessWidget {
     }
 
     final bottomPad = MediaQuery.paddingOf(context).bottom;
-    final bottomOffset = math.max(16.0, bottomPad + 6.0);
+    final bottomOffset = math.max(14.0, bottomPad + 6.0);
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(18, 0, 18, bottomOffset),
+      padding: EdgeInsets.fromLTRB(20, 0, 20, bottomOffset),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: _maxWidth),
@@ -690,11 +690,11 @@ class _BottomNavBar extends StatelessWidget {
                 accent: colors.primary,
                 content: colors.text,
                 container: colors.isDark
-                    ? const Color(0xFF202229).withValues(
-                        alpha: highContrast ? 1.0 : 0.72,
+                    ? const Color(0xFF1A1C22).withValues(
+                        alpha: highContrast ? 1.0 : 0.86,
                       )
                     : Colors.white.withValues(
-                        alpha: highContrast ? 1.0 : 0.72,
+                        alpha: highContrast ? 1.0 : 0.88,
                       ),
               ),
               child: LiquidBottomTabs(
@@ -753,7 +753,7 @@ class _LiquidTabFace extends StatelessWidget {
           inAccentCopy
               ? _BottomNavBar._activeIcons[tab]
               : _BottomNavBar._icons[tab],
-          size: 22,
+          size: 20.5,
           color: colors.text2,
         ),
         Text(
@@ -763,7 +763,7 @@ class _LiquidTabFace extends StatelessWidget {
           style: TextStyle(
             fontSize: 10.5,
             height: 1.15,
-            fontWeight: inAccentCopy ? FontWeight.w700 : FontWeight.w500,
+            fontWeight: inAccentCopy ? FontWeight.w600 : FontWeight.w500,
             color: colors.text2,
           ),
         ),

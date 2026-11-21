@@ -92,26 +92,20 @@ class LiquidGlassSurface extends StatelessWidget {
     final baseFill = tintColor ??
         (selected
             ? colors.primaryContainer.withValues(
-                alpha: colors.isDark ? 0.86 : 0.90,
+                alpha: colors.isDark ? 0.88 : 0.94,
               )
             : colors.isDark
-            ? Color.lerp(colors.card, Colors.white, bright ? 0.08 : 0.04)!
-                .withValues(alpha: highContrast ? 1.0 : (bright ? 0.78 : 0.72))
+            ? Color.lerp(colors.card, Colors.white, bright ? 0.05 : 0.02)!
+                .withValues(alpha: highContrast ? 1.0 : (bright ? 0.88 : 0.80))
             : Colors.white.withValues(
-                alpha: highContrast ? 1.0 : (bright ? 0.92 : 0.72),
+                alpha: highContrast ? 1.0 : (bright ? 0.92 : 0.84),
               ));
 
-    final rimColor = selected
-        ? colors.primary.withValues(alpha: colors.isDark ? 0.55 : 0.40)
-        : colors.isDark
-        ? Colors.white.withValues(alpha: bright ? 0.16 : 0.12)
-        : Colors.white.withValues(alpha: bright ? 0.98 : 0.92);
-
     final outerBorder = selected
-        ? colors.primary.withValues(alpha: 0.36)
+        ? colors.primary.withValues(alpha: 0.30)
         : colors.isDark
-        ? Colors.white.withValues(alpha: 0.10)
-        : Colors.black.withValues(alpha: bright ? 0.045 : 0.055);
+        ? Colors.white.withValues(alpha: 0.09)
+        : const Color(0xFF0F172A).withValues(alpha: bright ? 0.065 : 0.075);
 
     final shape = radius >= Radii.pill
         ? Radii.pillShape
@@ -121,17 +115,17 @@ class LiquidGlassSurface extends StatelessWidget {
         ? null
         : <BoxShadow>[
             BoxShadow(
-              color: Colors.black.withValues(
-                alpha: colors.isDark ? 0.30 : (bright ? 0.055 : 0.065),
+              color: const Color(0xFF0F172A).withValues(
+                alpha: colors.isDark ? 0.24 : 0.04,
               ),
-              blurRadius: 14,
-              offset: const Offset(0, 4),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
             ),
             BoxShadow(
-              color: Colors.black.withValues(
-                alpha: colors.isDark ? 0.16 : 0.025,
+              color: const Color(0xFF0F172A).withValues(
+                alpha: colors.isDark ? 0.14 : 0.03,
               ),
-              blurRadius: 3,
+              blurRadius: 1.5,
               offset: const Offset(0, 1),
             ),
           ];
@@ -165,33 +159,14 @@ class LiquidGlassSurface extends StatelessWidget {
     final sigma = highContrast ? 0.0 : (reduceEffects ? 10.0 : blurSigma);
     final surface = DecoratedBox(
       decoration: ShapeDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Color.lerp(
-              baseFill,
-              Colors.white,
-              colors.isDark ? 0.06 : (bright ? 0.40 : 0.26),
-            )!,
-            colors.isDark
-                ? baseFill
-                : Color.lerp(
-                    baseFill,
-                    const Color(0xFFF6F8FC),
-                    bright ? 0.35 : 0.15,
-                  )!,
-          ],
-        ),
-        shape: shape.copyWith(
-          side: BorderSide(color: rimColor, width: bright ? 1.2 : 1.0),
-        ),
+        color: baseFill,
+        shape: shape,
       ),
       child: inner,
     );
     return DecoratedBox(
       decoration: ShapeDecoration(
-        shape: shape.copyWith(side: BorderSide(color: outerBorder, width: 0.7)),
+        shape: shape.copyWith(side: BorderSide(color: outerBorder, width: 0.75)),
         shadows: shadows,
       ),
       child: ClipPath(
@@ -240,8 +215,8 @@ class GlassCard extends StatelessWidget {
         : pureBlack
         ? Colors.white.withValues(alpha: 0.09)
         : colors.isDark
-        ? Colors.white.withValues(alpha: 0.065)
-        : Colors.black.withValues(alpha: 0.035);
+        ? Colors.white.withValues(alpha: 0.068)
+        : const Color(0xFF0F172A).withValues(alpha: 0.055);
     final shape = base.copyWith(
       side: BorderSide(color: borderColor, width: bordered ? 0.9 : 0.75),
     );
@@ -561,7 +536,7 @@ class PrimaryButton extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final bg = danger ? colors.expense : colors.primary;
     final fg = danger ? scheme.onError : colors.onPrimary;
-    final shape = Radii.pillShape;
+    final shape = Radii.shape(Radii.lg);
     final button = Opacity(
       opacity: onPressed == null ? 0.42 : 1,
       child: Pressable(
@@ -569,32 +544,20 @@ class PrimaryButton extends StatelessWidget {
         shape: shape,
         pressedScale: 0.96,
         child: Container(
-          height: 48,
+          height: 46,
           padding: const EdgeInsets.symmetric(horizontal: Gaps.xl),
           decoration: ShapeDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Color.lerp(bg, Colors.white, colors.isDark ? 0.08 : 0.12)!,
-                bg,
-              ],
-            ),
-            shape: shape.copyWith(
-              side: BorderSide(
-                color: Colors.white.withValues(
-                  alpha: colors.isDark ? 0.18 : 0.28,
-                ),
-                width: 0.9,
-              ),
-            ),
+            color: bg,
+            shape: shape,
             shadows: onPressed == null
                 ? null
                 : [
                     BoxShadow(
-                      color: bg.withValues(alpha: colors.isDark ? 0.34 : 0.28),
-                      blurRadius: 16,
-                      offset: const Offset(0, 6),
+                      color: const Color(0xFF0F172A).withValues(
+                        alpha: colors.isDark ? 0.28 : 0.12,
+                      ),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
                     ),
                   ],
           ),
@@ -662,7 +625,7 @@ class GhostButton extends StatelessWidget {
     final colors = context.colors;
     final fg = danger ? colors.expense : colors.text;
     final bg = danger ? colors.expenseSoft : colors.block;
-    final shape = Radii.pillShape;
+    final shape = Radii.shape(Radii.lg);
     final button = Opacity(
       opacity: onPressed == null ? 0.42 : 1,
       child: Pressable(
@@ -670,7 +633,7 @@ class GhostButton extends StatelessWidget {
         shape: shape,
         pressedScale: 0.96,
         child: Container(
-          height: 46,
+          height: 44,
           padding: const EdgeInsets.symmetric(horizontal: Gaps.lg),
           decoration: ShapeDecoration(color: bg, shape: shape),
           child: Row(
@@ -718,7 +681,7 @@ class HeaderGlassSurface extends StatelessWidget {
   const HeaderGlassSurface({
     super.key,
     required this.child,
-    this.height = 42,
+    this.height = 36,
     this.radius = Radii.pill,
     this.padding = EdgeInsets.zero,
     this.selected = false,
@@ -753,8 +716,8 @@ class GlassIconButton extends StatelessWidget {
     this.onTap,
     this.tooltip,
     this.selected = false,
-    this.iconSize = 20,
-    this.size = 42,
+    this.iconSize = 18.5,
+    this.size = 36,
     this.radius = Radii.pill,
     this.bright = true,
   });
@@ -801,7 +764,7 @@ class GlassActionGroup extends StatelessWidget {
   const GlassActionGroup({
     super.key,
     required this.children,
-    this.height = 42,
+    this.height = 36,
   });
 
   final List<Widget> children;
@@ -1196,12 +1159,14 @@ class Segmented<T> extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    final outerShape = Radii.shape(11);
+    final thumbShape = Radii.shape(8.5);
     return Container(
-      height: 40,
-      padding: const EdgeInsets.all(4),
+      height: 36,
+      padding: const EdgeInsets.all(3),
       decoration: ShapeDecoration(
         color: colors.block,
-        shape: Radii.pillShape,
+        shape: outerShape,
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -1220,20 +1185,20 @@ class Segmented<T> extends StatelessWidget {
                 left: selectedIndex * segmentWidth,
                 top: 0,
                 width: segmentWidth,
-                height: 32,
+                height: 30,
                 child: DecoratedBox(
                   decoration: ShapeDecoration(
                     color: accentActive
                         ? colors.primary
                         : (colors.isDark ? colors.inset : colors.card),
-                    shape: Radii.pillShape,
+                    shape: thumbShape,
                     shadows: [
                       BoxShadow(
-                        color: Colors.black.withValues(
-                          alpha: colors.isDark ? 0.24 : 0.08,
+                        color: const Color(0xFF0F172A).withValues(
+                          alpha: colors.isDark ? 0.24 : 0.07,
                         ),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
+                        blurRadius: 4,
+                        offset: const Offset(0, 1),
                       ),
                     ],
                   ),
@@ -1251,9 +1216,9 @@ class Segmented<T> extends StatelessWidget {
                         excludeSemantics: true,
                         child: Pressable(
                           onTap: () => onChanged(value),
-                          shape: Radii.pillShape,
+                          shape: thumbShape,
                           child: SizedBox(
-                            height: 32,
+                            height: 30,
                             child: Center(
                               child: AnimatedDefaultTextStyle(
                                 duration: motionDuration(
@@ -1296,8 +1261,8 @@ class AppIconBadge extends StatelessWidget {
     super.key,
     required this.icon,
     required this.color,
-    this.size = 36,
-    this.iconSize = 19,
+    this.size = 32,
+    this.iconSize = 17,
   });
 
   final IconData icon;
@@ -1312,8 +1277,8 @@ class AppIconBadge extends StatelessWidget {
       width: size,
       height: size,
       decoration: ShapeDecoration(
-        color: color.withValues(alpha: isDark ? 0.22 : 0.12),
-        shape: Radii.shape(size * 0.30),
+        color: color.withValues(alpha: isDark ? 0.18 : 0.09),
+        shape: Radii.shape(size * 0.28),
       ),
       child: Icon(icon, size: iconSize, color: color),
     );
@@ -1417,16 +1382,16 @@ class SectionHeading extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
     return Padding(
-      padding: const EdgeInsets.only(left: 2, bottom: 8),
+      padding: const EdgeInsets.only(left: 4, bottom: 7),
       child: Row(
         children: [
           Text(
             title,
             style: TextStyle(
-              fontSize: 12.5,
-              fontWeight: FontWeight.w600,
-              color: colors.text2,
-              letterSpacing: 0.2,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: colors.text3,
+              letterSpacing: 0.3,
             ),
           ),
           if (trailing != null) ...[
@@ -1463,7 +1428,7 @@ class MonthSwitchPill extends StatelessWidget {
         ? '${parsed.month}月'
         : formatMonthLabel(month);
     return HeaderGlassSurface(
-      height: 40,
+      height: 36,
       radius: Radii.pill,
       bright: true,
       child: Row(
@@ -1478,14 +1443,14 @@ class MonthSwitchPill extends StatelessWidget {
             onTap: onPick,
             shape: Radii.shape(8),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 7),
+              padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 6),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   AnimatedMonthLabel(
                     label: label,
                     style: TextStyle(
-                      fontSize: 13.5,
+                      fontSize: 13,
                       fontWeight: FontWeight.w600,
                       color: colors.text,
                       fontFeatures: tabularFigures,
@@ -1494,7 +1459,7 @@ class MonthSwitchPill extends StatelessWidget {
                   const SizedBox(width: 2),
                   Icon(
                     Icons.keyboard_arrow_down_rounded,
-                    size: 15,
+                    size: 14,
                     color: colors.text3,
                   ),
                 ],
@@ -1535,9 +1500,9 @@ class _MonthArrowButton extends StatelessWidget {
         shape: Radii.shape(10),
         pressedScale: 0.92,
         child: SizedBox(
-          width: 28,
-          height: 36,
-          child: Icon(icon, size: 18, color: context.colors.text2),
+          width: 26,
+          height: 34,
+          child: Icon(icon, size: 16.5, color: context.colors.text2),
         ),
       ),
     );

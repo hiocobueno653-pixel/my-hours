@@ -417,14 +417,18 @@ class _TodayWorkspaceCardState extends ConsumerState<_TodayWorkspaceCard> {
                         disableAnimations: disable,
                       ),
                       curve: Curves2.soft,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: ShapeDecoration(
-                        color: statusBg,
-                        shape: Radii.pillShape,
-                      ),
+                      padding: active
+                          ? const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 2.5,
+                            )
+                          : EdgeInsets.zero,
+                      decoration: active
+                          ? ShapeDecoration(
+                              color: statusBg,
+                              shape: Radii.pillShape,
+                            )
+                          : null,
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -444,9 +448,11 @@ class _TodayWorkspaceCardState extends ConsumerState<_TodayWorkspaceCard> {
                               statusText,
                               key: ValueKey(statusText),
                               style: TextStyle(
-                                color: statusColor,
-                                fontSize: TypeScale.micro,
-                                fontWeight: FontWeight.w600,
+                                color: active ? statusColor : colors.text3,
+                                fontSize: 11.5,
+                                fontWeight: active
+                                    ? FontWeight.w600
+                                    : FontWeight.w500,
                               ),
                             ),
                           ),
@@ -482,18 +488,23 @@ class _TodayWorkspaceCardState extends ConsumerState<_TodayWorkspaceCard> {
                   constraints: const BoxConstraints(maxWidth: 168),
                   child: Pressable(
                     onTap: widget.onOpenWorkManager,
-                    shape: Radii.pillShape,
+                    shape: Radii.shape(8),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 5,
-                      ),
-                      decoration: ShapeDecoration(
-                        color: activeRate <= 0
-                            ? colors.primaryContainer
-                            : colors.block,
-                        shape: Radii.pillShape,
-                      ),
+                      padding: activeRate <= 0
+                          ? const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3.5,
+                            )
+                          : const EdgeInsets.symmetric(
+                              horizontal: 4,
+                              vertical: 3,
+                            ),
+                      decoration: activeRate <= 0
+                          ? ShapeDecoration(
+                              color: colors.primaryContainer,
+                              shape: Radii.shape(8),
+                            )
+                          : null,
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -505,16 +516,16 @@ class _TodayWorkspaceCardState extends ConsumerState<_TodayWorkspaceCard> {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w600,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
                                 color: activeRate <= 0
                                     ? colors.onPrimaryContainer
-                                    : colors.text2,
+                                    : colors.text3,
                                 fontFeatures: tabularFigures,
                               ),
                             ),
                           ),
-                          const SizedBox(width: 2),
+                          const SizedBox(width: 1),
                           Icon(
                             Icons.chevron_right_rounded,
                             size: 14,
@@ -529,7 +540,7 @@ class _TodayWorkspaceCardState extends ConsumerState<_TodayWorkspaceCard> {
                 ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -599,49 +610,32 @@ class _TodayWorkspaceCardState extends ConsumerState<_TodayWorkspaceCard> {
                                           fontSize: 36,
                                           height: 1.02,
                                           fontWeight: FontWeight.w700,
-                                          letterSpacing: -0.8,
+                                          letterSpacing: -1.0,
                                         ),
                                       ),
                                     const SizedBox(width: 5),
                                     Text(
                                       context.unit.name,
                                       style: TextStyle(
-                                        color: colors.text2,
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w600,
+                                        color: colors.text3,
+                                        fontSize: 13.5,
+                                        fontWeight: FontWeight.w500,
                                       ),
                                     ),
                                   ],
                                 ),
                                 if (!kHoursOnly) ...[
-                                  const SizedBox(height: 6),
-                                  AnimatedContainer(
-                                    duration: motionDuration(
-                                      Timings.fast,
-                                      disableAnimations: disable,
-                                    ),
-                                    curve: Curves2.soft,
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 9,
-                                      vertical: 3,
-                                    ),
-                                    decoration: ShapeDecoration(
+                                  const SizedBox(height: 5),
+                                  AnimatedNumericText(
+                                    value: pay,
+                                    formatter: (value) =>
+                                        '今日工资 ${formatAmount(value.toDouble(), withSymbol: true)}',
+                                    style: TextStyle(
                                       color: pay > 0
-                                          ? colors.incomeSoft
-                                          : colors.block,
-                                      shape: Radii.pillShape,
-                                    ),
-                                    child: AnimatedNumericText(
-                                      value: pay,
-                                      formatter: (value) =>
-                                          '今日工资 ${formatAmount(value.toDouble(), withSymbol: true)}',
-                                      style: TextStyle(
-                                        color: pay > 0
-                                            ? colors.income
-                                            : colors.text2,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                      ),
+                                          ? colors.income
+                                          : colors.text3,
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w500,
                                     ),
                                   ),
                                 ],
@@ -1038,43 +1032,26 @@ class _TimerCompactButton extends StatelessWidget {
         : positive
         ? colors.income
         : colors.text2;
-    final shape = Radii.pillShape;
+    final shape = Radii.shape(Radii.md);
     return Pressable(
       onTap: onTap,
       haptic: false,
       shape: shape,
       pressedScale: 0.94,
       child: Container(
-        height: 44,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+        height: 38,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
         decoration: ShapeDecoration(
-          color: primary && !disabled ? null : bg,
-          gradient: primary && !disabled
-              ? LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Color.lerp(bg, Colors.white, colors.isDark ? 0.08 : 0.14)!,
-                    bg,
-                  ],
-                )
-              : null,
-          shape: primary && !disabled
-              ? shape.copyWith(
-                  side: BorderSide(
-                    color: Colors.white.withValues(
-                      alpha: colors.isDark ? 0.18 : 0.28,
-                    ),
-                    width: 0.9,
-                  ),
-                )
-              : shape,
+          color: bg,
+          shape: shape,
           shadows: primary && !disabled
               ? [
                   BoxShadow(
-                    color: bg.withValues(alpha: colors.isDark ? 0.36 : 0.30),
-                    blurRadius: 14,
-                    offset: const Offset(0, 5),
+                    color: const Color(0xFF0F172A).withValues(
+                      alpha: colors.isDark ? 0.26 : 0.10,
+                    ),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
                   ),
                 ]
               : null,
@@ -1132,7 +1109,7 @@ class _QuickStepChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
-    final shape = Radii.pillShape;
+    final shape = Radii.shape(9);
     return AnimatedOpacity(
       duration: motionDuration(Timings.instant, disableAnimations: disable),
       curve: Curves2.soft,
@@ -1143,19 +1120,19 @@ class _QuickStepChip extends StatelessWidget {
         shape: shape,
         pressedScale: 0.94,
         child: Container(
-          constraints: const BoxConstraints(minWidth: 44, minHeight: 34),
-          padding: const EdgeInsets.symmetric(horizontal: 11),
+          constraints: const BoxConstraints(minWidth: 42, minHeight: 32),
+          padding: const EdgeInsets.symmetric(horizontal: 10),
           alignment: Alignment.center,
           decoration: ShapeDecoration(
-            color: colors.block,
+            color: colors.block.withValues(alpha: colors.isDark ? 0.85 : 0.78),
             shape: shape,
           ),
           child: Text(
             label,
             style: TextStyle(
               color: colors.text,
-              fontSize: 12.5,
-              fontWeight: FontWeight.w600,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
               fontFeatures: tabularFigures,
             ),
           ),
@@ -1181,28 +1158,33 @@ class _ToolbarMiniAction extends StatelessWidget {
     final colors = context.colors;
     return Pressable(
       onTap: onTap,
-      shape: Radii.pillShape,
+      shape: Radii.shape(9),
       pressedScale: 0.94,
       child: Container(
-        constraints: const BoxConstraints(minHeight: 34),
-        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+        constraints: const BoxConstraints(minHeight: 32),
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
         decoration: ShapeDecoration(
-          color: colors.primaryContainer.withValues(
-            alpha: colors.isDark ? 0.62 : 0.78,
+          color: Colors.transparent,
+          shape: Radii.shape(9).copyWith(
+            side: BorderSide(
+              color: colors.isDark
+                  ? Colors.white.withValues(alpha: 0.10)
+                  : const Color(0xFF0F172A).withValues(alpha: 0.08),
+              width: 0.75,
+            ),
           ),
-          shape: Radii.pillShape,
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 14.5, color: colors.primary),
+            Icon(icon, size: 13.5, color: colors.text2),
             const SizedBox(width: 3),
             Text(
               label,
               style: TextStyle(
-                fontSize: 12.5,
-                fontWeight: FontWeight.w600,
-                color: colors.primary,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: colors.text2,
               ),
             ),
           ],
@@ -1235,32 +1217,31 @@ class _MonthHoursCard extends StatelessWidget {
         : (summary.workDays / workdays).clamp(0.0, 1.0);
     return GlassCard(
       onTap: onTap,
-      padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
+      padding: const EdgeInsets.fromLTRB(15, 13, 13, 13),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              AppIconBadge(
-                icon: Icons.schedule_rounded,
+              Icon(
+                Icons.schedule_rounded,
+                size: 14,
                 color: colors.primary,
-                size: 26,
-                iconSize: 15,
               ),
-              const SizedBox(width: 7),
+              const SizedBox(width: 5),
               Text(
                 '本月${context.unit.quantity}',
                 style: TextStyle(
                   color: colors.text2,
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
               const Spacer(),
-              Icon(Icons.chevron_right_rounded, size: 15, color: colors.text3),
+              Icon(Icons.chevron_right_rounded, size: 14.5, color: colors.text3),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 9),
           Row(
             crossAxisAlignment: CrossAxisAlignment.baseline,
             textBaseline: TextBaseline.alphabetic,
@@ -1274,10 +1255,10 @@ class _MonthHoursCard extends StatelessWidget {
                     formatter: (value) => formatHoursValue(value.toDouble()),
                     style: TextStyle(
                       color: colors.text,
-                      fontSize: 24,
+                      fontSize: 23,
                       height: 1.05,
                       fontWeight: FontWeight.w700,
-                      letterSpacing: -0.4,
+                      letterSpacing: -0.6,
                     ),
                   ),
                 ),
@@ -1290,7 +1271,7 @@ class _MonthHoursCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          ProgressBar(ratio: progress, color: colors.primary, height: 4),
+          ProgressBar(ratio: progress, color: colors.primary, height: 3),
           const SizedBox(height: 6),
           Text(
             '${summary.workDays}天 · 日均 ${formatHoursValue(summary.averageHours)}${context.unit.short}',
@@ -1331,34 +1312,33 @@ class _MonthSalaryCard extends StatelessWidget {
         : (settlement.settled / settlement.total).clamp(0.0, 1.0);
     return GlassCard(
       onTap: onTap,
-      padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
+      padding: const EdgeInsets.fromLTRB(15, 13, 13, 13),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              AppIconBadge(
-                icon: kHoursOnly
+              Icon(
+                kHoursOnly
                     ? Icons.event_available_rounded
-                    : Icons.payments_rounded,
+                    : Icons.payments_outlined,
+                size: 14,
                 color: colors.income,
-                size: 26,
-                iconSize: 15,
               ),
-              const SizedBox(width: 7),
+              const SizedBox(width: 5),
               Text(
                 kHoursOnly ? '本月出勤' : '本月工资',
                 style: TextStyle(
                   color: colors.text2,
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
               const Spacer(),
-              Icon(Icons.chevron_right_rounded, size: 15, color: colors.text3),
+              Icon(Icons.chevron_right_rounded, size: 14.5, color: colors.text3),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 9),
           FittedBox(
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerLeft,
@@ -1371,16 +1351,16 @@ class _MonthSalaryCard extends StatelessWidget {
                 color: kHoursOnly
                     ? colors.income
                     : (monthPay > 0 ? colors.income : colors.text),
-                fontSize: 24,
+                fontSize: 23,
                 height: 1.05,
                 fontWeight: FontWeight.w700,
-                letterSpacing: -0.4,
+                letterSpacing: -0.6,
               ),
             ),
           ),
           const SizedBox(height: 8),
           if (!kHoursOnly) ...[
-            ProgressBar(ratio: settleRatio, color: colors.income, height: 4),
+            ProgressBar(ratio: settleRatio, color: colors.income, height: 3),
             const SizedBox(height: 6),
           ] else
             const Spacer(),
@@ -1420,32 +1400,31 @@ class _MonthBalanceMiniCard extends StatelessWidget {
     final net = summary.balance;
     return GlassCard(
       onTap: onTap,
-      padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
+      padding: const EdgeInsets.fromLTRB(15, 13, 13, 13),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              AppIconBadge(
-                icon: Icons.account_balance_wallet_rounded,
+              Icon(
+                Icons.account_balance_wallet_outlined,
+                size: 14,
                 color: colors.chart[1],
-                size: 26,
-                iconSize: 15,
               ),
-              const SizedBox(width: 7),
+              const SizedBox(width: 5),
               Text(
                 '本月结余',
                 style: TextStyle(
                   color: colors.text2,
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
               const Spacer(),
-              Icon(Icons.chevron_right_rounded, size: 15, color: colors.text3),
+              Icon(Icons.chevron_right_rounded, size: 14.5, color: colors.text3),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 9),
           FittedBox(
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerLeft,
@@ -1453,10 +1432,10 @@ class _MonthBalanceMiniCard extends StatelessWidget {
               formatAmount(net, withSymbol: true),
               style: TextStyle(
                 color: net < 0 ? colors.expense : colors.text,
-                fontSize: 24,
+                fontSize: 23,
                 height: 1.05,
                 fontWeight: FontWeight.w700,
-                letterSpacing: -0.4,
+                letterSpacing: -0.6,
                 fontFeatures: tabularFigures,
               ),
             ),
@@ -1496,37 +1475,36 @@ class _TodayLedgerMiniCard extends StatelessWidget {
     final colors = context.colors;
     return GlassCard(
       onTap: onTap,
-      padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
+      padding: const EdgeInsets.fromLTRB(15, 13, 13, 13),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              AppIconBadge(
-                icon: Icons.receipt_long_rounded,
+              Icon(
+                Icons.receipt_long_outlined,
+                size: 14,
                 color: colors.warning,
-                size: 26,
-                iconSize: 15,
               ),
-              const SizedBox(width: 7),
+              const SizedBox(width: 5),
               Text(
                 '今日账目',
                 style: TextStyle(
                   color: colors.text2,
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
               const Spacer(),
-              Icon(Icons.chevron_right_rounded, size: 15, color: colors.text3),
+              Icon(Icons.chevron_right_rounded, size: 14.5, color: colors.text3),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 9),
           Text(
             entryCount == 0 ? '暂无收支' : '$entryCount 笔',
             style: TextStyle(
               color: entryCount == 0 ? colors.text3 : colors.text,
-              fontSize: 22,
+              fontSize: 21,
               height: 1.05,
               fontWeight: FontWeight.w700,
               fontFeatures: tabularFigures,
@@ -1573,22 +1551,21 @@ class _TodayLedgerStrip extends StatelessWidget {
         : '$entryCount 笔 · 收 ${formatAmount(income, withSymbol: true)} · 支 ${formatAmount(expense, withSymbol: true)}';
     return GlassCard(
       onTap: onTap,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 11),
       child: Row(
         children: [
-          AppIconBadge(
-            icon: Icons.receipt_long_rounded,
-            color: colors.warning,
-            size: 28,
-            iconSize: 15,
+          Icon(
+            Icons.receipt_long_outlined,
+            size: 16,
+            color: colors.text2,
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
           Text(
             '今日账目',
             style: TextStyle(
               color: colors.text,
-              fontSize: 13.5,
-              fontWeight: FontWeight.w600,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
             ),
           ),
           const SizedBox(width: 10),
@@ -1630,22 +1607,21 @@ class _MonthBalanceStrip extends StatelessWidget {
     final net = summary.balance;
     return GlassCard(
       onTap: onTap,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 11),
       child: Row(
         children: [
-          AppIconBadge(
-            icon: Icons.account_balance_wallet_rounded,
-            color: colors.chart[1],
-            size: 28,
-            iconSize: 15,
+          Icon(
+            Icons.account_balance_wallet_outlined,
+            size: 16,
+            color: colors.text2,
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
           Text(
             '本月结余',
             style: TextStyle(
               color: colors.text,
-              fontSize: 13.5,
-              fontWeight: FontWeight.w600,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
             ),
           ),
           const SizedBox(width: 10),

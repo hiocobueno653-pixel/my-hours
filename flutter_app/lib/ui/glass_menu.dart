@@ -49,7 +49,7 @@ Future<void> showDropletGlassMenu(
   required List<GlassMenuAction> items,
   Rect? anchorRect,
   Offset? anchorOffset,
-  double panelWidth = 228,
+  double panelWidth = 188,
   bool preferRightAlign = true,
 }) {
   if (items.isEmpty) return Future<void>.value();
@@ -199,7 +199,7 @@ class _DropletGlassMenuOverlayState extends State<_DropletGlassMenuOverlay> {
     final screen = media.size;
     final safeTop = media.padding.top + 12;
     final safeBottom = screen.height - media.padding.bottom - 20;
-    final width = math.min(widget.panelWidth, screen.width - 28);
+    final width = math.min(widget.panelWidth, screen.width - 40);
     final estimatedHeight = _estimateMenuHeight(widget.items).clamp(80.0, screen.height * 0.68);
 
     final openBelow =
@@ -249,11 +249,11 @@ class _DropletGlassMenuOverlayState extends State<_DropletGlassMenuOverlay> {
                     ? 1.0
                     : (t / 0.45).clamp(0.0, 1.0);
                 final morphRadius = widget.disableAnimations
-                    ? 28.0
-                    : lerpDouble(width * 0.46, 28.0, Curves2.out.transform(t))!;
+                    ? 16.0
+                    : lerpDouble(width * 0.34, 16.0, Curves2.out.transform(t))!;
                 final contentBlur = widget.disableAnimations
                     ? 0.0
-                    : (1.0 - (t / 0.72).clamp(0.0, 1.0)) * 5.5;
+                    : (1.0 - (t / 0.72).clamp(0.0, 1.0)) * 3.5;
 
                 return Opacity(
                   opacity: opacity,
@@ -271,7 +271,7 @@ class _DropletGlassMenuOverlayState extends State<_DropletGlassMenuOverlay> {
               child: ConstrainedBox(
                 constraints: BoxConstraints(maxHeight: screen.height * 0.68),
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  padding: const EdgeInsets.symmetric(vertical: 5),
                   child: _buildMenuBody(context),
                 ),
               ),
@@ -294,11 +294,11 @@ class _DropletGlassMenuOverlayState extends State<_DropletGlassMenuOverlay> {
         for (var i = 0; i < widget.items.length; i++) ...[
           if (widget.items[i].dividerBefore && i > 0)
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               child: Divider(
                 height: 1,
-                thickness: 0.7,
-                color: colors.text.withValues(alpha: colors.isDark ? 0.12 : 0.08),
+                thickness: 0.6,
+                color: colors.divider,
               ),
             ),
           if (widget.items[i].sectionTitle != null)
@@ -309,12 +309,12 @@ class _DropletGlassMenuOverlayState extends State<_DropletGlassMenuOverlay> {
               ),
               opacity: hasExpanded && _expandedSubmenuIndex != i ? 0.42 : 1.0,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(18, 6, 18, 4),
+                padding: const EdgeInsets.fromLTRB(14, 5, 14, 3),
                 child: Text(
                   widget.items[i].sectionTitle!,
                   style: TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
                     color: colors.text3,
                   ),
                 ),
@@ -361,11 +361,11 @@ class _DropletGlassMenuOverlayState extends State<_DropletGlassMenuOverlay> {
   }
 
   double _estimateMenuHeight(List<GlassMenuAction> items) {
-    var total = 16.0;
+    var total = 10.0;
     for (final item in items) {
-      if (item.dividerBefore) total += 13;
-      if (item.sectionTitle != null) total += 24;
-      total += item.subtitle != null ? 56 : 46;
+      if (item.dividerBefore) total += 9;
+      if (item.sectionTitle != null) total += 20;
+      total += item.subtitle != null ? 50 : 40;
     }
     return total;
   }
@@ -388,18 +388,12 @@ class _DropletMenuSurface extends StatelessWidget {
     final isDark = colors.isDark;
     final highContrast = MediaQuery.maybeOf(context)?.highContrast ?? false;
     final shape = Radii.shape(radius);
-    final bgTop = isDark
-        ? const Color(0xFF2B2D36).withValues(alpha: highContrast ? 1.0 : 0.80)
-        : Colors.white.withValues(alpha: highContrast ? 1.0 : 0.84);
-    final bgBottom = isDark
-        ? const Color(0xFF1E2028).withValues(alpha: highContrast ? 1.0 : 0.76)
-        : const Color(0xFFF6F7FC).withValues(alpha: highContrast ? 1.0 : 0.78);
-    final rim = isDark
-        ? Colors.white.withValues(alpha: 0.16)
-        : Colors.white.withValues(alpha: 0.94);
+    final surface = isDark
+        ? const Color(0xFF1D1F26).withValues(alpha: highContrast ? 1.0 : 0.95)
+        : Colors.white.withValues(alpha: highContrast ? 1.0 : 0.96);
     final outer = isDark
         ? Colors.white.withValues(alpha: 0.10)
-        : Colors.black.withValues(alpha: 0.06);
+        : const Color(0xFF0F172A).withValues(alpha: 0.08);
 
     final innerContent = contentBlur > 0.25
         ? ImageFiltered(
@@ -413,17 +407,21 @@ class _DropletMenuSurface extends StatelessWidget {
 
     return DecoratedBox(
       decoration: ShapeDecoration(
-        shape: shape.copyWith(side: BorderSide(color: outer, width: 0.8)),
+        shape: shape.copyWith(side: BorderSide(color: outer, width: 0.75)),
         shadows: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.46 : 0.14),
-            blurRadius: 34,
-            offset: const Offset(0, 12),
+            color: const Color(0xFF0F172A).withValues(
+              alpha: isDark ? 0.42 : 0.11,
+            ),
+            blurRadius: 22,
+            offset: const Offset(0, 8),
           ),
           BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.22 : 0.05),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
+            color: const Color(0xFF0F172A).withValues(
+              alpha: isDark ? 0.20 : 0.04,
+            ),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
           ),
         ],
       ),
@@ -431,17 +429,13 @@ class _DropletMenuSurface extends StatelessWidget {
         clipper: ShapeBorderClipper(shape: shape),
         child: BackdropFilter(
           filter: ImageFilter.blur(
-            sigmaX: highContrast ? 0 : 24,
-            sigmaY: highContrast ? 0 : 24,
+            sigmaX: highContrast ? 0 : 16,
+            sigmaY: highContrast ? 0 : 16,
           ),
           child: DecoratedBox(
             decoration: ShapeDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [bgTop, bgBottom],
-              ),
-              shape: shape.copyWith(side: BorderSide(color: rim, width: 1.2)),
+              color: surface,
+              shape: shape,
             ),
             child: innerContent,
           ),
@@ -470,20 +464,25 @@ class _GlassMenuRow extends StatelessWidget {
         : action.selected
         ? colors.primary
         : colors.text;
+    final iconColor = action.danger
+        ? colors.expense
+        : action.selected
+        ? colors.primary
+        : colors.text2;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
       child: Pressable(
         onTap: onTap,
-        shape: Radii.shape(16),
+        shape: Radii.shape(10),
         pressedScale: 0.98,
         child: Container(
-          constraints: const BoxConstraints(minHeight: 44),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          constraints: const BoxConstraints(minHeight: 37),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           child: Row(
             children: [
               if (action.icon != null) ...[
-                Icon(action.icon, size: 20, color: fg),
-                const SizedBox(width: 12),
+                Icon(action.icon, size: 17, color: iconColor),
+                const SizedBox(width: 9),
               ],
               Expanded(
                 child: Column(
@@ -495,8 +494,10 @@ class _GlassMenuRow extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
+                        fontSize: 13.5,
+                        fontWeight: action.selected
+                            ? FontWeight.w600
+                            : FontWeight.w500,
                         color: fg,
                       ),
                     ),
@@ -506,7 +507,10 @@ class _GlassMenuRow extends StatelessWidget {
                         action.subtitle!,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 12, color: colors.text3),
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: colors.text3,
+                        ),
                       ),
                     ],
                   ],
@@ -515,7 +519,7 @@ class _GlassMenuRow extends StatelessWidget {
               if (trailingOverride != null)
                 trailingOverride!
               else if (action.selected)
-                Icon(Icons.check_rounded, size: 19, color: colors.primary),
+                Icon(Icons.check_rounded, size: 16, color: colors.primary),
             ],
           ),
         ),
@@ -562,24 +566,15 @@ class _AccordionSubmenuItem extends StatelessWidget {
         decoration: expanded
             ? ShapeDecoration(
                 color: colors.isDark
-                    ? const Color(0xFF313440).withValues(alpha: 0.94)
-                    : Colors.white.withValues(alpha: 0.96),
-                shape: Radii.shape(22).copyWith(
+                    ? colors.block
+                    : colors.page,
+                shape: Radii.shape(12).copyWith(
                   side: BorderSide(
                     color: colors.isDark
-                        ? Colors.white.withValues(alpha: 0.14)
-                        : Colors.black.withValues(alpha: 0.06),
+                        ? Colors.white.withValues(alpha: 0.08)
+                        : const Color(0xFF0F172A).withValues(alpha: 0.05),
                   ),
                 ),
-                shadows: [
-                  BoxShadow(
-                    color: Colors.black.withValues(
-                      alpha: colors.isDark ? 0.36 : 0.10,
-                    ),
-                    blurRadius: 18,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
               )
             : null,
         child: Column(
@@ -742,7 +737,7 @@ class GlassMenuButton extends StatelessWidget {
     required this.items,
     this.icon = Icons.more_vert_rounded,
     this.tooltip = '更多操作',
-    this.panelWidth = 228,
+    this.panelWidth = 188,
   });
 
   final List<GlassMenuAction> items;
@@ -785,7 +780,7 @@ class LiquidContextMenuRegion extends StatefulWidget {
     super.key,
     required this.itemsBuilder,
     required this.child,
-    this.panelWidth = 208,
+    this.panelWidth = 188,
     this.highlightRadius = Radii.card,
   });
 

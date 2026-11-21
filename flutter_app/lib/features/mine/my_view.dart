@@ -136,7 +136,7 @@ class MyView extends ConsumerWidget {
                                 numericValue: summary.totalHours,
                                 formatter: (v) =>
                                     '${formatHoursValue(v.toDouble())}${context.unit.short}',
-                                color: colors.primary,
+                                color: colors.text,
                               ),
                               if (!kHoursOnly) ...[
                                 _MiniMetric(
@@ -169,71 +169,41 @@ class MyView extends ConsumerWidget {
                             ],
                           ),
                           if (!kHoursOnly) ...[
-                            const SizedBox(height: 14),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 10,
-                              ),
-                              decoration: ShapeDecoration(
-                                color: colors.block.withValues(
-                                  alpha: colors.isDark ? 0.62 : 0.72,
+                            const SizedBox(height: 12),
+                            Divider(
+                              height: 1,
+                              thickness: 0.7,
+                              color: colors.divider,
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                Text(
+                                  '本月工资结算 ${(wageRatio * 100).round()}%',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                    color: colors.text2,
+                                    fontFeatures: tabularFigures,
+                                  ),
                                 ),
-                                shape: Radii.shape(Radii.md),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Text(
-                                        '本月工资结算',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                          color: colors.text2,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 6,
-                                          vertical: 1.5,
-                                        ),
-                                        decoration: ShapeDecoration(
-                                          color: colors.incomeSoft,
-                                          shape: Radii.pillShape,
-                                        ),
-                                        child: Text(
-                                          '${(wageRatio * 100).round()}%',
-                                          style: TextStyle(
-                                            fontSize: 10.5,
-                                            fontWeight: FontWeight.w700,
-                                            color: colors.income,
-                                            fontFeatures: tabularFigures,
-                                          ),
-                                        ),
-                                      ),
-                                      const Spacer(),
-                                      Text(
-                                        '已结 ${formatAmount(settlement.settled, withSymbol: true)}'
-                                        ' · 待结 ${formatAmount(settlement.pending, withSymbol: true)}',
-                                        style: TextStyle(
-                                          fontSize: 11.5,
-                                          color: colors.text3,
-                                          fontFeatures: tabularFigures,
-                                        ),
-                                      ),
-                                    ],
+                                const Spacer(),
+                                Text(
+                                  '已结 ${formatAmount(settlement.settled, withSymbol: true)}'
+                                  ' · 待结 ${formatAmount(settlement.pending, withSymbol: true)}',
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    color: colors.text3,
+                                    fontFeatures: tabularFigures,
                                   ),
-                                  const SizedBox(height: 6),
-                                  ProgressBar(
-                                    ratio: wageRatio,
-                                    color: colors.income,
-                                    height: 4.5,
-                                  ),
-                                ],
-                              ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            ProgressBar(
+                              ratio: wageRatio,
+                              color: colors.income,
+                              height: 3.5,
                             ),
                           ],
                         ],
@@ -418,7 +388,7 @@ class MyView extends ConsumerWidget {
                     const SizedBox(height: Gaps.xl),
                     Center(
                       child: Text(
-                        '时页 TIMEPAGE · 1.7.6 · 数据完全本地保存',
+                        '时页 TIMEPAGE · 1.7.7 · 数据完全本地保存',
                         style: TextStyle(fontSize: 11.5, color: colors.text3),
                       ),
                     ),
@@ -437,25 +407,25 @@ class MyView extends ConsumerWidget {
             title: '我的',
             actions: [
               HeaderGlassSurface(
-                height: 40,
+                height: 34,
                 radius: Radii.pill,
                 bright: true,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 10),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
                       Icons.lock_outline_rounded,
-                      size: 14,
+                      size: 13,
                       color: colors.income,
                     ),
-                    const SizedBox(width: 5),
+                    const SizedBox(width: 4),
                     Text(
                       '仅本机',
                       style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: colors.text,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w500,
+                        color: colors.text2,
                       ),
                     ),
                   ],

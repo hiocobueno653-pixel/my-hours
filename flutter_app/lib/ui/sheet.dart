@@ -247,9 +247,9 @@ class _SheetScaffoldState extends State<SheetScaffold> {
                 ),
                 side: BorderSide(
                   color: colors.isDark
-                      ? Colors.white.withValues(alpha: 0.12)
-                      : Colors.white.withValues(alpha: 0.9),
-                  width: 1,
+                      ? Colors.white.withValues(alpha: 0.09)
+                      : const Color(0xFF0F172A).withValues(alpha: 0.06),
+                  width: 0.75,
                 ),
               ),
               shadows: context.floatingShadows,
@@ -268,10 +268,10 @@ class _SheetScaffoldState extends State<SheetScaffold> {
                     children: [
                       const SizedBox(height: Gaps.sm),
                       Container(
-                        width: 36,
-                        height: 4,
+                        width: 32,
+                        height: 3.5,
                         decoration: BoxDecoration(
-                          color: colors.outline.withValues(alpha: 0.4),
+                          color: colors.outline.withValues(alpha: 0.32),
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
@@ -302,8 +302,8 @@ class _SheetScaffoldState extends State<SheetScaffold> {
                               icon: Icons.close_rounded,
                               onTap: _requestClose,
                               tooltip: '关闭',
-                              iconSize: 18,
-                              size: 40,
+                              iconSize: 17,
+                              size: 34,
                               radius: Radii.pill,
                             ),
                           ],

@@ -40,19 +40,13 @@ Future<bool?> showConfirmDialog(
           : colors.primary;
       final confirmForeground = danger ? Colors.white : colors.onPrimary;
       final dialogShape = Radii.shape(Radii.alert);
-      final rimColor = isDark
-          ? Colors.white.withValues(alpha: 0.16)
-          : Colors.white.withValues(alpha: 0.92);
       final outerStroke = isDark
           ? Colors.white.withValues(alpha: 0.10)
-          : Colors.black.withValues(alpha: 0.06);
-      final glassTop = isDark
-          ? const Color(0xFF282A33).withValues(alpha: highContrast ? 1.0 : 0.82)
-          : Colors.white.withValues(alpha: highContrast ? 1.0 : 0.85);
-      final glassBottom = isDark
-          ? const Color(0xFF1E2028).withValues(alpha: highContrast ? 1.0 : 0.78)
-          : const Color(0xFFF6F7FC).withValues(alpha: highContrast ? 1.0 : 0.78);
-      final blurSigma = highContrast ? 0.0 : (disable ? 12.0 : 26.0);
+          : const Color(0xFF0F172A).withValues(alpha: 0.07);
+      final surfaceColor = isDark
+          ? colors.card.withValues(alpha: highContrast ? 1.0 : 0.96)
+          : Colors.white.withValues(alpha: highContrast ? 1.0 : 0.97);
+      final blurSigma = highContrast ? 0.0 : (disable ? 8.0 : 16.0);
       final scrimOpacity = animation.drive(
         CurveTween(
           curve: const Interval(0, 0.45, curve: Curves2.out),
@@ -66,7 +60,7 @@ Future<bool?> showConfirmDialog(
                 opacity: scrimOpacity,
                 child: ColoredBox(
                   key: const ValueKey('dialog-scrim'),
-                  color: Colors.black.withValues(alpha: isDark ? 0.52 : 0.28),
+                  color: Colors.black.withValues(alpha: isDark ? 0.56 : 0.30),
                 ),
               ),
             ),
@@ -111,29 +105,20 @@ Future<bool?> showConfirmDialog(
                 );
               },
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 26),
+                padding: const EdgeInsets.symmetric(horizontal: 34),
                 child: Material(
                   type: MaterialType.transparency,
                   child: ConstrainedBox(
                     constraints: BoxConstraints(
-                      maxWidth: 336,
-                      maxHeight: MediaQuery.sizeOf(dialogContext).height * 0.76,
+                      maxWidth: 282,
+                      maxHeight: MediaQuery.sizeOf(dialogContext).height * 0.72,
                     ),
                     child: DecoratedBox(
                       decoration: ShapeDecoration(
                         shape: dialogShape.copyWith(
-                          side: BorderSide(color: outerStroke, width: 0.8),
+                          side: BorderSide(color: outerStroke, width: 0.75),
                         ),
-                        shadows: [
-                          ...context.floatingShadows,
-                          BoxShadow(
-                            color: Colors.black.withValues(
-                              alpha: isDark ? 0.38 : 0.12,
-                            ),
-                            blurRadius: 42,
-                            offset: const Offset(0, 18),
-                          ),
-                        ],
+                        shadows: context.floatingShadows,
                       ),
                       child: ClipPath(
                         clipper: ShapeBorderClipper(shape: dialogShape),
@@ -141,21 +126,15 @@ Future<bool?> showConfirmDialog(
                           sigma: blurSigma,
                           child: DecoratedBox(
                             decoration: ShapeDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [glassTop, glassBottom],
-                              ),
-                              shape: dialogShape.copyWith(
-                                side: BorderSide(color: rimColor, width: 1.2),
-                              ),
+                              color: surfaceColor,
+                              shape: dialogShape,
                             ),
                             child: SingleChildScrollView(
                               padding: const EdgeInsets.fromLTRB(
-                                24,
-                                24,
-                                24,
                                 20,
+                                19,
+                                20,
+                                15,
                               ),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -164,48 +143,45 @@ Future<bool?> showConfirmDialog(
                                     title,
                                     textAlign: TextAlign.left,
                                     style: TextStyle(
-                                      fontSize: 19,
-                                      height: 1.3,
-                                      fontWeight: FontWeight.w700,
+                                      fontSize: 16,
+                                      height: 1.32,
+                                      fontWeight: FontWeight.w600,
                                       letterSpacing: -0.2,
                                       color: colors.text,
                                     ),
                                   ),
                                   if (description != null) ...[
-                                    const SizedBox(height: 8),
+                                    const SizedBox(height: 6),
                                     Text(
                                       description,
                                       textAlign: TextAlign.left,
                                       style: TextStyle(
-                                        fontSize: 14.5,
-                                        height: 1.5,
+                                        fontSize: 13,
+                                        height: 1.48,
                                         color: colors.text2,
                                       ),
                                     ),
                                   ],
-                                  const SizedBox(height: 22),
+                                  const SizedBox(height: 16),
                                   Row(
                                     children: [
                                       Expanded(
                                         child: _DialogButton(
                                           label: cancelLabel,
-                                          background: colors.text.withValues(
-                                            alpha: isDark ? 0.12 : 0.08,
-                                          ),
+                                          background: colors.block,
                                           foreground: colors.text,
                                           onTap: () =>
                                               Navigator.of(dialogContext)
                                                   .pop(false),
                                         ),
                                       ),
-                                      const SizedBox(width: 12),
+                                      const SizedBox(width: 8),
                                       Expanded(
                                         child: _DialogButton(
                                           label: confirmLabel,
                                           background: confirmBackground,
                                           foreground: confirmForeground,
                                           bold: true,
-                                          elevated: true,
                                           onTap: () =>
                                               Navigator.of(dialogContext)
                                                   .pop(true),
@@ -241,7 +217,6 @@ class _DialogButton extends StatelessWidget {
     required this.foreground,
     required this.onTap,
     this.bold = false,
-    this.elevated = false,
   });
 
   final String label;
@@ -249,11 +224,10 @@ class _DialogButton extends StatelessWidget {
   final Color foreground;
   final VoidCallback onTap;
   final bool bold;
-  final bool elevated;
 
   @override
   Widget build(BuildContext context) {
-    final shape = Radii.pillShape;
+    final shape = Radii.shape(Radii.md);
     return Semantics(
       button: true,
       label: label,
@@ -265,25 +239,16 @@ class _DialogButton extends StatelessWidget {
         pressedScale: 0.96,
         child: Container(
           width: double.infinity,
-          height: 48,
+          height: 40,
           decoration: ShapeDecoration(
             color: background,
             shape: shape,
-            shadows: elevated
-                ? [
-                    BoxShadow(
-                      color: background.withValues(alpha: 0.30),
-                      blurRadius: 14,
-                      offset: const Offset(0, 5),
-                    ),
-                  ]
-                : null,
           ),
           child: Center(
             child: Text(
               label,
               style: TextStyle(
-                fontSize: 15,
+                fontSize: 13.5,
                 fontWeight: bold ? FontWeight.w600 : FontWeight.w500,
                 color: foreground,
               ),

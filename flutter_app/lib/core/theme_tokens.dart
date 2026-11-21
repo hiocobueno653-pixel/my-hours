@@ -69,7 +69,7 @@ class AppColors {
 
   /// 轻盈描边：暗色纯黑与玻璃浮层上提供微弱轮廓，亮色卡片靠面差呼吸。
   Color get cardBorder =>
-      isDark ? const Color(0xFF2B2D36) : const Color(0xFFE5E5EC);
+      isDark ? const Color(0xFF262830) : const Color(0xFFE6E8EE);
 
   AppColors copyWith({
     Color? page,
@@ -211,47 +211,47 @@ class AppColors {
   }
 
   static const AppColors light = AppColors(
-    page: Color(0xFFF2F2F7),
+    page: Color(0xFFF5F6F8),
     card: Color(0xFFFFFFFF),
-    block: Color(0xFFE9E9F0),
-    inset: Color(0xFFDDDDE6),
-    text: Color(0xFF18181C),
-    text2: Color(0xFF5C5C68),
-    text3: Color(0xFF8E8E9A),
-    divider: Color(0xFFEAEAF0),
-    outline: Color(0xFFA0A0AD),
-    primary: Color(0xFF007AFF),
+    block: Color(0xFFECEEF2),
+    inset: Color(0xFFE1E4EA),
+    text: Color(0xFF14151A),
+    text2: Color(0xFF5A5E6B),
+    text3: Color(0xFF8C919E),
+    divider: Color(0xFFECEEF3),
+    outline: Color(0xFF9EA3B0),
+    primary: Color(0xFF2563EB),
     onPrimary: Color(0xFFFFFFFF),
-    primaryContainer: Color(0xFFE6F1FF),
-    onPrimaryContainer: Color(0xFF0055CC),
-    income: Color(0xFF0F9D6B),
-    incomeSoft: Color(0xFFE6F7F0),
-    expense: Color(0xFFE53935),
-    expenseSoft: Color(0xFFFDECEC),
-    warning: Color(0xFFE68A00),
-    warningSoft: Color(0xFFFFF4E0),
+    primaryContainer: Color(0xFFEDF3FF),
+    onPrimaryContainer: Color(0xFF1A47B8),
+    income: Color(0xFF15845E),
+    incomeSoft: Color(0xFFECF8F3),
+    expense: Color(0xFFD6403B),
+    expenseSoft: Color(0xFFFDF0EF),
+    warning: Color(0xFFD17A0E),
+    warningSoft: Color(0xFFFEF6EA),
     chart: [
-      Color(0xFF007AFF),
-      Color(0xFF5856D6),
-      Color(0xFF0F9D6B),
-      Color(0xFFFF9500),
-      Color(0xFFE53935),
-      Color(0xFFAF52DE),
+      Color(0xFF2563EB),
+      Color(0xFF5B5CE6),
+      Color(0xFF15845E),
+      Color(0xFFD98218),
+      Color(0xFFD6403B),
+      Color(0xFF9B51E0),
     ],
     isDark: false,
   );
 
   static const AppColors dark = AppColors(
-    page: Color(0xFF111114),
-    card: Color(0xFF1E1F24),
-    block: Color(0xFF2A2C33),
-    inset: Color(0xFF373A44),
+    page: Color(0xFF0E0F12),
+    card: Color(0xFF17181D),
+    block: Color(0xFF22242B),
+    inset: Color(0xFF2E313A),
     text: Color(0xFFF5F5F7),
-    text2: Color(0xFFA6A8B2),
-    text3: Color(0xFF757885),
-    divider: Color(0xFF2A2C34),
-    outline: Color(0xFF6F7380),
-    primary: Color(0xFF479BFF),
+    text2: Color(0xFFA4A8B4),
+    text3: Color(0xFF727684),
+    divider: Color(0xFF23252D),
+    outline: Color(0xFF6C707E),
+    primary: Color(0xFF5B93FF),
     onPrimary: Color(0xFF061326),
     primaryContainer: Color(0xFF1A3159),
     onPrimaryContainer: Color(0xFFD6E8FF),
@@ -262,7 +262,7 @@ class AppColors {
     warning: Color(0xFFFBBF24),
     warningSoft: Color(0xFF3D2E14),
     chart: [
-      Color(0xFF479BFF),
+      Color(0xFF5B93FF),
       Color(0xFF8B89F8),
       Color(0xFF34D399),
       Color(0xFFFBBF24),
@@ -274,15 +274,15 @@ class AppColors {
 
   static const AppColors darkPureBlack = AppColors(
     page: Color(0xFF000000),
-    card: Color(0xFF121317),
-    block: Color(0xFF1E2027),
-    inset: Color(0xFF2A2D36),
+    card: Color(0xFF111216),
+    block: Color(0xFF1C1E24),
+    inset: Color(0xFF282B33),
     text: Color(0xFFF7F7FA),
     text2: Color(0xFFC4C4CF),
     text3: Color(0xFF8D8D9B),
     divider: Color(0xFF1D2028),
     outline: Color(0xFF787C87),
-    primary: Color(0xFF479BFF),
+    primary: Color(0xFF5B93FF),
     onPrimary: Color(0xFF061326),
     primaryContainer: Color(0xFF1A3159),
     onPrimaryContainer: Color(0xFFD6E8FF),
@@ -293,7 +293,7 @@ class AppColors {
     warning: Color(0xFFFBBF24),
     warningSoft: Color(0xFF3D2E14),
     chart: [
-      Color(0xFF479BFF),
+      Color(0xFF5B93FF),
       Color(0xFF8B89F8),
       Color(0xFF34D399),
       Color(0xFFFBBF24),
@@ -315,14 +315,14 @@ double _contrastRatio(Color a, Color b) {
 /// FlClash 风格连续曲率超椭圆圆角刻度。
 abstract final class Radii {
   static const double xs = 6;
-  static const double sm = 10;
-  static const double md = 14;
-  static const double lg = 18;
-  static const double xl = 22;
-  static const double xxl = 28;
-  static const double hero = 26;
-  static const double alert = 32;
-  static const double card = 22;
+  static const double sm = 8;
+  static const double md = 12;
+  static const double lg = 14;
+  static const double xl = 16;
+  static const double xxl = 20;
+  static const double hero = 20;
+  static const double alert = 22;
+  static const double card = 18;
   static const double pill = 999;
 
   static const BorderRadius cardRadius = BorderRadius.all(
@@ -386,7 +386,7 @@ abstract final class Gaps {
   static const double page = 16;
 
   /// 主页面标题栏高度（不含状态栏）。
-  static const double headerHeight = 60;
+  static const double headerHeight = 54;
 }
 
 /// 主题扩展：把令牌挂到 `ThemeData.extensions`，组件里用 `context.tokens` 取。
@@ -406,38 +406,38 @@ class AppTokens extends ThemeExtension<AppTokens> {
     colors: AppColors.light,
     shadows: [
       BoxShadow(
-        color: Color(0x09000000),
-        blurRadius: 16,
-        offset: Offset(0, 4),
+        color: Color(0x060F172A),
+        blurRadius: 8,
+        offset: Offset(0, 2),
       ),
       BoxShadow(
-        color: Color(0x05000000),
-        blurRadius: 3,
+        color: Color(0x050F172A),
+        blurRadius: 1.5,
         offset: Offset(0, 1),
       ),
     ],
     floatingShadows: [
       BoxShadow(
-        color: Color(0x1C000000),
-        blurRadius: 28,
-        offset: Offset(0, 10),
+        color: Color(0x140F172A),
+        blurRadius: 20,
+        offset: Offset(0, 8),
       ),
-      BoxShadow(color: Color(0x0C000000), blurRadius: 6, offset: Offset(0, 2)),
+      BoxShadow(color: Color(0x080F172A), blurRadius: 4, offset: Offset(0, 1)),
     ],
   );
 
   static const AppTokens darkTokens = AppTokens(
     colors: AppColors.dark,
     shadows: [
-      BoxShadow(color: Color(0x2E000000), blurRadius: 14, offset: Offset(0, 4)),
+      BoxShadow(color: Color(0x22000000), blurRadius: 8, offset: Offset(0, 2)),
     ],
     floatingShadows: [
       BoxShadow(
-        color: Color(0x5C000000),
-        blurRadius: 28,
-        offset: Offset(0, 10),
+        color: Color(0x48000000),
+        blurRadius: 22,
+        offset: Offset(0, 8),
       ),
-      BoxShadow(color: Color(0x2A000000), blurRadius: 6, offset: Offset(0, 2)),
+      BoxShadow(color: Color(0x22000000), blurRadius: 4, offset: Offset(0, 1)),
     ],
   );
 
@@ -486,7 +486,7 @@ double pageBottomInset(BuildContext context) {
     return keyboardInset > safeInset ? keyboardInset : safeInset;
   }
   final wide = MediaQuery.sizeOf(context).width >= 720;
-  return wide ? system + 28 : system + 124;
+  return wide ? system + 28 : system + 112;
 }
 
 /// 构建 ThemeData。

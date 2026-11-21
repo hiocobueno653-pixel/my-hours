@@ -153,7 +153,7 @@ class _StatsPageState extends ConsumerState<StatsPage> {
                                 formatter: (v) =>
                                     formatHoursValue(v.toDouble()),
                                 unit: context.unit.short,
-                                color: colors.primary,
+                                color: colors.text,
                               ),
                               _YearMetric(
                                 label: '出勤天数',
@@ -176,63 +176,55 @@ class _StatsPageState extends ConsumerState<StatsPage> {
                             ],
                           ),
                           if (!kHoursOnly) ...[
-                            const SizedBox(height: 14),
-                            Container(
-                              padding: const EdgeInsets.fromLTRB(
-                                12,
-                                11,
-                                12,
-                                11,
-                              ),
-                              decoration: ShapeDecoration(
-                                color: colors.block.withValues(
-                                  alpha: colors.isDark ? 0.62 : 0.70,
+                            const SizedBox(height: 12),
+                            Divider(
+                              height: 1,
+                              thickness: 0.7,
+                              color: colors.divider,
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                _YearMetric(
+                                  label: '全年收入',
+                                  numericValue: summary.totalIncome,
+                                  formatter: (v) => formatAmount(
+                                    v.toDouble(),
+                                    withSymbol: true,
+                                  ),
+                                  unit: '',
+                                  color: colors.income,
+                                  compact: true,
                                 ),
-                                shape: Radii.shape(Radii.md),
-                              ),
-                              child: Row(
-                                children: [
-                                  _YearMetric(
-                                    label: '全年收入',
-                                    numericValue: summary.totalIncome,
-                                    formatter: (v) => formatAmount(
-                                      v.toDouble(),
-                                      withSymbol: true,
-                                    ),
-                                    unit: '',
-                                    color: colors.income,
-                                    compact: true,
+                                _YearMetric(
+                                  label: '全年支出',
+                                  numericValue: summary.totalExpense,
+                                  formatter: (v) => formatAmount(
+                                    v.toDouble(),
+                                    withSymbol: true,
                                   ),
-                                  _YearMetric(
-                                    label: '全年支出',
-                                    numericValue: summary.totalExpense,
-                                    formatter: (v) => formatAmount(
-                                      v.toDouble(),
-                                      withSymbol: true,
-                                    ),
-                                    unit: '',
-                                    color: colors.expense,
-                                    compact: true,
+                                  unit: '',
+                                  color: colors.expense,
+                                  compact: true,
+                                ),
+                                _YearMetric(
+                                  label: '年度净结余',
+                                  numericValue:
+                                      summary.totalIncome -
+                                      summary.totalExpense,
+                                  formatter: (v) => formatAmount(
+                                    v.toDouble(),
+                                    withSymbol: true,
                                   ),
-                                  _YearMetric(
-                                    label: '年度净结余',
-                                    numericValue:
-                                        summary.totalIncome -
-                                        summary.totalExpense,
-                                    formatter: (v) => formatAmount(
-                                      v.toDouble(),
-                                      withSymbol: true,
-                                    ),
-                                    unit: '',
-                                    color:
-                                        summary.totalIncome >=
-                                            summary.totalExpense
-                                        ? colors.text
-                                        : colors.expense,
-                                    compact: true,
-                                  ),
-                                ],
-                              ),
+                                  unit: '',
+                                  color:
+                                      summary.totalIncome >=
+                                          summary.totalExpense
+                                      ? colors.text
+                                      : colors.expense,
+                                  compact: true,
+                                ),
+                              ],
                             ),
                           ],
                         ],
@@ -245,13 +237,12 @@ class _StatsPageState extends ConsumerState<StatsPage> {
                         children: [
                           Row(
                             children: [
-                              AppIconBadge(
-                                icon: Icons.show_chart_rounded,
+                              Icon(
+                                Icons.show_chart_rounded,
                                 color: colors.primary,
-                                size: 28,
-                                iconSize: 16,
+                                size: 16,
                               ),
-                              const SizedBox(width: 8),
+                              const SizedBox(width: 6),
                               Text(
                                 '每月${context.unit.quantity}趋势',
                                 style: TextStyle(
@@ -286,13 +277,12 @@ class _StatsPageState extends ConsumerState<StatsPage> {
                           children: [
                             Row(
                               children: [
-                                const AppIconBadge(
-                                  icon: Icons.pie_chart_outline_rounded,
-                                  color: Color(0xFF5856D6),
-                                  size: 28,
-                                  iconSize: 16,
+                              Icon(
+                                Icons.pie_chart_outline_rounded,
+                                color: colors.chart[1],
+                                size: 16,
                                 ),
-                                const SizedBox(width: 8),
+                              const SizedBox(width: 6),
                                 Text(
                                   '按工作构成（$_year 年）',
                                   style: TextStyle(
@@ -325,13 +315,12 @@ class _StatsPageState extends ConsumerState<StatsPage> {
                           children: [
                             Row(
                               children: [
-                                AppIconBadge(
-                                  icon: Icons.bar_chart_rounded,
+                              Icon(
+                                Icons.bar_chart_rounded,
                                   color: colors.income,
-                                  size: 28,
-                                  iconSize: 16,
+                                size: 16,
                                 ),
-                                const SizedBox(width: 8),
+                              const SizedBox(width: 6),
                                 Text(
                                   '每月收支对比',
                                   style: TextStyle(
@@ -382,15 +371,14 @@ class _StatsPageState extends ConsumerState<StatsPage> {
                           children: [
                             Row(
                               children: [
-                                AppIconBadge(
-                                  icon: Icons.donut_large_rounded,
+                              Icon(
+                                Icons.donut_large_rounded,
                                   color: _categoryType == LedgerType.expense
                                       ? colors.expense
                                       : colors.income,
-                                  size: 28,
-                                  iconSize: 16,
+                                size: 16,
                                 ),
-                                const SizedBox(width: 8),
+                              const SizedBox(width: 6),
                                 Expanded(
                                   child: Text(
                                     '${formatMonthLabel(categoryMonth)} '
