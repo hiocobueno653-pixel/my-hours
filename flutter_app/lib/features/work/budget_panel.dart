@@ -191,8 +191,8 @@ class _ProgressBlock extends StatelessWidget {
               target <= 0
                   ? '未设置'
                   : (reached
-                        ? '$overText ${formatAmount(remaining)}'
-                        : '$underText ${formatAmount(remaining)}'),
+                        ? '$overText ${formatAmount(remaining, withSymbol: true)}'
+                        : '$underText ${formatAmount(remaining, withSymbol: true)}'),
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
@@ -205,7 +205,7 @@ class _ProgressBlock extends StatelessWidget {
         ProgressBar(ratio: ratio, color: color, height: 8),
         const SizedBox(height: 4),
         Text(
-          '${formatAmount(current)} / ${target <= 0 ? '—' : formatAmount(target)}',
+          '${formatAmount(current, withSymbol: true)} / ${target <= 0 ? '—' : formatAmount(target, withSymbol: true)}',
           style: TextStyle(
             fontSize: 12,
             color: colors.text2,

@@ -42,7 +42,7 @@ void main() {
 
     expect(find.text('主题色彩'), findsOneWidget);
     expect(find.text('纯黑模式'), findsOneWidget);
-    expect(find.text('液态玻璃'), findsOneWidget);
+    expect(find.text('选项卡动画'), findsOneWidget);
     expect(find.text('字体与阅读'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });

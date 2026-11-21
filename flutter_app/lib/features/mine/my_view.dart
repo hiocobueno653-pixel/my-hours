@@ -2,43 +2,37 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/formatters.dart';
-import '../../core/motion.dart';
+import '../../core/measure_unit.dart';
 import '../../core/theme_tokens.dart';
+import '../../data/constants.dart';
 import '../../data/dates.dart';
 import '../../data/ledger.dart';
+import '../../data/profiles.dart';
 import '../../data/records.dart';
 import '../../state/app_controller.dart';
+import '../../ui/export_sheet.dart';
 import '../../ui/month_picker.dart';
+import '../../ui/page_route.dart';
 import '../../ui/pinned_header.dart';
 import '../../ui/widgets.dart';
-import '../ledger/category_manager.dart';
 import '../charts/charts.dart';
+import '../ledger/category_manager.dart';
 import '../work/budget_panel.dart';
 import '../work/wage_panel.dart';
 import 'backup_page.dart';
 import 'settings_page.dart';
-import 'stats_page.dart';
 import 'theme_page.dart';
-import '../../core/measure_unit.dart';
-import 'package:animations/animations.dart';
 
-/// 我的页：数据带 + 功能入口。二级页走 Navigator（返回键与手势由路由负责）。
+/// 我的页：工作时薪、工资结算、预算与数据备份管理中心。
 class MyView extends ConsumerWidget {
-  const MyView({
-    super.key,
-    required this.largeText,
-    required this.onLargeTextChanged,
-  });
-
-  final bool largeText;
-  final ValueChanged<bool> onLargeTextChanged;
+  const MyView({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colors = context.colors;
     final state = ref.watch(appControllerProvider);
     final month = ref.watch(selectedMonthProvider);
-    final hours = getMonthSummary(state.records, month).totalHours;
+    final summary = getMonthSummary(state.records, month);
     final pay = getMonthPay(state.records, month, state.workProfiles);
     final ledger = getLedgerMonthSummary(state.entries, month);
     final settlement = getSettlementSummary(
@@ -46,33 +40,34 @@ class MyView extends ConsumerWidget {
       month,
       state.workProfiles,
     );
-    final monthDelta = getMonthDelta(state.records, month);
     final budget = ref.watch(budgetTargetsProvider);
+    final defaultWork =
+        getWorkById(state.workProfiles, defaultWorkId) ??
+        (state.workProfiles.isEmpty ? null : state.workProfiles.first);
     final wageRatio = settlement.total <= 0
         ? 0.0
-        : settlement.settled / settlement.total;
-    final budgetRatio = budget.monthlyExpenseBudget <= 0
-        ? 0.0
-        : ledger.expense / budget.monthlyExpenseBudget;
-    final goalRatio = budget.monthlyIncomeGoal <= 0
-        ? 0.0
-        : ledger.income / budget.monthlyIncomeGoal;
+        : (settlement.settled / settlement.total).clamp(0.0, 1.0);
 
     return Stack(
       children: [
         Positioned.fill(
           child: ListView(
+            physics: const BouncingScrollPhysics(
+              parent: AlwaysScrollableScrollPhysics(),
+            ),
             padding: EdgeInsets.only(
-              top: PinnedHeader.totalHeight(context) + 8,
+              top: PinnedHeader.totalHeight(context) + 12,
               bottom: pageBottomInset(context),
             ),
             children: [
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: Gaps.lg),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     GlassCard(
+                      radius: Radii.hero,
+                      padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -90,11 +85,16 @@ class MyView extends ConsumerWidget {
                                         .setMonth(picked);
                                   }
                                 },
-                                shape: Radii.shape(Radii.sm),
-                                child: Padding(
+                                shape: Radii.pillShape,
+                                pressedScale: 0.96,
+                                child: Container(
                                   padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                    vertical: 8,
+                                    horizontal: 11,
+                                    vertical: 5,
+                                  ),
+                                  decoration: ShapeDecoration(
+                                    color: colors.block,
+                                    shape: Radii.pillShape,
                                   ),
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
@@ -102,292 +102,327 @@ class MyView extends ConsumerWidget {
                                       AnimatedMonthLabel(
                                         label: formatMonthLabel(month),
                                         style: TextStyle(
-                                          fontSize: 13,
+                                          fontSize: 12.5,
                                           fontWeight: FontWeight.w600,
-                                          color: colors.text2,
+                                          color: colors.text,
                                         ),
                                       ),
                                       const SizedBox(width: 2),
                                       Icon(
-                                        Icons.expand_more_rounded,
-                                        size: 17,
+                                        Icons.unfold_more_rounded,
+                                        size: 14,
                                         color: colors.text3,
                                       ),
                                     ],
                                   ),
                                 ),
                               ),
+                              const Spacer(),
+                              Text(
+                                '月度总览',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                  color: colors.text3,
+                                ),
+                              ),
                             ],
                           ),
-                          if (monthDelta != null) ...[
-                            const SizedBox(height: 2),
-                            Text(
-                              '${monthDelta.delta >= 0 ? '↑' : '↓'} 比上月 '
-                              '${monthDelta.delta >= 0 ? '+' : ''}'
-                              '${formatHoursValue(monthDelta.delta.abs())} ${context.unit.name}'
-                              '（${monthDelta.percent >= 0 ? '+' : ''}${monthDelta.percent}%）',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w500,
-                                color: monthDelta.delta >= 0
-                                    ? colors.income
-                                    : colors.expense,
-                                fontFeatures: tabularFigures,
-                              ),
-                            ),
-                          ],
-                          const SizedBox(height: Gaps.md),
+                          const SizedBox(height: 14),
                           Row(
                             children: [
                               _MiniMetric(
                                 label: context.unit.quantity,
-                                value: formatHoursValue(hours),
-                                color: colors.accent,
+                                numericValue: summary.totalHours,
+                                formatter: (v) =>
+                                    '${formatHoursValue(v.toDouble())}${context.unit.short}',
+                                color: colors.primary,
                               ),
-                              _MiniMetric(
-                                label: '工资',
-                                value: formatAmount(pay),
-                                color: colors.income,
-                              ),
-                              _MiniMetric(
-                                label: '结余',
-                                value: formatAmount(ledger.balance),
-                                color: ledger.balance >= 0
-                                    ? colors.text
-                                    : colors.expense,
-                              ),
+                              if (!kHoursOnly) ...[
+                                _MiniMetric(
+                                  label: '工资',
+                                  numericValue: pay,
+                                  formatter: (v) => formatAmount(
+                                    v.toDouble(),
+                                    withSymbol: true,
+                                  ),
+                                  color: colors.income,
+                                ),
+                                _MiniMetric(
+                                  label: '结余',
+                                  numericValue: ledger.balance,
+                                  formatter: (v) => formatAmount(
+                                    v.toDouble(),
+                                    withSymbol: true,
+                                  ),
+                                  color: ledger.balance >= 0
+                                      ? colors.text
+                                      : colors.expense,
+                                ),
+                              ] else
+                                _MiniMetric(
+                                  label: '出勤天数',
+                                  numericValue: summary.workDays,
+                                  formatter: (v) => '${v.round()} 天',
+                                  color: colors.income,
+                                ),
                             ],
                           ),
+                          if (!kHoursOnly) ...[
+                            const SizedBox(height: 14),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 10,
+                              ),
+                              decoration: ShapeDecoration(
+                                color: colors.block.withValues(
+                                  alpha: colors.isDark ? 0.62 : 0.72,
+                                ),
+                                shape: Radii.shape(Radii.md),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Text(
+                                        '本月工资结算',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: colors.text2,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 1.5,
+                                        ),
+                                        decoration: ShapeDecoration(
+                                          color: colors.incomeSoft,
+                                          shape: Radii.pillShape,
+                                        ),
+                                        child: Text(
+                                          '${(wageRatio * 100).round()}%',
+                                          style: TextStyle(
+                                            fontSize: 10.5,
+                                            fontWeight: FontWeight.w700,
+                                            color: colors.income,
+                                            fontFeatures: tabularFigures,
+                                          ),
+                                        ),
+                                      ),
+                                      const Spacer(),
+                                      Text(
+                                        '已结 ${formatAmount(settlement.settled, withSymbol: true)}'
+                                        ' · 待结 ${formatAmount(settlement.pending, withSymbol: true)}',
+                                        style: TextStyle(
+                                          fontSize: 11.5,
+                                          color: colors.text3,
+                                          fontFeatures: tabularFigures,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  ProgressBar(
+                                    ratio: wageRatio,
+                                    color: colors.income,
+                                    height: 4.5,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),
-                    const SizedBox(height: Gaps.md),
-                    if (!kHoursOnly) ...[
-                      GlassCard(
-                        onTap: () => showWagePanel(context, month),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Text(
-                                  '本月工资',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: colors.text2,
-                                  ),
-                                ),
-                                const Spacer(),
-                                Text(
-                                  '结算明细',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: colors.text3,
-                                  ),
-                                ),
-                                Icon(
-                                  Icons.chevron_right_rounded,
-                                  size: 18,
-                                  color: colors.text3,
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                Text(
-                                  formatAmount(pay),
-                                  style: TextStyle(
-                                    fontSize: 26,
-                                    height: 1,
-                                    fontWeight: FontWeight.w700,
-                                    letterSpacing: -0.02,
-                                    color: colors.income,
-                                    fontFeatures: tabularFigures,
-                                  ),
-                                ),
-                                Padding(
-                                  padding: const EdgeInsets.only(
-                                    left: 3,
-                                    bottom: 2,
-                                  ),
-                                  child: Text(
-                                    '元',
-                                    style: TextStyle(
-                                      fontSize: TypeScale.caption,
-                                      color: colors.text2,
-                                    ),
-                                  ),
-                                ),
-                                const Spacer(),
-                                Text(
-                                  '待结算 ${formatAmount(settlement.pending)}',
-                                  style: TextStyle(
-                                    fontSize: TypeScale.caption,
-                                    color: colors.text2,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            ProgressBar(
-                              ratio: wageRatio,
-                              color: colors.income,
-                              height: 5,
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: Gaps.md),
-                      GlassCard(
-                        onTap: () => showBudgetPanel(context),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Text(
-                                  '预算与目标',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: colors.text2,
-                                  ),
-                                ),
-                                const Spacer(),
-                                Icon(
-                                  Icons.chevron_right_rounded,
-                                  size: 18,
-                                  color: colors.text3,
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            _BudgetMiniRow(
-                              label: '支出',
-                              value: ledger.expense,
-                              target: budget.monthlyExpenseBudget,
-                              ratio: budgetRatio,
-                              color: colors.expense,
-                            ),
-                            const SizedBox(height: 8),
-                            _BudgetMiniRow(
-                              label: '收入',
-                              value: ledger.income,
-                              target: budget.monthlyIncomeGoal,
-                              ratio: goalRatio,
-                              color: colors.income,
-                              invert: true,
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: Gaps.md),
-                    ],
+                    const SizedBox(height: Gaps.lg),
+                    SectionHeading(
+                      title: context.unit.id == 'hours'
+                          ? '记工与账务'
+                          : '${context.unit.quantity}与账务',
+                    ),
                     GlassCard(
-                      padding: const EdgeInsets.symmetric(vertical: Gaps.xs),
+                      padding: const EdgeInsets.symmetric(vertical: 4),
                       child: Column(
                         children: [
-                          // 容器变换：点开的不是「新页面压上来」，而是这一行
-                          // 自己长大成页面，返回时缩回原位——来路和去路同一条。
-                          OpenContainer(
-                            closedBuilder: (itemContext, open) => ListRow(
-                              title: '年度统计',
-                              subtitle: '全年${context.unit.quantity}/工资趋势、收支与分类占比',
+                          if (!kHoursOnly) ...[
+                            ListRow(
+                              title: '工作与${context.unit.rateName}',
+                              subtitle: defaultWork == null ||
+                                      defaultWork.hourlyRate <= 0
+                                  ? '未设置默认${context.unit.rateName}，点此配置'
+                                  : '${defaultWork.name} · ¥${formatRate(defaultWork.hourlyRate)}/${context.unit.rateShort}'
+                                        '${state.workProfiles.length > 1 ? '（共 ${state.workProfiles.length} 项）' : ''}',
+                              leading: AppIconBadge(
+                                icon: Icons.work_outline_rounded,
+                                color: colors.primary,
+                              ),
                               showChevron: true,
-                              onTap: open,
+                              onTap: () => showWorkManager(context),
                             ),
-                            // 条目在卡片内部，圆角由外层的 GlassCard 负责。
-                            closedShape: const RoundedRectangleBorder(),
-                            closedColor: Colors.transparent,
-                            openColor: colors.page,
-                            transitionType: ContainerTransitionType.fade,
-                            transitionDuration: Timings.slow,
-                            openBuilder: (pageContext, close) =>
-                                StatsPage(onBack: close),
+                            Divider(
+                              height: 1,
+                              color: colors.divider,
+                              indent: 64,
+                              endIndent: 16,
+                            ),
+                            ListRow(
+                              title: '工资结算明细',
+                              subtitle: settlement.pending > 0
+                                  ? '还有 ${formatAmount(settlement.pending, withSymbol: true)} 待结算'
+                                  : '批量标记已结算并同步入账',
+                              leading: AppIconBadge(
+                                icon: Icons.payments_outlined,
+                                color: colors.income,
+                              ),
+                              showChevron: true,
+                              onTap: () => showWagePanel(context, month),
+                            ),
+                            Divider(
+                              height: 1,
+                              color: colors.divider,
+                              indent: 64,
+                              endIndent: 16,
+                            ),
+                            ListRow(
+                              title: '预算与月目标',
+                              subtitle: budget.monthlyExpenseBudget > 0
+                                  ? '月支出预算 ${formatAmount(budget.monthlyExpenseBudget, withSymbol: true)}'
+                                  : '设置月支出上限与收入目标',
+                              leading: AppIconBadge(
+                                icon: Icons.track_changes_rounded,
+                                color: colors.warning,
+                              ),
+                              showChevron: true,
+                              onTap: () => showBudgetPanel(context),
+                            ),
+                            Divider(
+                              height: 1,
+                              color: colors.divider,
+                              indent: 64,
+                              endIndent: 16,
+                            ),
+                            ListRow(
+                              title: '账目分类管理',
+                              subtitle: '管理自定义收支分类',
+                              leading: const AppIconBadge(
+                                icon: Icons.sell_outlined,
+                                color: Color(0xFFAF52DE),
+                              ),
+                              showChevron: true,
+                              onTap: () => showCategoryManager(context),
+                            ),
+                          ] else
+                            ListRow(
+                              title: '工作类型管理',
+                              subtitle: '共 ${state.workProfiles.length} 项工作',
+                              leading: AppIconBadge(
+                                icon: Icons.work_outline_rounded,
+                                color: colors.primary,
+                              ),
+                              showChevron: true,
+                              onTap: () => showWorkManager(context),
+                            ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: Gaps.lg),
+                    const SectionHeading(title: '数据与安全'),
+                    GlassCard(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Column(
+                        children: [
+                          ListRow(
+                            title: '数据与备份',
+                            subtitle: 'JSON 备份导出、恢复与自动快照',
+                            leading: const AppIconBadge(
+                              icon: Icons.inventory_2_outlined,
+                              color: Color(0xFF5856D6),
+                            ),
+                            showChevron: true,
+                            onTap: () => _openSubpage(
+                              context,
+                              (close) => BackupPage(onBack: close),
+                            ),
                           ),
                           Divider(
                             height: 1,
                             color: colors.divider,
-                            indent: 16,
-                            endIndent: 16,
-                          ),
-                          OpenContainer(
-                            closedBuilder: (itemContext, open) => ListRow(
-                              title: '数据与备份',
-                              subtitle: '导出 / 导入 / 迁移对账',
-                              showChevron: true,
-                              onTap: open,
-                            ),
-                            closedShape: const RoundedRectangleBorder(),
-                            closedColor: Colors.transparent,
-                            openColor: colors.page,
-                            transitionType: ContainerTransitionType.fade,
-                            transitionDuration: Timings.slow,
-                            openBuilder: (pageContext, close) => BackupPage(onBack: close),
-                          ),
-                          Divider(
-                            height: 1,
-                            color: colors.divider,
-                            indent: 16,
-                            endIndent: 16,
-                          ),
-                          OpenContainer(
-                            closedBuilder: (itemContext, open) => ListRow(
-                              title: '主题与外观',
-                              subtitle: '主题色、液态玻璃、底栏与文本缩放',
-                              showChevron: true,
-                              onTap: open,
-                            ),
-                            closedShape: const RoundedRectangleBorder(),
-                            closedColor: Colors.transparent,
-                            openColor: colors.page,
-                            transitionType: ContainerTransitionType.fade,
-                            transitionDuration: Timings.slow,
-                            openBuilder: (pageContext, close) => ThemePage(onBack: close),
-                          ),
-                          Divider(
-                            height: 1,
-                            color: colors.divider,
-                            indent: 16,
+                            indent: 64,
                             endIndent: 16,
                           ),
                           ListRow(
-                            title: '分类管理',
-                            subtitle: '默认分类与自定义分类',
-                            showChevron: true,
-                            onTap: () => showCategoryManager(context),
-                          ),
-                          Divider(
-                            height: 1,
-                            color: colors.divider,
-                            indent: 16,
-                            endIndent: 16,
-                          ),
-                          OpenContainer(
-                            closedBuilder: (itemContext, open) => ListRow(
-                              title: '使用设置',
-                              subtitle: '深色模式、大字、动效、清空数据',
-                              showChevron: true,
-                              onTap: open,
+                            title: '导出月度报表',
+                            subtitle: '生成 CSV 表格分享或归档',
+                            leading: const AppIconBadge(
+                              icon: Icons.download_rounded,
+                              color: Color(0xFF0EA5E9),
                             ),
-                            closedShape: const RoundedRectangleBorder(),
-                            closedColor: Colors.transparent,
-                            openColor: colors.page,
-                            transitionType: ContainerTransitionType.fade,
-                            transitionDuration: Timings.slow,
-                            openBuilder: (pageContext, close) => SettingsPage(
-                              onBack: close,
-                              largeText: largeText,
-                              onLargeTextChanged: onLargeTextChanged,
+                            showChevron: true,
+                            onTap: () => showExportSheet(
+                              context,
+                              month: month,
+                              records: state.records,
+                              entries: state.entries,
+                              includeLedger: !kHoursOnly,
                             ),
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: Gaps.xxl),
+                    const SizedBox(height: Gaps.lg),
+                    const SectionHeading(title: '个性化与系统'),
+                    GlassCard(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Column(
+                        children: [
+                          ListRow(
+                            title: '主题与外观',
+                            subtitle: '主题色彩、深色模式与字体缩放',
+                            leading: const AppIconBadge(
+                              icon: Icons.palette_outlined,
+                              color: Color(0xFFEC4899),
+                            ),
+                            showChevron: true,
+                            onTap: () => _openSubpage(
+                              context,
+                              (close) => ThemePage(onBack: close),
+                            ),
+                          ),
+                          Divider(
+                            height: 1,
+                            color: colors.divider,
+                            indent: 64,
+                            endIndent: 16,
+                          ),
+                          ListRow(
+                            title: '使用设置',
+                            subtitle: '计量单位、实时通知、动效与重置',
+                            leading: const AppIconBadge(
+                              icon: Icons.tune_rounded,
+                              color: Color(0xFF64748B),
+                            ),
+                            showChevron: true,
+                            onTap: () => _openSubpage(
+                              context,
+                              (close) => SettingsPage(onBack: close),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: Gaps.xl),
+                    Center(
+                      child: Text(
+                        '时页 TIMEPAGE · 1.7.6 · 数据完全本地保存',
+                        style: TextStyle(fontSize: 11.5, color: colors.text3),
+                      ),
+                    ),
+                    const SizedBox(height: Gaps.sm),
                   ],
                 ),
               ),
@@ -402,25 +437,26 @@ class MyView extends ConsumerWidget {
             title: '我的',
             actions: [
               HeaderGlassSurface(
-                height: 30,
-                radius: 15,
+                height: 40,
+                radius: Radii.pill,
                 bright: true,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 9,
-                  vertical: 7.5,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
-                      Icons.cloud_off_rounded,
-                      size: 13,
-                      color: colors.text2,
+                      Icons.lock_outline_rounded,
+                      size: 14,
+                      color: colors.income,
                     ),
-                    const SizedBox(width: 4),
+                    const SizedBox(width: 5),
                     Text(
                       '仅本机',
-                      style: TextStyle(fontSize: 11, color: colors.text2),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: colors.text,
+                      ),
                     ),
                   ],
                 ),
@@ -431,18 +467,33 @@ class MyView extends ConsumerWidget {
       ],
     );
   }
+}
 
+void _openSubpage(
+  BuildContext context,
+  Widget Function(VoidCallback close) builder,
+) {
+  final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+  Navigator.of(context).push(
+    AppCardPageRoute<void>(
+      disableAnimations: disable,
+      builder: (pageContext) =>
+          builder(() => Navigator.of(pageContext).maybePop()),
+    ),
+  );
 }
 
 class _MiniMetric extends StatelessWidget {
   const _MiniMetric({
     required this.label,
-    required this.value,
+    required this.numericValue,
+    required this.formatter,
     required this.color,
   });
 
   final String label;
-  final String value;
+  final num numericValue;
+  final String Function(num value) formatter;
   final Color color;
 
   @override
@@ -452,77 +503,24 @@ class _MiniMetric extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: TextStyle(fontSize: TypeScale.caption, color: colors.text2)),
-          const SizedBox(height: 2),
+          Text(label, style: TextStyle(fontSize: 11.5, color: colors.text3)),
+          const SizedBox(height: 3),
           FittedBox(
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerLeft,
-            child: Text(
-              value,
+            child: AnimatedNumericText(
+              value: numericValue,
+              formatter: formatter,
               style: TextStyle(
-                fontSize: 20,
+                fontSize: 19,
                 fontWeight: FontWeight.w700,
-                letterSpacing: -0.02,
+                letterSpacing: -0.3,
                 color: color,
-                fontFeatures: tabularFigures,
               ),
             ),
           ),
         ],
       ),
-    );
-  }
-}
-
-class _BudgetMiniRow extends StatelessWidget {
-  const _BudgetMiniRow({
-    required this.label,
-    required this.value,
-    required this.target,
-    required this.ratio,
-    required this.color,
-    this.invert = false,
-  });
-
-  final String label;
-  final double value;
-  final double target;
-  final double ratio;
-  final Color color;
-  final bool invert;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
-    final hasTarget = target > 0;
-    final reached = invert ? ratio >= 1 : ratio > 1;
-    return Column(
-      children: [
-        Row(
-          children: [
-            Text(label, style: TextStyle(fontSize: 12, color: colors.text2)),
-            const Spacer(),
-            Text(
-              hasTarget
-                  ? '${formatAmount(value)} / ${formatAmount(target)}'
-                  : '未设置',
-              style: TextStyle(
-                fontSize: TypeScale.caption,
-                color: reached ? color : colors.text2,
-                fontFeatures: tabularFigures,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        ProgressBar(
-          ratio: hasTarget ? ratio : 0,
-          // 未达成时用本行语义色的半透明：预算条跟随「支出/收入」，
-          // 不要用品牌蓝——亮蓝在整页里看起来像可点击的主操作。
-          color: reached ? color : color.withValues(alpha: 0.5),
-          height: 5,
-        ),
-      ],
     );
   }
 }

@@ -4,10 +4,12 @@
 library;
 
 import 'measure_unit.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'dashboard_layout.dart';
 import 'theme_tokens.dart';
 
 enum AppDockStyle { floating, fixed }
@@ -32,15 +34,29 @@ class AppSettings extends ChangeNotifier {
   static const _kWelcomeSeen = 'my-hours.welcomeSeen';
   static const _kBrandWelcomeSeen = 'my-hours.brandWelcomeSeen';
   static const _kAccent = 'my-hours.accent';
+  static const _kAccentPalette = 'my-hours.accentPalette';
   static const _kPureBlack = 'my-hours.pureBlack';
   static const _kColorStyle = 'my-hours.colorStyle';
   static const _kDockStyle = 'my-hours.dockStyle';
   static const _kTabTransition = 'my-hours.tabTransition';
   static const _kGlassPreference = 'my-hours.glassPreference';
+  static const _kFontFamily = 'my-hours.fontFamily';
   static const _kCustomTextScale = 'my-hours.customTextScale';
   static const _kFollowSystemText = 'my-hours.followSystemText';
   static const _kUnit = 'my-hours.unit';
   static const _kTimer = 'my-hours.timer';
+  static const _kDashboardCards = 'my-hours.dashboardCards';
+
+  static const Color defaultAccentColor = Color(0xFF007AFF);
+
+  static const List<Color> defaultAccentPalette = [
+    Color(0xFF007AFF),
+    Color(0xFF8B5CF6),
+    Color(0xFF10B981),
+    Color(0xFFF59E0B),
+    Color(0xFFEC4899),
+    Color(0xFF64748B),
+  ];
 
   static Future<AppSettings> load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -65,6 +81,19 @@ class AppSettings extends ChangeNotifier {
 
   Future<void> setMeasureUnit(MeasureUnit unit) async {
     await _prefs.setString(_kUnit, unit.id);
+    notifyListeners();
+  }
+
+  /// 首页月汇总卡的顺序；今日概览和日历固定，不在此列表。
+  List<String> get dashboardCards => DashboardCardIds.sanitize(
+    _prefs.getStringList(_kDashboardCards) ?? DashboardCardIds.defaults,
+  );
+
+  Future<void> setDashboardCards(List<String> cards) async {
+    await _prefs.setStringList(
+      _kDashboardCards,
+      DashboardCardIds.sanitize(cards),
+    );
     notifyListeners();
   }
 
@@ -110,13 +139,126 @@ class AppSettings extends ChangeNotifier {
       final value = int.tryParse(hex, radix: 16);
       if (value != null) return Color(0xFF000000 | value);
     }
-    return const Color(0xFF2563EB);
+    return defaultAccentColor;
   }
 
   Future<void> setAccentColor(Color color) async {
-    final hex = (color.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0');
-    await _prefs.setString(_kAccent, '#$hex');
+    await _prefs.setString(_kAccent, _encodeHex(color));
     notifyListeners();
+  }
+
+  /// 主题页展示的色板（包含用户新增与编辑过的自定义色）。
+  List<Color> get accentPalette {
+    final stored = _prefs.getStringList(_kAccentPalette);
+    if (stored == null || stored.isEmpty) {
+      final current = accentColor;
+      final hasCurrent = defaultAccentPalette.any(
+        (item) => item.toARGB32() == current.toARGB32(),
+      );
+      return hasCurrent
+          ? List<Color>.of(defaultAccentPalette)
+          : [...defaultAccentPalette, current];
+    }
+    final parsed = <Color>[];
+    final seen = <int>{};
+    for (final raw in stored) {
+      final color = _decodeHex(raw);
+      if (color != null && seen.add(color.toARGB32())) {
+        parsed.add(color);
+      }
+    }
+    return parsed.isEmpty ? List<Color>.of(defaultAccentPalette) : parsed;
+  }
+
+  bool get isDefaultThemeColor {
+    if (accentColor.toARGB32() != defaultAccentColor.toARGB32()) return false;
+    if (colorStyle != AppColorStyle.vivid) return false;
+    final current = accentPalette;
+    if (current.length != defaultAccentPalette.length) return false;
+    for (var i = 0; i < current.length; i++) {
+      if (current[i].toARGB32() != defaultAccentPalette[i].toARGB32()) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  Future<void> addAccentColor(Color color) async {
+    final next = List<Color>.of(accentPalette);
+    final rgb = color.toARGB32() | 0xFF000000;
+    final normalized = Color(rgb);
+    if (!next.any((item) => item.toARGB32() == rgb)) {
+      next.add(normalized);
+    }
+    await _prefs.setStringList(
+      _kAccentPalette,
+      [for (final item in next) _encodeHex(item)],
+    );
+    await _prefs.setString(_kAccent, _encodeHex(normalized));
+    notifyListeners();
+  }
+
+  Future<void> editAccentColor(Color oldColor, Color newColor) async {
+    final oldRgb = oldColor.toARGB32() | 0xFF000000;
+    final newRgb = newColor.toARGB32() | 0xFF000000;
+    final normalized = Color(newRgb);
+    final next = List<Color>.of(accentPalette);
+    final index = next.indexWhere((item) => item.toARGB32() == oldRgb);
+    if (index == -1) {
+      await addAccentColor(normalized);
+      return;
+    }
+    if (oldRgb == newRgb) return;
+    if (next.any((item) => item.toARGB32() == newRgb)) {
+      next.removeAt(index);
+    } else {
+      next[index] = normalized;
+    }
+    await _prefs.setStringList(
+      _kAccentPalette,
+      [for (final item in next) _encodeHex(item)],
+    );
+    if (accentColor.toARGB32() == oldRgb) {
+      await _prefs.setString(_kAccent, _encodeHex(normalized));
+    }
+    notifyListeners();
+  }
+
+  Future<void> removeAccentColor(Color color) async {
+    final rgb = color.toARGB32() | 0xFF000000;
+    final next = List<Color>.of(accentPalette)
+      ..removeWhere((item) => item.toARGB32() == rgb);
+    if (next.isEmpty) return;
+    await _prefs.setStringList(
+      _kAccentPalette,
+      [for (final item in next) _encodeHex(item)],
+    );
+    if (accentColor.toARGB32() == rgb) {
+      final fallback = next.any(
+        (item) => item.toARGB32() == defaultAccentColor.toARGB32(),
+      )
+          ? defaultAccentColor
+          : next.first;
+      await _prefs.setString(_kAccent, _encodeHex(fallback));
+    }
+    notifyListeners();
+  }
+
+  Future<void> resetThemeColors() async {
+    await _prefs.remove(_kAccentPalette);
+    await _prefs.setString(_kAccent, _encodeHex(defaultAccentColor));
+    await _prefs.setString(_kColorStyle, 'vivid');
+    notifyListeners();
+  }
+
+  static String _encodeHex(Color color) =>
+      '#${(color.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase()}';
+
+  static Color? _decodeHex(String raw) {
+    final hex = raw.trim().replaceFirst('#', '');
+    if (hex.length != 6) return null;
+    final value = int.tryParse(hex, radix: 16);
+    return value == null ? null : Color(0xFF000000 | value);
   }
 
   bool get pureBlack => _prefs.getBool(_kPureBlack) ?? false;
@@ -189,6 +331,18 @@ class AppSettings extends ChangeNotifier {
       AppGlassPreference.extreme => 'extreme',
     };
     await _prefs.setString(_kGlassPreference, stored);
+    notifyListeners();
+  }
+
+  /// 应用内字体族。空字符串/null 表示跟随系统默认字体。
+  String get fontFamily => _prefs.getString(_kFontFamily) ?? '';
+
+  Future<void> setFontFamily(String value) async {
+    if (value.isEmpty) {
+      await _prefs.remove(_kFontFamily);
+    } else {
+      await _prefs.setString(_kFontFamily, value);
+    }
     notifyListeners();
   }
 

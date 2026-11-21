@@ -9,6 +9,7 @@
 library;
 
 import 'package:flutter/animation.dart';
+import 'package:flutter/physics.dart';
 
 /// 动效纪律（改动画前先读这里）
 ///
@@ -76,6 +77,70 @@ abstract final class Curves2 {
 
   /// 跑马灯、进度、循环。
   static const Curve linear = Curves.linear;
+}
+
+/// 在固定时间窗口内采样弹簧仿真，并把尾部极小残差线性收拢到精确 1.0。
+class SpringCurve extends Curve {
+  SpringCurve(
+    SpringDescription spring, {
+    required this.seconds,
+    double velocity = 0,
+  }) : _simulation = SpringSimulation(spring, 0, 1, velocity);
+
+  final double seconds;
+  final SpringSimulation _simulation;
+
+  late final double _residual = 1.0 - _simulation.x(seconds);
+
+  @override
+  double transformInternal(double t) =>
+      _simulation.x(t * seconds) + _residual * t;
+}
+
+/// 对齐 FlClash v0.9.4 的实测物理弹簧与转场参数。
+abstract final class FlClashSprings {
+  /// 路由推入 / 弹出：临界阻尼 300ms 弹簧，初速 9× 距离/秒。
+  static final SpringDescription push = SpringDescription.withDurationAndBounce(
+    duration: const Duration(milliseconds: 300),
+  );
+  static const double pushLaunchSpeed = 9.0;
+  static final Curve pushCurve = SpringCurve(
+    push,
+    seconds: 0.32,
+    velocity: pushLaunchSpeed,
+  );
+  static const double coveredSlideFraction = 0.30;
+  static const double coveredDimAlpha = 0.10;
+
+  /// 居中确认弹窗：275ms 临界阻尼弹簧，在 404ms 内收稳；入场 1.2 → 1.0。
+  static final SpringDescription alert =
+      SpringDescription.withDurationAndBounce(
+        duration: const Duration(milliseconds: 275),
+      );
+  static const double alertEntryScale = 1.20;
+  static final Curve alertCurve = SpringCurve(alert, seconds: 0.40);
+
+  /// 顶栏搜索展开 / 收起弹簧。
+  static final SpringDescription searchOpen = SpringDescription.withDampingRatio(
+    mass: 1,
+    stiffness: 390,
+    ratio: 0.75,
+  );
+  static final SpringDescription searchClose =
+      SpringDescription.withDampingRatio(
+        mass: 1,
+        stiffness: 600,
+        ratio: 0.75,
+      );
+  static final Curve searchOpenCurve = SpringCurve(searchOpen, seconds: 0.45);
+  static final Curve searchCloseCurve = SpringCurve(searchClose, seconds: 0.25);
+
+  /// 液滴形变弹簧（菜单回位、色块微弹）。
+  static final SpringDescription droplet = SpringDescription.withDampingRatio(
+    mass: 1,
+    stiffness: 165,
+    ratio: 0.80,
+  );
 }
 
 /// 统一入口：把时长折叠为 0（系统「移除动画」或应用内关闭动效）。

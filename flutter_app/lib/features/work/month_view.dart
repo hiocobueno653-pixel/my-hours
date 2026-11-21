@@ -1,9 +1,15 @@
+import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/dashboard_layout.dart';
 import '../../core/formatters.dart';
+import '../../core/measure_unit.dart';
 import '../../core/motion.dart';
+import '../../core/settings.dart';
 import '../../core/theme_tokens.dart';
 import '../../data/constants.dart';
 import '../../data/dates.dart';
@@ -13,21 +19,21 @@ import '../../data/records.dart';
 import '../../state/app_controller.dart';
 import '../../ui/dialog.dart';
 import '../../ui/export_sheet.dart';
+import '../../ui/glass_menu.dart';
 import '../../ui/month_picker.dart';
 import '../../ui/pinned_header.dart';
 import '../../ui/sheet.dart';
 import '../../ui/widgets.dart';
 import '../ledger/ledger_view.dart';
+import 'budget_panel.dart';
 import 'month_detail.dart';
 import 'wage_panel.dart';
 import 'work_bento_header.dart';
-import '../../core/measure_unit.dart';
 
-/// 记工页：今天卡 + 月汇总 + 日历。
+/// 工时主页：今日一体工作台 + 月汇总条 + 可交互月历 + 选中日就地详情。
 class MonthView extends ConsumerStatefulWidget {
   const MonthView({super.key, this.onOpenLedger});
 
-  /// 「记一笔」跳到记账页并预填日期（只记工时变体为 null）。
   final void Function(String date)? onOpenLedger;
 
   @override
@@ -37,12 +43,15 @@ class MonthView extends ConsumerStatefulWidget {
 class _MonthViewState extends ConsumerState<MonthView> {
   int _calendarDirection = 1;
   bool _dayFlowOpen = false;
+  String? _selectedDate;
+  bool _editingLayout = false;
 
   void _changeMonth(String next, {int? direction}) {
     final current = ref.read(selectedMonthProvider);
     if (next == current) return;
     setState(() {
       _calendarDirection = direction ?? (next.compareTo(current) < 0 ? -1 : 1);
+      _selectedDate = null;
     });
     ref.read(selectedMonthProvider.notifier).setMonth(next);
   }
@@ -52,14 +61,12 @@ class _MonthViewState extends ConsumerState<MonthView> {
     _changeMonth(shiftMonth(current, direction), direction: direction);
   }
 
-  void _quickSaveToday(double deltaOrSet) {
+  void _quickSaveToday(double value, {bool replace = false}) {
     final state = ref.read(appControllerProvider);
     final date = todayISO();
     final record = getRecordByDate(state.records, date);
     if (record?.settled == true) return;
-    final nextHours = record == null
-        ? deltaOrSet
-        : (deltaOrSet == 8 ? 8.0 : record.hours + deltaOrSet);
+    final nextHours = replace ? value : (record?.hours ?? 0) + value;
     ref
         .read(appControllerProvider.notifier)
         .saveDay(
@@ -71,16 +78,17 @@ class _MonthViewState extends ConsumerState<MonthView> {
           fixedPay: record?.fixedPay,
           settled: false,
         );
+    setState(() => _selectedDate = date);
   }
 
-  Future<void> _openDay(String date) async {
+  Future<void> _openDay(String date, {bool directEdit = false}) async {
     if (_dayFlowOpen) return;
     _dayFlowOpen = true;
     try {
       final state = ref.read(appControllerProvider);
       final record = getRecordByDate(state.records, date);
-      if (record == null) {
-        await showDayEditor(context, date);
+      if (record == null || directEdit) {
+        await showDayEditor(context, date, record: record);
       } else {
         final edit = await showDayDetail(context, record);
         if (edit == true && mounted) {
@@ -92,25 +100,67 @@ class _MonthViewState extends ConsumerState<MonthView> {
     }
   }
 
+  String _resolveSelectedDate(
+    String month,
+    String today,
+    List<MonthDay> dates,
+    Map<String, WorkDayRecord> recordsByDate,
+  ) {
+    final current = _selectedDate;
+    if (current != null && current.startsWith('$month-')) return current;
+    if (today.startsWith('$month-')) return today;
+    if (recordsByDate.isNotEmpty) {
+      final sorted = recordsByDate.keys.toList()..sort();
+      return sorted.last;
+    }
+    return dates.isNotEmpty ? dates.first.date : today;
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final records = ref.watch(appControllerProvider.select((s) => s.records));
-    final entries = ref.watch(appControllerProvider.select((s) => s.entries));
-    final profiles = ref.watch(
-      appControllerProvider.select((s) => s.workProfiles),
-    );
+    AppSettings? settings;
+    try {
+      settings = ref.read(settingsProvider);
+    } on Object {
+      settings = null;
+    }
+    if (settings != null) {
+      final listenable = settings;
+      return ListenableBuilder(
+        listenable: listenable,
+        builder: (context, _) =>
+            _buildContent(context, colors, listenable, listenable.dashboardCards),
+      );
+    }
+    return _buildContent(context, colors, null, DashboardCardIds.defaults);
+  }
+
+  Widget _buildContent(
+    BuildContext context,
+    AppColors colors,
+    AppSettings? settings,
+    List<String> dashboardCards,
+  ) {
+    final records = ref.watch(recordsProvider);
+    final entries = ref.watch(entriesProvider);
+    final profiles = ref.watch(workProfilesProvider);
     final month = ref.watch(selectedMonthProvider);
     final today = todayISO();
     final todayRecord = getRecordByDate(records, today);
     final summary = ref.watch(currentMonthWorkSummaryProvider);
-    final monthPay = getMonthPay(records, month, profiles);
-    final settlement = getSettlementSummary(records, month, profiles);
-    final monthDelta = getMonthDelta(records, month);
-    final todayEntries = [
-      for (final entry in entries)
-        if (entry.date == today) entry,
-    ];
+    final monthWork = ref.watch(currentMonthWorkViewDataProvider);
+    final monthLedger = ref.watch(currentMonthLedgerViewDataProvider);
+    final monthPay = monthWork.monthPay;
+    final settlement = monthWork.settlement;
+    final monthDelta = monthWork.monthDelta;
+    final ledgerSummary = monthLedger.summary;
+    final todayEntries = month == currentMonthKey()
+        ? (monthLedger.entriesByDate[today] ?? const <LedgerEntry>[])
+        : [
+            for (final entry in entries)
+              if (entry.date == today) entry,
+          ];
     var todayIncome = 0.0;
     var todayExpense = 0.0;
     for (final entry in todayEntries) {
@@ -126,105 +176,139 @@ class _MonthViewState extends ConsumerState<MonthView> {
               '${monthDelta.delta >= 0 ? '+' : ''}'
               '${formatHoursValue(monthDelta.delta.abs())} ${context.unit.name}'
               '（${monthDelta.percent >= 0 ? '+' : ''}${monthDelta.percent}%）';
-    final dates = getMonthDates(month);
-    // 真实工作日数（周一至周五）。硬编码 22 会让百分比偏离实际值。
-    // 用 parseMonthKey 而不是 substring + int.parse：后者遇到 `999-12`
-    // 这类异常月份键会在 substring(0, 4) 上抛 FormatException，直接打挂整页。
-    final parsedMonth = parseMonthKey(month);
-    final workdays = parsedMonth == null
-        ? 0
-        : workdaysInMonth(parsedMonth.year, parsedMonth.month);
-    // 记了工时却算不出钱的天数：只可能是缺时薪（或时长与日薪都为 0）。
-    final underpaidDays = [
-      for (final record in getMonthRecords(records, month))
-        if (record.hours > 0 && recordPay(record, profiles) <= 0) record,
-    ].length;
-    final recordsByDate = {
-      for (final record in records)
-        if (record.date.startsWith('$month-')) record.date: record,
-    };
-    final entriesByDate = <String, List<LedgerEntry>>{};
-    for (final entry in entries) {
-      if (!entry.date.startsWith('$month-')) continue;
-      entriesByDate.putIfAbsent(entry.date, () => []).add(entry);
-    }
+    final dates = monthWork.dates;
+    final workdays = monthWork.workdays;
+    final underpaidDays = monthWork.underpaidDays;
+    final recordsByDate = monthWork.recordsByDate;
+    final entriesByDate = monthLedger.entriesByDate;
+    final activeDate = _resolveSelectedDate(
+      month,
+      today,
+      dates,
+      recordsByDate,
+    );
+    final activeRecord = recordsByDate[activeDate];
+    final activeEntries = entriesByDate[activeDate] ?? const <LedgerEntry>[];
 
     return Stack(
       children: [
         Positioned.fill(
           child: ListView(
+            physics: const BouncingScrollPhysics(
+              parent: AlwaysScrollableScrollPhysics(),
+            ),
             padding: EdgeInsets.only(
-              top: PinnedHeader.totalHeight(context) + 8,
+              top: PinnedHeader.totalHeight(context) + 12,
               bottom: pageBottomInset(context),
             ),
             children: [
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: Gaps.lg),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     if (month != currentMonthKey()) ...[
-                      // 历史月份：提示条在前，卡片仍在——不再整块顶掉上面。
                       _PastMonthBanner(
                         month: month,
                         onTap: () => _changeMonth(currentMonthKey()),
                       ),
                       const SizedBox(height: Gaps.sm),
                     ],
-                    ...[
-                      WorkBentoHeader(showToday: month == currentMonthKey(),
-                        date: today,
-                        record: todayRecord,
-                        profiles: profiles,
-                        income: todayIncome,
-                        expense: todayExpense,
-                        entryCount: todayEntries.length,
-                        summary: summary,
-                        monthPay: monthPay,
-                        settlement: settlement,
-                        workdays: workdays,
-                        onOpenLedger: widget.onOpenLedger == null
-                            ? null
-                            : () => widget.onOpenLedger!(today),
-                        onOpenToday: () => _openDay(today),
-                        onQuickHours: _quickSaveToday,
-                        onOpenMonthDetail: () =>
-                            showMonthDetail(context, month),
-                        onOpenWage: () => showWagePanel(context, month),
-                        deltaText: deltaText,
-                        deltaColor: monthDelta != null && monthDelta.delta >= 0
-                            ? colors.income
-                            : colors.expense,
-                      ),
-                      if (month == currentMonthKey() && todayEntries.isNotEmpty) ...[
-                        const SizedBox(height: Gaps.sm),
-                        _TodayLedgerCard(entries: todayEntries),
-                      ],
-                    ],
-                    // 有工时却没算出工资 = 记录缺时薪。不提示的话用户只会看到
-                    // 一个恒为 0 的「本月工资」，很难自己想明白是缺时薪。
-                    // 只记工时变体没有工资概念，不提示。
-                    if (!kHoursOnly && underpaidDays > 0)
-                      Padding(
-                        padding: const EdgeInsets.only(top: Gaps.md),
-                        child: _MissingRateHint(
-                          days: underpaidDays,
-                          onTap: () => showWorkManager(context),
-                        ),
-                      ),
-                    const SizedBox(height: Gaps.md),
-                    _SwipeableCalendar(
-                      month: month,
-                      dates: dates,
-                      records: recordsByDate,
-                      entriesByDate: entriesByDate,
-                      today: today,
-                      direction: _calendarDirection,
-                      onTapDate: _openDay,
-                      onOpenDetail: () => showMonthDetail(context, month),
-                      onShift: _shiftMonth,
+                    if (_editingLayout && settings != null)
+                      _DashboardLayoutEditor(
+                        cards: dashboardCards,
+                        labelOf: (id) => _dashboardCardLabel(context, id),
+                        onChanged: (next) {
+                          unawaited(settings.setDashboardCards(next));
+                          if (mounted) setState(() {});
+                        },
+                        onDone: () => setState(() => _editingLayout = false),
+                      )
+                    else
+                      RepaintBoundary(
+                        child: WorkBentoHeader(
+                      showToday: month == currentMonthKey(),
+                      date: today,
+                      record: todayRecord,
+                      profiles: profiles,
+                      income: todayIncome,
+                      expense: todayExpense,
+                      entryCount: todayEntries.length,
+                      summary: summary,
+                      ledgerSummary: ledgerSummary,
+                      cards: dashboardCards,
+                      todayEntries: todayEntries,
+                      monthPay: monthPay,
+                      settlement: settlement,
+                      workdays: workdays,
+                      onOpenLedger: kHoursOnly
+                          ? null
+                          : () => showLedgerEditor(context, presetDate: today),
+                      onOpenToday: () => _openDay(today),
+                      onQuickAmount: _quickSaveToday,
+                      onOpenMonthDetail: () => showMonthDetail(context, month),
+                      onOpenWage: () => showWagePanel(context, month),
+                      onOpenWorkManager: () => showWorkManager(context),
+                      deltaText: deltaText,
+                      deltaColor: monthDelta != null && monthDelta.delta >= 0
+                          ? colors.income
+                          : colors.expense,
                     ),
-                    const SizedBox(height: Gaps.xxl),
+                      ),
+                    if (!kHoursOnly && underpaidDays > 0) ...[
+                      const SizedBox(height: Gaps.cardGap),
+                      _MissingRateHint(
+                        days: underpaidDays,
+                        onTap: () => showWorkManager(context),
+                      ),
+                    ],
+                    const SizedBox(height: Gaps.cardGap),
+                    RepaintBoundary(
+                      child: _SwipeableCalendar(
+                        month: month,
+                        dates: dates,
+                        records: recordsByDate,
+                        entriesByDate: entriesByDate,
+                        today: today,
+                        selectedDate: activeDate,
+                        direction: _calendarDirection,
+                        onTapDate: (date) {
+                          HapticFeedback.selectionClick();
+                          if (date == activeDate) {
+                            _openDay(date);
+                          } else {
+                            setState(() => _selectedDate = date);
+                          }
+                        },
+                        onLongPressDate: (date, globalPos) =>
+                            _showDayContextMenu(
+                              context,
+                              date: date,
+                              record: recordsByDate[date],
+                              globalPosition: globalPos,
+                            ),
+                        onOpenDetail: () => showMonthDetail(context, month),
+                        onShift: _shiftMonth,
+                      ),
+                    ),
+                    const SizedBox(height: Gaps.cardGap),
+                    _SelectedDayCard(
+                      date: activeDate,
+                      isToday: activeDate == today,
+                      record: activeRecord,
+                      entries: activeEntries,
+                      profiles: profiles,
+                      onEdit: () => _openDay(activeDate, directEdit: true),
+                      onDetail: activeRecord == null
+                          ? null
+                          : () => _openDay(activeDate),
+                      onAddLedger: kHoursOnly
+                          ? null
+                          : () => showLedgerEditor(
+                              context,
+                              presetDate: activeDate,
+                            ),
+                    ),
                   ],
                 ),
               ),
@@ -236,9 +320,38 @@ class _MonthViewState extends ConsumerState<MonthView> {
           left: 0,
           right: 0,
           child: PinnedHeader(
-            title: '计时',
+            title: context.unit.quantity,
+            animateTitle: true,
+            titleHint: '长按切换计量单位',
+            onTitleLongPress: settings == null
+                ? null
+                : (pos) => _showUnitMenu(context, settings, pos),
             actions: [
-              _MonthSwitch(
+              if (_editingLayout)
+                Pressable(
+                  onTap: () => setState(() => _editingLayout = false),
+                  shape: Radii.pillShape,
+                  pressedScale: 0.94,
+                  child: Container(
+                    height: 36,
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    alignment: Alignment.center,
+                    decoration: ShapeDecoration(
+                      color: colors.primary,
+                      shape: Radii.pillShape,
+                    ),
+                    child: Text(
+                      '完成',
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w600,
+                        color: colors.onPrimary,
+                      ),
+                    ),
+                  ),
+                )
+              else ...[
+              MonthSwitchPill(
                 month: month,
                 onChanged: _changeMonth,
                 onPick: () async {
@@ -251,126 +364,205 @@ class _MonthViewState extends ConsumerState<MonthView> {
                   }
                 },
               ),
-              BarActionButton(
-                icon: Icons.download_rounded,
-                tooltip: '导出本月数据',
-                bright: true,
-                onTap: () => showExportSheet(
-                  context,
-                  month: month,
-                  records: records,
-                  entries: entries,
-                  includeLedger: !kHoursOnly,
-                ),
+              GlassMenuButton(
+                tooltip: '更多操作',
+                items: [
+                  GlassMenuAction(
+                    label: '导出本月数据',
+                    icon: Icons.download_rounded,
+                    onSelected: () => showExportSheet(
+                      context,
+                      month: month,
+                      records: records,
+                      entries: entries,
+                      includeLedger: !kHoursOnly,
+                    ),
+                  ),
+                  if (!kHoursOnly)
+                    GlassMenuAction(
+                      label: '快速记一笔账',
+                      icon: Icons.add_card_rounded,
+                      onSelected: () =>
+                          showLedgerEditor(context, presetDate: activeDate),
+                    ),
+                  GlassMenuAction(
+                    label: '工作与${context.unit.rateName}',
+                    icon: Icons.work_outline_rounded,
+                    dividerBefore: true,
+                    sectionTitle: '快捷管理',
+                    onSelected: () => showWorkManager(context),
+                  ),
+                  if (!kHoursOnly) ...[
+                    GlassMenuAction(
+                      label: '工资结算明细',
+                      icon: Icons.payments_outlined,
+                      onSelected: () => showWagePanel(context, month),
+                    ),
+                    GlassMenuAction(
+                      label: '预算与月目标',
+                      icon: Icons.track_changes_rounded,
+                      onSelected: () => showBudgetPanel(context),
+                    ),
+                  ],
+                  if (settings != null)
+                    GlassMenuAction(
+                      label: '首页指标卡',
+                      subtitle: '已启用 ${dashboardCards.length} 项',
+                      icon: Icons.dashboard_customize_outlined,
+                      dividerBefore: true,
+                      children: [
+                        GlassMenuAction(
+                          label: '编辑顺序与卡片',
+                          icon: Icons.drag_indicator_rounded,
+                          onSelected: () =>
+                              setState(() => _editingLayout = true),
+                        ),
+                        for (final cardId in DashboardCardIds.all)
+                          if (!kHoursOnly ||
+                              (cardId != DashboardCardIds.ledgerBalance &&
+                                  cardId != DashboardCardIds.todayLedger))
+                            GlassMenuAction(
+                              label: _dashboardCardLabel(context, cardId),
+                              selected: dashboardCards.contains(cardId),
+                              onSelected: () {
+                                final next = List<String>.of(dashboardCards);
+                                if (next.contains(cardId)) {
+                                  if (next.length > 1) next.remove(cardId);
+                                } else {
+                                  next.add(cardId);
+                                }
+                                unawaited(settings.setDashboardCards(next));
+                                if (mounted) setState(() {});
+                              },
+                            ),
+                      ],
+                    ),
+                ],
               ),
+              ],
             ],
           ),
         ),
       ],
     );
   }
-}
 
-class _MonthSwitch extends StatelessWidget {
-  const _MonthSwitch({
-    required this.month,
-    required this.onChanged,
-    required this.onPick,
-  });
-
-  final String month;
-  final ValueChanged<String> onChanged;
-  final VoidCallback onPick;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
-    return HeaderGlassSurface(
-      height: 44,
-      radius: 22,
-      bright: true,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _MonthStepButton(
-            icon: Icons.chevron_left_rounded,
-            semanticLabel: '上个月',
-            onTap: () => onChanged(shiftMonth(month, -1)),
+  void _showUnitMenu(
+    BuildContext context,
+    AppSettings settings,
+    Offset globalPosition,
+  ) {
+    final current = settings.measureUnit;
+    unawaited(showDropletGlassMenu(
+      context,
+      anchorOffset: globalPosition,
+      preferRightAlign: false,
+      items: [
+        for (var i = 0; i < MeasureUnit.presets.length; i++)
+          GlassMenuAction(
+            label:
+                '${MeasureUnit.presets[i].quantity}（${MeasureUnit.presets[i].name}）',
+            sectionTitle: i == 0 ? '切换计量单位' : null,
+            selected: MeasureUnit.presets[i].id == current.id,
+            onSelected: () {
+              unawaited(settings.setMeasureUnit(MeasureUnit.presets[i]));
+            },
           ),
-          Pressable(
-            onTap: onPick,
-            shape: Radii.pillShape,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  AnimatedMonthLabel(
-                    label: formatMonthLabel(month),
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: colors.text,
-                      fontFeatures: tabularFigures,
-                    ),
-                  ),
-                  const SizedBox(width: 2),
-                  Icon(
-                    Icons.expand_more_rounded,
-                    size: 16,
-                    color: colors.text3,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          _MonthStepButton(
-            icon: Icons.chevron_right_rounded,
-            semanticLabel: '下个月',
-            onTap: () => onChanged(shiftMonth(month, 1)),
-          ),
-        ],
-      ),
-    );
+      ],
+    ));
   }
-}
 
-class _MonthStepButton extends StatelessWidget {
-  const _MonthStepButton({
-    required this.icon,
-    required this.semanticLabel,
-    required this.onTap,
-  });
+  String _dashboardCardLabel(BuildContext context, String cardId) {
+    return switch (cardId) {
+      DashboardCardIds.monthQuantity => '本月${context.unit.quantity}',
+      DashboardCardIds.monthSalary => '本月工资',
+      DashboardCardIds.ledgerBalance => '本月结余',
+      DashboardCardIds.todayLedger => '今日账目',
+      _ => cardId,
+    };
+  }
 
-  final IconData icon;
-  final String semanticLabel;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      label: semanticLabel,
-      onTap: onTap,
-      excludeSemantics: true,
-      child: Pressable(
-        onTap: onTap,
-        shape: Radii.pillShape,
-        pressedScale: 0.92,
-        child: SizedBox(
-          width: 44,
-          height: 44,
-          child: Icon(icon, size: 18, color: context.colors.text2),
+  void _showDayContextMenu(
+    BuildContext context, {
+    required String date,
+    required WorkDayRecord? record,
+    required Offset globalPosition,
+  }) {
+    if (date.compareTo(todayISO()) > 0) return;
+    HapticFeedback.mediumImpact();
+    setState(() => _selectedDate = date);
+    final settled = record?.settled == true;
+    final items = <GlassMenuAction>[
+      if (record == null)
+        GlassMenuAction(
+          label: '一键记 8${context.unit.short}',
+          icon: Icons.bolt_rounded,
+          onSelected: () {
+            ref.read(appControllerProvider.notifier).saveDay(date, 8, '');
+          },
         ),
+      if (record != null)
+        GlassMenuAction(
+          label: '查看详情',
+          icon: Icons.visibility_outlined,
+          onSelected: () => _openDay(date),
+        ),
+      GlassMenuAction(
+        label: record == null ? '记一笔${context.unit.quantity}' : '编辑记录',
+        icon: Icons.edit_outlined,
+        onSelected: () => _openDay(date, directEdit: true),
+      ),
+      if (!kHoursOnly && record != null && record.hours > 0)
+        GlassMenuAction(
+          label: settled ? '撤销结算' : '标记已结算',
+          icon: settled
+              ? Icons.undo_rounded
+              : Icons.check_circle_outline_rounded,
+          onSelected: () {
+            ref
+                .read(appControllerProvider.notifier)
+                .setRecordSettled(date, !settled);
+          },
+        ),
+      if (!kHoursOnly)
+        GlassMenuAction(
+          label: '记一笔账',
+          icon: Icons.add_card_rounded,
+          onSelected: () => showLedgerEditor(context, presetDate: date),
+        ),
+      if (record != null)
+        GlassMenuAction(
+          label: '删除记录',
+          icon: Icons.delete_outline_rounded,
+          danger: true,
+          dividerBefore: true,
+          onSelected: () async {
+            final confirmed = await showConfirmDialog(
+              context,
+              title: '删除 ${formatDateLabel(date)} 的记录？',
+              description: '已结算的工资账目也会一并移除。',
+              confirmLabel: '删除',
+              danger: true,
+            );
+            if (confirmed == true && mounted) {
+              ref.read(appControllerProvider.notifier).deleteDay(date);
+            }
+          },
+        ),
+    ];
+    unawaited(
+      showDropletGlassMenu(
+        context,
+        anchorOffset: globalPosition,
+        panelWidth: 204,
+        preferRightAlign:
+            globalPosition.dx > MediaQuery.sizeOf(context).width * 0.48,
+        items: items,
       ),
     );
   }
 }
 
-/// 非当前月的顶部提示条，用来替代「今天」工作区。
-///
-/// 不显示今天卡片是刻意的：否则页面顶部是今天的工资与账目、下方是所选月的
-/// 日历，用户点「修改记录」改的却是今天，编辑目标与所见月份错位。
 class _PastMonthBanner extends StatelessWidget {
   const _PastMonthBanner({required this.month, required this.onTap});
 
@@ -380,53 +572,51 @@ class _PastMonthBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    return Semantics(
-      button: true,
-      label: '正在查看${formatMonthLabel(month)}，回到本月',
-      onTap: onTap,
-      excludeSemantics: true,
-      child: Pressable(
-        onTap: onTap,
-        shape: Radii.shape(Radii.md),
-        pressedScale: 0.98,
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: ShapeDecoration(
-            // inset 而不是 block：浅色下 block 与页底同色，提示条会隐形。
-            color: colors.inset,
-            shape: Radii.shape(Radii.md),
+    final isFuture = month.compareTo(currentMonthKey()) > 0;
+    return GlassCard(
+      flat: true,
+      padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
+      child: Row(
+        children: [
+          Icon(
+            isFuture ? Icons.event_outlined : Icons.history_rounded,
+            size: 17,
+            color: colors.text2,
           ),
-          child: Row(
-            children: [
-              Icon(Icons.today_rounded, size: 18, color: colors.primary),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  '正在查看 ${formatMonthLabel(month)}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 12.5, color: colors.text2),
-                ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              isFuture
+                  ? '正在查看 ${formatMonthLabel(month)} 未来月份'
+                  : '正在查看 ${formatMonthLabel(month)} 历史记录',
+              style: TextStyle(fontSize: 13, color: colors.text2),
+            ),
+          ),
+          Pressable(
+            onTap: onTap,
+            shape: Radii.shape(8),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: ShapeDecoration(
+                color: colors.primaryContainer,
+                shape: Radii.shape(8),
               ),
-              const SizedBox(width: 6),
-              Text(
+              child: Text(
                 '回到本月',
                 style: TextStyle(
-                  fontSize: 12.5,
+                  fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: colors.primary,
+                  color: colors.onPrimaryContainer,
                 ),
               ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
 }
 
-/// 有工时但没有时薪时的引导条：把「工资恒为 0」变成一个可点的下一步。
 class _MissingRateHint extends StatelessWidget {
   const _MissingRateHint({required this.days, required this.onTap});
 
@@ -436,168 +626,273 @@ class _MissingRateHint extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    return Semantics(
-      button: true,
-      label: '$days 天有${context.unit.quantity}但未设时薪，去设置时薪',
+    return Pressable(
       onTap: onTap,
-      excludeSemantics: true,
-      child: Pressable(
-        onTap: onTap,
-        shape: Radii.shape(Radii.md),
-        pressedScale: 0.98,
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: ShapeDecoration(
-            color: colors.primaryContainer,
-            shape: Radii.shape(Radii.md),
+      shape: Radii.shape(Radii.md),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: ShapeDecoration(
+          color: colors.warningSoft,
+          shape: Radii.shape(Radii.md).copyWith(
+            side: BorderSide(color: colors.warning.withValues(alpha: 0.25)),
           ),
-          child: Row(
-            children: [
-              Icon(
-                Icons.tips_and_updates_outlined,
-                size: 18,
-                color: colors.onPrimaryContainer,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  '$days 天记了${context.unit.quantity}却没算工资：先给工作设时薪',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    height: 1.4,
-                    color: colors.onPrimaryContainer,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                '去设置',
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.info_outline_rounded, size: 17, color: colors.warning),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                '有 $days 天${context.unit.quantity}未设${context.unit.rateName}，暂无法计入工资',
                 style: TextStyle(
                   fontSize: 12.5,
-                  fontWeight: FontWeight.w600,
-                  color: colors.onPrimaryContainer,
+                  fontWeight: FontWeight.w500,
+                  color: colors.text,
                 ),
               ),
-            ],
-          ),
+            ),
+            Text(
+              '去设置',
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: colors.warning,
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded, size: 16, color: colors.warning),
+          ],
         ),
       ),
     );
   }
 }
 
-class _TodayLedgerCard extends StatelessWidget {
-  const _TodayLedgerCard({required this.entries});
+class _SelectedDayCard extends StatelessWidget {
+  const _SelectedDayCard({
+    required this.date,
+    required this.isToday,
+    required this.record,
+    required this.entries,
+    required this.profiles,
+    required this.onEdit,
+    required this.onDetail,
+    required this.onAddLedger,
+  });
 
+  final String date;
+  final bool isToday;
+  final WorkDayRecord? record;
   final List<LedgerEntry> entries;
+  final List<WorkProfile> profiles;
+  final VoidCallback onEdit;
+  final VoidCallback? onDetail;
+  final VoidCallback? onAddLedger;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    final parsed = DateTime.tryParse(date);
+    final weekday = parsed == null ? '' : '周${weekdayName(parsed.weekday % 7)}';
+    final pay = record == null ? 0.0 : recordPay(record!, profiles);
+    final settled = record?.settled == true;
+    final workName = record == null ? '' : workNameOf(record!, profiles);
+    final isFuture = date.compareTo(todayISO()) > 0;
+
+    var netLedger = 0.0;
+    for (final entry in entries) {
+      netLedger += entry.type == LedgerType.income ? entry.amount : -entry.amount;
+    }
+
     return GlassCard(
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
+      onTap: isFuture ? null : (onDetail ?? onEdit),
+      padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-            child: Row(
-              children: [
-                Text(
-                  '今日账目',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: colors.text,
+          Row(
+            children: [
+              Text(
+                '${formatDateLabel(date)} $weekday',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: colors.text,
+                ),
+              ),
+              if (isToday) ...[
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: ShapeDecoration(
+                    color: colors.primaryContainer,
+                    shape: Radii.shape(6),
+                  ),
+                  child: Text(
+                    '今天',
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w600,
+                      color: colors.onPrimaryContainer,
+                    ),
                   ),
                 ),
-                const Spacer(),
-                Text(
-                  '${entries.length} 笔',
-                  style: TextStyle(fontSize: 11.5, color: colors.text2),
+              ],
+              if (settled) ...[
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: ShapeDecoration(
+                    color: colors.incomeSoft,
+                    shape: Radii.shape(6),
+                  ),
+                  child: Text(
+                    '已结算',
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w600,
+                      color: colors.income,
+                    ),
+                  ),
                 ),
               ],
-            ),
+              const Spacer(),
+              if (!isFuture) ...[
+                if (onAddLedger != null)
+                  _InlineAction(
+                    label: '记账',
+                    icon: Icons.add_rounded,
+                    onTap: onAddLedger!,
+                  ),
+                const SizedBox(width: 4),
+                _InlineAction(
+                  label: record == null ? '记录' : '编辑',
+                  icon: record == null
+                      ? Icons.add_task_rounded
+                      : Icons.edit_outlined,
+                  primary: record == null,
+                  onTap: onEdit,
+                ),
+              ],
+            ],
           ),
-          for (final entry in entries)
-            Pressable(
-              onTap: () => showLedgerEditor(context, entry: entry),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 9),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 34,
-                      height: 34,
-                      alignment: Alignment.center,
-                      decoration: ShapeDecoration(
-                        color: entry.type == LedgerType.income
-                            ? colors.incomeSoft
-                            : colors.expenseSoft,
-                        shape: Radii.shape(10),
-                      ),
-                      child: Icon(
-                        entry.type == LedgerType.income
-                            ? Icons.arrow_downward_rounded
-                            : Icons.arrow_upward_rounded,
-                        size: 16,
-                        color: entry.type == LedgerType.income
-                            ? colors.income
-                            : colors.expense,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            entry.category,
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              color: colors.text,
-                            ),
-                          ),
-                          if (entry.remark.isNotEmpty)
-                            Text(
-                              entry.remark,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                color: colors.text2,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                    Text(
-                      '${entry.type == LedgerType.income ? '+' : '-'}'
-                      '${formatAmount(entry.amount)}',
+          const SizedBox(height: 6),
+          if (isFuture)
+            Text(
+              '未来日期暂不可录入${context.unit.quantity}',
+              style: TextStyle(fontSize: 12.5, color: colors.text3),
+            )
+          else if (record == null && entries.isEmpty)
+            Text(
+              '这一天还没有${context.unit.quantity}或账目，点右上角或再点一次日历即可快速录入。',
+              style: TextStyle(fontSize: 12.5, color: colors.text3),
+            )
+          else ...[
+            Row(
+              children: [
+                if (record != null)
+                  Expanded(
+                    child: Text(
+                      record!.hours == 0
+                          ? '休息日'
+                          : '${formatHoursValue(record!.hours)} ${context.unit.name}'
+                                '${!kHoursOnly && pay > 0 ? ' · ${formatAmount(pay, withSymbol: true)}' : ''}'
+                                '${workName.isNotEmpty ? ' · $workName' : ''}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: entry.type == LedgerType.income
-                            ? colors.income
-                            : colors.expense,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: colors.text,
                         fontFeatures: tabularFigures,
                       ),
                     ),
-                  ],
-                ),
-              ),
+                  )
+                else
+                  Expanded(
+                    child: Text(
+                      '未记录${context.unit.quantity}',
+                      style: TextStyle(fontSize: 12.5, color: colors.text3),
+                    ),
+                  ),
+                if (entries.isNotEmpty)
+                  Text(
+                    '账目 ${entries.length} 笔 (${netLedger >= 0 ? '+' : ''}${formatAmount(netLedger, withSymbol: true)})',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: netLedger >= 0 ? colors.income : colors.expense,
+                      fontFeatures: tabularFigures,
+                    ),
+                  ),
+              ],
             ),
+            if (record != null && record!.remark.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                record!.remark,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 12, color: colors.text2),
+              ),
+            ],
+          ],
         ],
       ),
     );
   }
 }
 
-/// 跟手横滑 + 进出场滑动。日历本身保持不变，只有月份切换时把旧卡
-/// 向手势方向送出，新卡从另一侧进入；不足阈值则弹回原位。
+class _InlineAction extends StatelessWidget {
+  const _InlineAction({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+    this.primary = false,
+  });
+
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+  final bool primary;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final shape = Radii.pillShape;
+    return Pressable(
+      onTap: onTap,
+      shape: shape,
+      pressedScale: 0.95,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+        decoration: ShapeDecoration(
+          color: primary ? colors.primaryContainer : colors.block,
+          shape: shape,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 14,
+              color: primary ? colors.onPrimaryContainer : colors.text2,
+            ),
+            const SizedBox(width: 3),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: primary ? colors.onPrimaryContainer : colors.text,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _SwipeableCalendar extends StatefulWidget {
   const _SwipeableCalendar({
     required this.month,
@@ -605,8 +900,10 @@ class _SwipeableCalendar extends StatefulWidget {
     required this.records,
     required this.entriesByDate,
     required this.today,
+    required this.selectedDate,
     required this.direction,
     required this.onTapDate,
+    required this.onLongPressDate,
     required this.onOpenDetail,
     required this.onShift,
   });
@@ -616,8 +913,10 @@ class _SwipeableCalendar extends StatefulWidget {
   final Map<String, WorkDayRecord> records;
   final Map<String, List<LedgerEntry>> entriesByDate;
   final String today;
+  final String selectedDate;
   final int direction;
   final ValueChanged<String> onTapDate;
+  final void Function(String date, Offset globalPosition) onLongPressDate;
   final VoidCallback onOpenDetail;
   final ValueChanged<int> onShift;
 
@@ -634,7 +933,7 @@ class _SwipeableCalendarState extends State<_SwipeableCalendar>
   late final AnimationController _slideController =
       AnimationController(
         vsync: this,
-        duration: const Duration(milliseconds: 300),
+        duration: Timings.slow,
       )..addStatusListener((status) {
         if (status == AnimationStatus.completed && mounted) {
           setState(() => _outgoing = null);
@@ -713,7 +1012,9 @@ class _SwipeableCalendarState extends State<_SwipeableCalendar>
       records: widget.records,
       entriesByDate: widget.entriesByDate,
       today: widget.today,
+      selectedDate: widget.selectedDate,
       onTapDate: widget.onTapDate,
+      onLongPressDate: widget.onLongPressDate,
       onOpenDetail: widget.onOpenDetail,
     );
     final outgoing = _outgoing;
@@ -722,13 +1023,8 @@ class _SwipeableCalendarState extends State<_SwipeableCalendar>
         : AnimatedBuilder(
             animation: _slideController,
             builder: (context, _) {
-              // 方向约定：_slideDirection = 1 表示「下个月」（用户向左滑）。
-              // 旧月份必须往左退场、新月份从右侧进场；反过来就是「往左滑、
-              // 卡片往右飞」。
-              final progress = Curves2.out.transform(
-                _slideController.value,
-              );
-              final travel = MediaQuery.sizeOf(context).width * 0.18;
+              final progress = Curves2.out.transform(_slideController.value);
+              final travel = MediaQuery.sizeOf(context).width * 0.16;
               return Stack(
                 alignment: Alignment.topCenter,
                 children: [
@@ -742,7 +1038,9 @@ class _SwipeableCalendarState extends State<_SwipeableCalendar>
                         records: outgoing.records,
                         entriesByDate: outgoing.entriesByDate,
                         today: outgoing.today,
+                        selectedDate: outgoing.selectedDate,
                         onTapDate: outgoing.onTapDate,
+                        onLongPressDate: outgoing.onLongPressDate,
                         onOpenDetail: outgoing.onOpenDetail,
                       ),
                     ),
@@ -754,10 +1052,7 @@ class _SwipeableCalendarState extends State<_SwipeableCalendar>
                         _slideDirection * travel * (1 - progress),
                         0,
                       ),
-                      child: Transform.scale(
-                        scale: 0.985 + 0.015 * progress,
-                        child: currentCard,
-                      ),
+                      child: currentCard,
                     ),
                   ),
                 ],
@@ -773,12 +1068,17 @@ class _SwipeableCalendarState extends State<_SwipeableCalendar>
       child: AnimatedContainer(
         duration: _dragging || disable
             ? Duration.zero
-            : const Duration(milliseconds: 260),
-        // 松手未过阈值时回到原位：轻度过冲带来「物理回弹」的手感，
-        // 但落点仍是唯一原位，不会漂移。
+            : Timings.base,
         curve: Curves2.out,
-        transform: Matrix4.translationValues(_dragDx * 0.62, 0, 0),
-        child: content,
+        transform: Matrix4.translationValues(_dragDx * 0.55, 0, 0),
+        child: ClipRect(
+          child: AnimatedSize(
+            duration: motionDuration(Timings.base, disableAnimations: disable),
+            curve: Curves2.out,
+            alignment: Alignment.topCenter,
+            child: content,
+          ),
+        ),
       ),
     );
   }
@@ -791,7 +1091,9 @@ class _CalendarCard extends StatelessWidget {
     required this.records,
     required this.entriesByDate,
     required this.today,
+    required this.selectedDate,
     required this.onTapDate,
+    required this.onLongPressDate,
     required this.onOpenDetail,
   });
 
@@ -800,19 +1102,80 @@ class _CalendarCard extends StatelessWidget {
   final Map<String, WorkDayRecord> records;
   final Map<String, List<LedgerEntry>> entriesByDate;
   final String today;
+  final String selectedDate;
   final ValueChanged<String> onTapDate;
+  final void Function(String date, Offset globalPosition) onLongPressDate;
   final VoidCallback onOpenDetail;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
     final textScale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.3);
-    // MonthDay.weekday 是 0(周日)…6(周六)，日历第一列是周一。
     final leadingBlanks = dates.isEmpty ? 0 : (dates.first.weekday + 6) % 7;
+    final recordedCount = records.values.where((r) => r.hours > 0).length;
     return GlassCard(
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+      radius: Radii.hero,
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 11),
       child: Column(
         children: [
+          Row(
+            children: [
+              Text(
+                '本月日历',
+                style: TextStyle(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w700,
+                  color: colors.text,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
+                decoration: ShapeDecoration(
+                  color: colors.primaryContainer.withValues(
+                    alpha: colors.isDark ? 0.65 : 0.85,
+                  ),
+                  shape: Radii.pillShape,
+                ),
+                child: Text(
+                  '已记 $recordedCount 天',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: colors.primary,
+                    fontFeatures: tabularFigures,
+                  ),
+                ),
+              ),
+              const Spacer(),
+              Pressable(
+                onTap: onOpenDetail,
+                shape: Radii.pillShape,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '月明细',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: colors.primary,
+                        ),
+                      ),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        size: 15,
+                        color: colors.primary,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 11),
           Row(
             children: [
               for (final label in const ['一', '二', '三', '四', '五', '六', '日'])
@@ -821,9 +1184,8 @@ class _CalendarCard extends StatelessWidget {
                     child: Text(
                       label,
                       style: TextStyle(
-                        fontSize: TypeScale.micro,
-                        fontWeight: FontWeight.w500,
-                        letterSpacing: 0.6,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
                         color: colors.text3,
                       ),
                     ),
@@ -840,12 +1202,9 @@ class _CalendarCard extends StatelessWidget {
             itemCount: leadingBlanks + dates.length,
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 7,
-              mainAxisSpacing: 3,
+              mainAxisSpacing: 4,
               crossAxisSpacing: 3,
-              // 固定行高而不是按宽度算正方形：窄屏/键盘弹出时 7 列宽度
-              // 只有约 44dp，正方形会把日期内容挤爆；50dp 能容纳
-              // 日期 + 工时 + 状态点，同时保留足够的纵向触控面积。
-              mainAxisExtent: 53 * textScale,
+              mainAxisExtent: 46 * textScale,
             ),
             itemBuilder: (context, index) {
               if (index < leadingBlanks) return const SizedBox.shrink();
@@ -855,44 +1214,41 @@ class _CalendarCard extends StatelessWidget {
                 record: records[day.date],
                 entries: entriesByDate[day.date] ?? const [],
                 isToday: day.date == today,
+                isSelected: day.date == selectedDate,
                 isFuture: day.date.compareTo(today) > 0,
                 isWeekend: day.weekday == 0 || day.weekday == 6,
                 onTap: () => onTapDate(day.date),
+                onLongPress: (pos) => onLongPressDate(day.date, pos),
               );
             },
           ),
-          const SizedBox(height: 10),
-          Divider(
-            height: 1,
-            thickness: 1,
-            color: colors.cardBorder,
-          ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
+          Divider(height: 1, thickness: 1, color: colors.divider),
+          const SizedBox(height: 8),
           Row(
             children: [
-              _CalendarLegendDot(color: colors.income, label: '收入'),
-              const SizedBox(width: 12),
-              _CalendarLegendDot(color: colors.expense, label: '支出'),
-              const SizedBox(width: 12),
-              _CalendarLegendDot(color: colors.warning, label: '已结算'),
+              if (!kHoursOnly) ...[
+                _CalendarLegendDot(color: colors.income, label: '收入'),
+                const SizedBox(width: 10),
+                _CalendarLegendDot(color: colors.expense, label: '支出'),
+                const SizedBox(width: 10),
+              ],
+              _CalendarLegendDot(
+                color: colors.income,
+                label: '已结算',
+                pill: true,
+              ),
+              const SizedBox(width: 10),
+              _CalendarLegendDot(
+                color: colors.warning,
+                label: '加班',
+                pill: true,
+                fillColor: colors.warningSoft,
+              ),
               const Spacer(),
-              Pressable(
-                onTap: onOpenDetail,
-                shape: Radii.shape(Radii.sm),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 5,
-                  ),
-                  child: Text(
-                    '明细',
-                    style: TextStyle(
-                      fontSize: TypeScale.label,
-                      fontWeight: FontWeight.w600,
-                      color: colors.primary,
-                    ),
-                  ),
-                ),
+              Text(
+                '长按快捷记录',
+                style: TextStyle(fontSize: 11, color: colors.text3),
               ),
             ],
           ),
@@ -903,10 +1259,17 @@ class _CalendarCard extends StatelessWidget {
 }
 
 class _CalendarLegendDot extends StatelessWidget {
-  const _CalendarLegendDot({required this.color, required this.label});
+  const _CalendarLegendDot({
+    required this.color,
+    required this.label,
+    this.pill = false,
+    this.fillColor,
+  });
 
   final Color color;
   final String label;
+  final bool pill;
+  final Color? fillColor;
 
   @override
   Widget build(BuildContext context) {
@@ -914,13 +1277,30 @@ class _CalendarLegendDot extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          width: 6,
-          height: 6,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        ),
+        if (pill)
+          Container(
+            width: 12,
+            height: 8,
+            decoration: BoxDecoration(
+              color: fillColor ?? colors.incomeSoft,
+              border: Border.all(
+                color: color.withValues(alpha: 0.45),
+                width: 1,
+              ),
+              borderRadius: BorderRadius.circular(3),
+            ),
+          )
+        else
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+            ),
+          ),
         const SizedBox(width: 4),
-        Text(label, style: TextStyle(fontSize: TypeScale.micro, color: colors.text2)),
+        Text(label, style: TextStyle(fontSize: 11, color: colors.text3)),
       ],
     );
   }
@@ -932,24 +1312,32 @@ class _CalendarCell extends StatelessWidget {
     required this.record,
     required this.entries,
     required this.isToday,
+    required this.isSelected,
     required this.isFuture,
     required this.isWeekend,
     required this.onTap,
+    required this.onLongPress,
   });
 
   final MonthDay day;
   final WorkDayRecord? record;
   final List<LedgerEntry> entries;
   final bool isToday;
+  final bool isSelected;
   final bool isFuture;
   final bool isWeekend;
   final VoidCallback onTap;
+  final ValueChanged<Offset> onLongPress;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
     final hasRecord = record != null;
-    final isRest = (record?.hours ?? 0) == 0;
+    final hours = record?.hours ?? 0;
+    final isRest = hasRecord && hours == 0;
+    final isSettled = record?.settled == true;
+    final isOvertime = hours > 8;
+
     var income = 0.0;
     var expense = 0.0;
     for (final entry in entries) {
@@ -959,154 +1347,172 @@ class _CalendarCell extends StatelessWidget {
         expense += entry.amount;
       }
     }
-    final hours = record?.hours ?? 0;
-    final isSettled = record?.settled == true;
-    final isOvertime = hasRecord && hours > 8;
-    final dayColor = isFuture
-        ? colors.text3
+
+    final cellBg = isSelected
+        ? colors.primary
+        : isSettled
+        ? colors.incomeSoft.withValues(alpha: colors.isDark ? 0.65 : 0.80)
+        : isOvertime
+        ? colors.warningSoft.withValues(alpha: colors.isDark ? 0.68 : 0.86)
+        : isToday
+        ? colors.primaryContainer.withValues(alpha: colors.isDark ? 0.55 : 0.62)
+        : Colors.transparent;
+
+    final borderSide = isToday && !isSelected
+        ? BorderSide(color: colors.primary.withValues(alpha: 0.55), width: 1.2)
+        : isSelected
+        ? BorderSide(
+            color: Colors.white.withValues(alpha: colors.isDark ? 0.22 : 0.45),
+            width: 1.0,
+          )
+        : isSettled && !isSelected
+        ? BorderSide(color: colors.income.withValues(alpha: 0.20), width: 0.8)
+        : isOvertime && !isSelected
+        ? BorderSide(color: colors.warning.withValues(alpha: 0.22), width: 0.8)
+        : BorderSide.none;
+
+    final dayColor = isSelected
+        ? colors.onPrimary
         : isToday
         ? colors.primary
-        : hasRecord
-        ? colors.text
-        : (isWeekend ? colors.text2 : colors.text3);
-    final hoursBackground = !hasRecord
-        ? Colors.transparent
-        : isRest
-        ? colors.inset
-        : isSettled
-        ? colors.warningSoft
-        : isOvertime
-        ? colors.warningSoft
-        : colors.primaryContainer;
-    final hoursColor = !hasRecord
-        ? colors.text3
-        : isRest
+        : isFuture
+        ? colors.text3.withValues(alpha: 0.52)
+        : isWeekend
         ? colors.text2
+        : colors.text;
+
+    final hoursColor = isSelected
+        ? colors.onPrimary.withValues(alpha: 0.92)
+        : isRest
+        ? colors.text3
         : isSettled
-        ? colors.warning
+        ? colors.income
         : isOvertime
         ? colors.warning
         : colors.primary;
-    final selectedGradient = colors.isDark
-        ? LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              colors.primaryContainer.withValues(alpha: 0.58),
-              colors.primaryContainer.withValues(alpha: 0.30),
-            ],
-          )
-        : const LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFFEFF6FF), Color(0xFFDBEAFE)],
-          );
-    final semanticsLabel = [
-      '${day.day}日',
-      if (isToday) '今天',
-      if (isFuture) '未来日期',
-      if (hasRecord)
-        isRest
-            ? '休息'
-            : '${formatHoursValue(hours)}${context.unit.name}',
-      if (!hasRecord) '未记工',
-      if (isSettled) '已结算',
-      if (income > 0) '收入${formatAmount(income)}元',
-      if (expense > 0) '支出${formatAmount(expense)}元',
-    ].join('，');
+
     return Semantics(
-      button: !isFuture,
-      enabled: !isFuture,
-      selected: isToday,
-      label: semanticsLabel,
-      onTap: isFuture ? null : onTap,
+      button: true,
+      selected: isSelected,
+      label: '${day.day}日',
+      onTap: onTap,
       excludeSemantics: true,
-      child: Opacity(
-        opacity: isFuture ? 0.55 : 1,
+      child: GestureDetector(
+        onLongPressStart: isFuture
+            ? null
+            : (details) => onLongPress(details.globalPosition),
         child: Pressable(
-          onTap: isFuture ? null : onTap,
-          child: Container(
+          onTap: onTap,
+          haptic: false,
+          shape: Radii.shape(14),
+          pressedScale: 0.92,
+          child: AnimatedContainer(
+            duration: motionDuration(
+              Timings.micro,
+              disableAnimations:
+                  MediaQuery.maybeDisableAnimationsOf(context) ?? false,
+            ),
+            curve: Curves2.out,
             decoration: ShapeDecoration(
-              color: isToday ? null : Colors.transparent,
-              gradient: isToday ? selectedGradient : null,
-              shadows: isToday
+              color: isSelected ? null : cellBg,
+              gradient: isSelected
+                  ? LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Color.lerp(
+                          colors.primary,
+                          Colors.white,
+                          colors.isDark ? 0.08 : 0.14,
+                        )!,
+                        colors.primary,
+                      ],
+                    )
+                  : null,
+              shape: Radii.shape(14).copyWith(side: borderSide),
+              shadows: isSelected
                   ? [
                       BoxShadow(
-                        color: colors.primary.withValues(alpha: 0.12),
-                        blurRadius: 10,
+                        color: colors.primary.withValues(alpha: 0.32),
+                        blurRadius: 12,
                         offset: const Offset(0, 4),
                       ),
                     ]
                   : null,
-              shape: RoundedSuperellipseBorder(
-                borderRadius: BorderRadius.circular(14),
-                side: isToday
-                    ? BorderSide(
-                        // 暗色下纯白描边会比格内数字更亮，反而抢走焦点；
-                        // 换成低透明的品牌蓝，仍然清楚但不刺眼。
-                        color: colors.isDark
-                            ? colors.primary.withValues(alpha: 0.30)
-                            : Colors.white.withValues(alpha: 0.92),
-                        width: colors.isDark ? 1.1 : 1.5,
-                      )
-                    : BorderSide.none,
-              ),
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+            padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 3),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // 日期独占一行、居中：原来左侧日期 + 右侧状态点把
-                // 一格宽度切成两半，数字总是被挤在左边缘。
                 Text(
                   '${day.day}',
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: 12.5,
                     height: 1.1,
-                    fontWeight: isToday ? FontWeight.w700 : FontWeight.w500,
+                    fontWeight: (isToday || isSelected)
+                        ? FontWeight.w700
+                        : FontWeight.w600,
                     color: dayColor,
                     fontFeatures: tabularFigures,
                   ),
                 ),
-                const SizedBox(height: 3),
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  curve: Curves2.out,
-                  height: 20,
-                  width: double.infinity,
-                  alignment: Alignment.center,
-                  decoration: hasRecord
-                      ? ShapeDecoration(
-                          color: hoursBackground,
-                          shape: Radii.shape(8),
-                        )
-                      : null,
-                  child: hasRecord
-                      ? FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: Text(
-                            isRest ? '休' : formatHoursValue(hours),
-                            style: TextStyle(
-                              fontSize: TypeScale.micro,
-                              fontWeight: FontWeight.w600,
-                              color: hoursColor,
-                              fontFeatures: tabularFigures,
+                if (hasRecord || !isFuture) ...[
+                  const SizedBox(height: 2),
+                  SizedBox(
+                    height: 13,
+                    child: hasRecord
+                        ? FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              isRest
+                                  ? '休'
+                                  : '${formatHoursValue(hours)}${context.unit.short}',
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                height: 1.0,
+                                fontWeight: FontWeight.w700,
+                                color: hoursColor,
+                                fontFeatures: tabularFigures,
+                              ),
+                            ),
+                          )
+                        : Center(
+                            child: Container(
+                              width: 3,
+                              height: 3,
+                              decoration: BoxDecoration(
+                                color: colors.outline.withValues(
+                                  alpha: colors.isDark ? 0.28 : 0.34,
+                                ),
+                                shape: BoxShape.circle,
+                              ),
                             ),
                           ),
-                        )
-                      : null,
-                ),
-                const SizedBox(height: 3),
-                SizedBox(
-                  height: 6,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      if (income > 0) _CalendarCellDot(color: colors.income),
-                      if (expense > 0) _CalendarCellDot(color: colors.expense),
-                    ],
                   ),
-                ),
+                ],
+                if (income > 0 || expense > 0) ...[
+                  const SizedBox(height: 2),
+                  SizedBox(
+                    height: 4,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        if (income > 0)
+                          _CellDot(
+                            color: isSelected
+                                ? colors.onPrimary.withValues(alpha: 0.90)
+                                : colors.income,
+                          ),
+                        if (expense > 0)
+                          _CellDot(
+                            color: isSelected
+                                ? colors.onPrimary.withValues(alpha: 0.72)
+                                : colors.expense,
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -1116,8 +1522,292 @@ class _CalendarCell extends StatelessWidget {
   }
 }
 
-class _CalendarCellDot extends StatelessWidget {
-  const _CalendarCellDot({required this.color});
+/// FlClash 风格首页卡片原位编辑区：轻摇摆（3.6s 周期 ±0.7° / 1.25dp）、
+/// 拖动抬起 1.03× 缩放 + 阴影、角落移除徽标与底部可添加卡池。
+class _DashboardLayoutEditor extends StatefulWidget {
+  const _DashboardLayoutEditor({
+    required this.cards,
+    required this.labelOf,
+    required this.onChanged,
+    required this.onDone,
+  });
+
+  final List<String> cards;
+  final String Function(String id) labelOf;
+  final ValueChanged<List<String>> onChanged;
+  final VoidCallback onDone;
+
+  @override
+  State<_DashboardLayoutEditor> createState() => _DashboardLayoutEditorState();
+}
+
+class _DashboardLayoutEditorState extends State<_DashboardLayoutEditor>
+    with SingleTickerProviderStateMixin {
+  static const _swaysPerLoop = [6, 7, 5];
+  static const _swayPhaseStep = 1.7;
+  static const _swayTurn = 0.7 * math.pi / 180;
+  static const _swayBob = 1.25;
+  static const _liftGrowth = 0.03;
+
+  late final AnimationController _sway = AnimationController(
+    vsync: this,
+    duration: Timings.toast * 9,
+  );
+  bool _tickerEnabled = true;
+  bool _disable = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _tickerEnabled = TickerMode.valuesOf(context).enabled;
+    _disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    if (_disable || !_tickerEnabled) {
+      _sway.stop();
+    } else if (!_sway.isAnimating) {
+      _sway.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _sway.dispose();
+    super.dispose();
+  }
+
+  IconData _iconOf(String cardId) => switch (cardId) {
+    DashboardCardIds.monthSalary => Icons.payments_outlined,
+    DashboardCardIds.ledgerBalance => Icons.account_balance_wallet_outlined,
+    DashboardCardIds.todayLedger => Icons.receipt_long_outlined,
+    _ => Icons.schedule_rounded,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final available = [
+      for (final id in DashboardCardIds.all)
+        if (!widget.cards.contains(id) &&
+            (!kHoursOnly ||
+                (id != DashboardCardIds.ledgerBalance &&
+                    id != DashboardCardIds.todayLedger)))
+          id,
+    ];
+
+    return GlassCard(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.dashboard_customize_outlined,
+                size: 16,
+                color: colors.primary,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                '编辑首页指标卡',
+                style: TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w700,
+                  color: colors.text,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '拖动排序',
+                style: TextStyle(fontSize: 11.5, color: colors.text3),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ReorderableListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            buildDefaultDragHandles: false,
+            itemCount: widget.cards.length,
+            onReorderItem: (oldIndex, newIndex) {
+              HapticFeedback.selectionClick();
+              final next = List<String>.of(widget.cards);
+              final item = next.removeAt(oldIndex);
+              next.insert(newIndex, item);
+              widget.onChanged(next);
+            },
+            proxyDecorator: (child, index, animation) {
+              return AnimatedBuilder(
+                animation: animation,
+                builder: (context, inner) {
+                  final t = Curves2.out.transform(animation.value);
+                  return Transform.scale(
+                    scale: 1.0 + _liftGrowth * t,
+                    child: DecoratedBox(
+                      decoration: ShapeDecoration(
+                        shape: Radii.shape(Radii.md),
+                        shadows: [
+                          for (final shadow in context.floatingShadows)
+                            shadow.copyWith(
+                              color: shadow.color.withValues(
+                                alpha: shadow.color.a * t,
+                              ),
+                            ),
+                        ],
+                      ),
+                      child: inner,
+                    ),
+                  );
+                },
+                child: child,
+              );
+            },
+            itemBuilder: (context, index) {
+              final id = widget.cards[index];
+              final canRemove = widget.cards.length > 1;
+              final row = Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                height: 54,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: ShapeDecoration(
+                  color: colors.block,
+                  shape: Radii.shape(Radii.md),
+                ),
+                child: Row(
+                  children: [
+                    ReorderableDragStartListener(
+                      index: index,
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 10),
+                        child: Icon(
+                          Icons.drag_indicator_rounded,
+                          size: 18,
+                          color: colors.text3,
+                        ),
+                      ),
+                    ),
+                    Icon(_iconOf(id), size: 17, color: colors.primary),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        widget.labelOf(id),
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: colors.text,
+                        ),
+                      ),
+                    ),
+                    if (canRemove)
+                      Pressable(
+                        onTap: () {
+                          final next = List<String>.of(widget.cards)
+                            ..remove(id);
+                          widget.onChanged(next);
+                        },
+                        shape: const CircleBorder(),
+                        pressedScale: 0.90,
+                        child: Container(
+                          width: 26,
+                          height: 26,
+                          decoration: BoxDecoration(
+                            color: colors.expenseSoft,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.remove_rounded,
+                            size: 16,
+                            color: colors.expense,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              );
+              return RepaintBoundary(
+                key: ValueKey('edit-card-$id'),
+                child: _disable
+                    ? row
+                    : AnimatedBuilder(
+                        animation: _sway,
+                        child: row,
+                        builder: (context, child) {
+                          final swings =
+                              _swaysPerLoop[index % _swaysPerLoop.length];
+                          final turn =
+                              _sway.value * 2 * math.pi * swings +
+                              index * _swayPhaseStep;
+                          return Transform.translate(
+                            offset: Offset(0, math.cos(turn) * _swayBob),
+                            child: Transform.rotate(
+                              angle: math.sin(turn) * _swayTurn,
+                              child: child,
+                            ),
+                          );
+                        },
+                      ),
+              );
+            },
+          ),
+          if (available.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              '可添加卡片',
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
+                color: colors.text3,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final id in available)
+                  Pressable(
+                    onTap: () => widget.onChanged([...widget.cards, id]),
+                    shape: Radii.pillShape,
+                    pressedScale: 0.94,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 11,
+                        vertical: 7,
+                      ),
+                      decoration: ShapeDecoration(
+                        color: colors.primaryContainer,
+                        shape: Radii.pillShape,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.add_rounded,
+                            size: 15,
+                            color: colors.onPrimaryContainer,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            widget.labelOf(id),
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                              color: colors.onPrimaryContainer,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _CellDot extends StatelessWidget {
+  const _CellDot({required this.color});
 
   final Color color;
 
@@ -1180,9 +1870,6 @@ class _DayEditorSheetState extends ConsumerState<DayEditorSheet> {
   String? _error;
   bool _submitted = false;
 
-  // 初始快照：用它做值比较判断「有没有改过」。
-  // 不能用 controller listener 直接置 dirty——TextEditingController 在光标移动时也会通知，
-  // 导致「打开弹层什么都没改，关闭却提示放弃」。
   late String _initialHours;
   late String _initialRemark;
   late String _initialFixedPay;
@@ -1204,8 +1891,6 @@ class _DayEditorSheetState extends ConsumerState<DayEditorSheet> {
     _remark = TextEditingController();
     _fixedPay = TextEditingController();
     _applyRecord(widget.record);
-    // 「本日工资」「可结算」都从控制器文本实时推导，控制器不通知父级
-    // 就不会重建：输入 8 小时后工资仍然显示 0。
     _hours.addListener(_onDraftInput);
     _fixedPay.addListener(_onDraftInput);
   }
@@ -1326,8 +2011,6 @@ class _DayEditorSheetState extends ConsumerState<DayEditorSheet> {
     }
     final state = ref.read(appControllerProvider);
     final rate = _draftRate(state.workProfiles);
-    // 用真正会落盘的参数算一次工资：0 元日不允许带 settled 标记，
-    // 否则会出现工资面板统计不到、批量撤销也清不掉的脏记录。
     final pay = recordPay(
       WorkDayRecord(
         date: _date,
@@ -1382,10 +2065,11 @@ class _DayEditorSheetState extends ConsumerState<DayEditorSheet> {
             ),
           ),
           QuickChips(
-            values: const [0, 4, 6, 8, 8.5, 10, 12],
+            values: context.unit.editorSteps,
             selected: _previewHours,
-            labelOf: (value) =>
-                value == 0 ? '休息' : '${formatHoursValue(value)}h',
+            labelOf: (value) => value == 0
+                ? '休息'
+                : '${formatHoursValue(value)}${context.unit.short}',
             onSelect: (value) {
               setState(() => _hours.text = formatHoursValue(value));
               _remarkFocus.requestFocus();
@@ -1399,51 +2083,63 @@ class _DayEditorSheetState extends ConsumerState<DayEditorSheet> {
             ),
           ],
           const SizedBox(height: Gaps.xl),
-          FormRow(
-            label: '工作',
-            hint: '时薪决定自动工资',
-            child: Wrap(
-              spacing: Gaps.sm,
-              runSpacing: Gaps.sm,
-              children: [
-                for (final profile in state.workProfiles)
-                  Pressable(
-                    onTap: () => setState(() => _workId = profile.id),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                      decoration: ShapeDecoration(
-                        color: (_workId ?? defaultWorkId) == profile.id
-                            ? colors.primaryContainer
-                            : colors.block,
-                        shape: Radii.pillShape,
-                      ),
-                      child: Text(
-                        '${profile.name}${profile.hourlyRate > 0 ? ' · ${formatAmount(profile.hourlyRate)}/h' : ''}',
-                        style: TextStyle(
-                          fontSize: 12.5,
+          if (!kHoursOnly) ...[
+            FormRow(
+              label: '工作',
+              hint: '${context.unit.rateName}决定自动工资',
+              child: Wrap(
+                spacing: Gaps.sm,
+                runSpacing: Gaps.sm,
+                children: [
+                  for (final profile in state.workProfiles)
+                    Pressable(
+                      onTap: () => setState(() => _workId = profile.id),
+                      shape: Radii.shape(Radii.sm),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: ShapeDecoration(
                           color: (_workId ?? defaultWorkId) == profile.id
-                              ? colors.onPrimaryContainer
-                              : colors.text2,
+                              ? colors.primaryContainer
+                              : colors.block,
+                          shape: Radii.shape(Radii.sm).copyWith(
+                            side: BorderSide(
+                              color: (_workId ?? defaultWorkId) == profile.id
+                                  ? colors.primary.withValues(alpha: 0.35)
+                                  : colors.cardBorder,
+                            ),
+                          ),
+                        ),
+                        child: Text(
+                          '${profile.name}${profile.hourlyRate > 0 ? ' · ¥${formatRate(profile.hourlyRate)}/${context.unit.rateShort}' : ''}',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: (_workId ?? defaultWorkId) == profile.id
+                                ? FontWeight.w600
+                                : FontWeight.w500,
+                            color: (_workId ?? defaultWorkId) == profile.id
+                                ? colors.onPrimaryContainer
+                                : colors.text2,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
-          ),
-          FormRow(
-            label: '当日工资',
-            hint: '留空 = ${context.unit.quantity} × 时薪',
-            child: NumberField(
-              controller: _fixedPay,
-              hintText: '自动',
-              suffixText: '元',
-              fontSize: 18,
+            FormRow(
+              label: '当日工资',
+              hint: '留空 = ${context.unit.quantity} × ${context.unit.rateName}',
+              child: NumberField(
+                controller: _fixedPay,
+                hintText: '自动',
+                suffixText: '元',
+                fontSize: 18,
+              ),
             ),
-          ),
+          ],
           FormRow(
             label: '备注',
             child: Container(
@@ -1466,63 +2162,63 @@ class _DayEditorSheetState extends ConsumerState<DayEditorSheet> {
               ),
             ),
           ),
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '已结算',
-                      style: TextStyle(fontSize: 14, color: colors.text),
-                    ),
-                    if (_previewPay <= 0)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 2),
-                        child: Text(
-                          '当天工资为 0，无需结算',
-                          style: TextStyle(fontSize: 11.5, color: colors.text3),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              Switch(
-                // 0 元日没有可结算金额：开关固定关闭并禁用，避免出现
-                // 「已结算但 0 元」这种工资面板统计不到、撤销也清不掉的脏状态。
-                value: _settled && _previewPay > 0,
-                onChanged: _previewPay <= 0
-                    ? null
-                    : (value) => setState(() => _settled = value),
-              ),
-            ],
-          ),
-          const SizedBox(height: Gaps.md),
-          Container(
-            padding: const EdgeInsets.all(Gaps.lg),
-            decoration: ShapeDecoration(
-              color: colors.block,
-              shape: Radii.shape(Radii.md),
-            ),
-            child: Row(
+          if (!kHoursOnly) ...[
+            Row(
               children: [
-                Text(
-                  '本日工资',
-                  style: TextStyle(fontSize: 12.5, color: colors.text3),
-                ),
-                const Spacer(),
-                Text(
-                  formatAmount(_previewPay, withSymbol: true),
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    color: colors.income,
-                    fontFeatures: tabularFigures,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '已结算',
+                        style: TextStyle(fontSize: 14, color: colors.text),
+                      ),
+                      if (_previewPay <= 0)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(
+                            '当天工资为 0，无需结算',
+                            style: TextStyle(fontSize: 11.5, color: colors.text3),
+                          ),
+                        ),
+                    ],
                   ),
+                ),
+                Switch(
+                  value: _settled && _previewPay > 0,
+                  onChanged: _previewPay <= 0
+                      ? null
+                      : (value) => setState(() => _settled = value),
                 ),
               ],
             ),
-          ),
+            const SizedBox(height: Gaps.md),
+            Container(
+              padding: const EdgeInsets.all(Gaps.lg),
+              decoration: ShapeDecoration(
+                color: colors.block,
+                shape: Radii.shape(Radii.md),
+              ),
+              child: Row(
+                children: [
+                  Text(
+                    '本日工资',
+                    style: TextStyle(fontSize: 12.5, color: colors.text2),
+                  ),
+                  const Spacer(),
+                  Text(
+                    formatAmount(_previewPay, withSymbol: true),
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: colors.income,
+                      fontFeatures: tabularFigures,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: Gaps.lg),
           PrimaryButton(label: '保存', expand: true, onPressed: _save),
         ],
@@ -1600,19 +2296,19 @@ class _DayStepButton extends StatelessWidget {
         message: label,
         child: Pressable(
           onTap: onTap,
-          shape: const CircleBorder(),
-          pressedScale: 0.90,
+          shape: Radii.shape(10),
+          pressedScale: 0.92,
           child: Opacity(
             opacity: enabled ? 1 : 0.35,
             child: Container(
-              width: 44,
-              height: 40,
+              width: 38,
+              height: 36,
               alignment: Alignment.center,
               decoration: ShapeDecoration(
-                color: colors.inset,
-                shape: const CircleBorder(),
+                color: colors.block,
+                shape: Radii.shape(10),
               ),
-              child: Icon(icon, size: 20, color: colors.text2),
+              child: Icon(icon, size: 19, color: colors.text2),
             ),
           ),
         ),
@@ -1646,70 +2342,101 @@ class DayDetailSheet extends ConsumerWidget {
             children: [
               Expanded(
                 child: _DetailMetric(
-                  label: '工时',
+                  label: context.unit.quantity,
                   value: formatHoursValue(record.hours),
                   unit: context.unit.name,
-                  color: colors.accent,
+                  color: colors.primary,
+                  tint: colors.primaryContainer.withValues(
+                    alpha: colors.isDark ? 0.45 : 0.72,
+                  ),
                 ),
               ),
-              const SizedBox(width: Gaps.xl),
-              Expanded(
-                child: _DetailMetric(
-                  label: '工资',
-                  value: formatAmount(pay),
-                  unit: '元',
-                  color: colors.income,
+              if (!kHoursOnly) ...[
+                const SizedBox(width: Gaps.md),
+                Expanded(
+                  child: _DetailMetric(
+                    label: '工资',
+                    value: formatAmount(pay, withSymbol: true),
+                    unit: '',
+                    color: colors.income,
+                    tint: colors.incomeSoft.withValues(
+                      alpha: colors.isDark ? 0.50 : 0.78,
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
           const SizedBox(height: Gaps.lg),
-          _DetailRow(label: '工作', value: work.name),
-          _DetailRow(
-            label: '有效时薪',
-            value:
-                '${formatAmount(effectiveRate(record, state.workProfiles))} 元/${context.unit.name}',
-          ),
-          if (hasFixedPay(record))
-            _DetailRow(
-              label: '自定义日薪',
-              value: '${formatAmount(record.fixedPay!)} 元',
+          if (!kHoursOnly || record.remark.isNotEmpty)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+              decoration: ShapeDecoration(
+                color: colors.block.withValues(
+                  alpha: colors.isDark ? 0.52 : 0.62,
+                ),
+                shape: Radii.shape(Radii.md),
+              ),
+              child: Column(
+                children: [
+                  if (!kHoursOnly) ...[
+                    _DetailRow(label: '工作', value: work.name),
+                    Divider(height: 1, color: colors.divider),
+                    _DetailRow(
+                      label: '有效${context.unit.rateName}',
+                      value:
+                          '¥${formatRate(effectiveRate(record, state.workProfiles))}'
+                          '/${context.unit.rateShort}',
+                    ),
+                    if (hasFixedPay(record)) ...[
+                      Divider(height: 1, color: colors.divider),
+                      _DetailRow(
+                        label: '自定义日薪',
+                        value: formatAmount(record.fixedPay!, withSymbol: true),
+                      ),
+                    ],
+                    Divider(height: 1, color: colors.divider),
+                    _DetailRow(
+                      label: '结算',
+                      value: record.settled
+                          ? (pay > 0 ? '已结算' : '已结算（¥0）')
+                          : '未结算',
+                      valueColor: record.settled ? colors.income : colors.text2,
+                    ),
+                  ],
+                  if (record.remark.isNotEmpty) ...[
+                    if (!kHoursOnly) Divider(height: 1, color: colors.divider),
+                    _DetailRow(label: '备注', value: record.remark),
+                  ],
+                ],
+              ),
             ),
-          _DetailRow(
-            label: '结算',
-            value: record.settled ? (pay > 0 ? '已结算' : '已结算（0 元）') : '未结算',
-            // 与日历图例一致：warning 琥珀 = 已结算（原来这里用 income 绿，
-            // 同一状态在日历和详情里是两种颜色）。
-            valueColor: record.settled ? colors.warning : colors.text3,
-          ),
-          if (record.remark.isNotEmpty)
-            _DetailRow(label: '备注', value: record.remark),
           const SizedBox(height: Gaps.xl),
           Row(
             children: [
-              Expanded(
-                child: GhostButton(
-                  // 0 元日没有可结算金额：按钮退化为不可点。
-                  // 已结算的 0 元历史脏数据仍允许「取消结算」清掉。
-                  label: record.settled ? '取消结算' : (pay > 0 ? '标记结算' : '无需结算'),
-                  icon: record.settled
-                      ? Icons.undo_rounded
-                      : (pay > 0
-                            ? Icons.check_circle_outline_rounded
-                            : Icons.do_not_disturb_on_outlined),
-                  onPressed: pay > 0 || record.settled
-                      ? () {
-                          controller.setRecordSettled(
-                            record.date,
-                            !record.settled,
-                          );
-                          HapticFeedback.selectionClick();
-                          Navigator.of(context).pop();
-                        }
-                      : null,
+              if (!kHoursOnly) ...[
+                Expanded(
+                  child: GhostButton(
+                    label: record.settled ? '取消结算' : (pay > 0 ? '标记结算' : '无需结算'),
+                    icon: record.settled
+                        ? Icons.undo_rounded
+                        : (pay > 0
+                              ? Icons.check_circle_outline_rounded
+                              : Icons.do_not_disturb_on_outlined),
+                    onPressed: pay > 0 || record.settled
+                        ? () {
+                            controller.setRecordSettled(
+                              record.date,
+                              !record.settled,
+                            );
+                            HapticFeedback.selectionClick();
+                            Navigator.of(context).pop();
+                          }
+                        : null,
+                  ),
                 ),
-              ),
-              const SizedBox(width: Gaps.md),
+                const SizedBox(width: Gaps.md),
+              ],
               Expanded(
                 child: GhostButton(
                   label: '编辑',
@@ -1726,6 +2453,7 @@ class DayDetailSheet extends ConsumerWidget {
             label: '删除记录',
             icon: Icons.delete_outline_rounded,
             danger: true,
+            expand: true,
             onPressed: () async {
               final confirmed = await showConfirmDialog(
                 context,
@@ -1741,15 +2469,12 @@ class DayDetailSheet extends ConsumerWidget {
                 Navigator.of(context).pop();
                 messenger.showSnackBar(
                   SnackBar(
-                    // 与确认框承诺的 6 秒一致（原来只有 3 秒，用户读到时已经过期）。
                     content: const Text('已删除 · 可撤销'),
                     behavior: SnackBarBehavior.floating,
                     duration: const Duration(seconds: 6),
                     action: SnackBarAction(
                       label: '撤销',
                       onPressed: () {
-                        // 只恢复工时记录；工资账目交给对账按**当前**时薪重建。
-                        // 用删除前的旧金额回写会与时薪改动后的 recordPay 分叉。
                         controller.saveDay(
                           record.date,
                           record.hours,
@@ -1778,49 +2503,71 @@ class _DetailMetric extends StatelessWidget {
     required this.value,
     required this.unit,
     required this.color,
+    required this.tint,
   });
 
   final String label;
   final String value;
   final String unit;
   final Color color;
+  final Color tint;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: TextStyle(fontSize: 11.5, color: colors.text3)),
-        const SizedBox(height: 4),
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          alignment: Alignment.centerLeft,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: 28,
-                  height: 1,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: -0.03,
-                  color: color,
-                  fontFeatures: tabularFigures,
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.only(left: 3, bottom: 2),
-                child: Text(
-                  unit,
-                  style: TextStyle(fontSize: TypeScale.micro, color: colors.text3),
-                ),
-              ),
-            ],
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: ShapeDecoration(
+        color: tint,
+        shape: Radii.shape(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w600,
+              color: colors.text2,
+            ),
           ),
-        ),
-      ],
+          const SizedBox(height: 6),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 26,
+                    height: 1.05,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.4,
+                    color: color,
+                    fontFeatures: tabularFigures,
+                  ),
+                ),
+                if (unit.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4),
+                    child: Text(
+                      unit,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: colors.text2,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1836,7 +2583,7 @@ class _DetailRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 7),
+      padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1850,10 +2597,13 @@ class _DetailRow extends StatelessWidget {
           Expanded(
             child: Text(
               value,
+              textAlign: TextAlign.right,
               style: TextStyle(
                 fontSize: 13.5,
+                fontWeight: FontWeight.w600,
                 color: valueColor ?? colors.text,
-                height: 1.5,
+                height: 1.4,
+                fontFeatures: tabularFigures,
               ),
             ),
           ),

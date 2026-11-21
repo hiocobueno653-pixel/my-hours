@@ -1,11 +1,9 @@
-/// 设计令牌：颜色 / 圆角 / 间距 / 阴影 / 字号。
+/// 设计令牌：FlClash 液态玻璃（Liquid Glass & Soft Surface）视觉系统。
 ///
-/// 视觉基线来自 `E:/蒸馏/FlClash_UI` 的令牌与版式测量（GPL-3.0 项目的
-/// 设计事实），只取数值，不引入 prism_ui 代码或资源。时页品牌色为
-/// `#2563EB`，深色主题使用偏蓝的夜间灰阶。改这里就等于改全站，不要在
-/// 组件里写裸色值。
+/// 冷灰呼吸画布、高洁净度大连续圆角卡片、电光钴蓝鲜明主色与真实液态玻璃折射。
 library;
 
+import 'package:fluid_glass/fluid_glass.dart';
 import 'package:flutter/material.dart';
 
 /// 主题色风格。主题页只改变主色及其派生色，不改变语义色。
@@ -69,10 +67,9 @@ class AppColors {
   Color get accentStrong => primary;
   Color get accentSoft => primaryContainer;
 
-  /// 卡片极细描边。浅色用 6% 的冷墨色、深色用 7% 白：纯靠投影区分卡片和
-  /// 页面底色时，白卡在冷灰底上边缘是「糊」的，加这一层才有实体边界。
+  /// 轻盈描边：暗色纯黑与玻璃浮层上提供微弱轮廓，亮色卡片靠面差呼吸。
   Color get cardBorder =>
-      isDark ? const Color(0x12FFFFFF) : const Color(0x0F0F172A);
+      isDark ? const Color(0xFF2B2D36) : const Color(0xFFE5E5EC);
 
   AppColors copyWith({
     Color? page,
@@ -136,13 +133,13 @@ class AppColors {
       AppColorStyle.vivid => seed,
       AppColorStyle.atmospheric => Color.lerp(
         seed,
-        isDark ? const Color(0xFF0B1120) : const Color(0xFFF3F5F9),
-        isDark ? 0.16 : 0.12,
+        isDark ? const Color(0xFF111114) : const Color(0xFFF2F2F7),
+        isDark ? 0.16 : 0.10,
       )!,
       AppColorStyle.soft => Color.lerp(
         seed,
-        isDark ? const Color(0xFF151D2E) : Colors.white,
-        isDark ? 0.20 : 0.26,
+        isDark ? const Color(0xFF1E1F24) : Colors.white,
+        isDark ? 0.18 : 0.20,
       )!,
       AppColorStyle.monochrome => HSLColor.fromColor(
         seed,
@@ -153,14 +150,17 @@ class AppColors {
     }
     final container = isDark
         ? Color.lerp(adjusted, base.inset, 0.72)!
-        : Color.lerp(adjusted, Colors.white, 0.84)!;
+        : Color.lerp(adjusted, Colors.white, 0.88)!;
     final onContainer = isDark
         ? Color.lerp(adjusted, Colors.white, 0.72)!
-        : Color.lerp(adjusted, Colors.black, 0.38)!;
+        : Color.lerp(adjusted, Colors.black, 0.40)!;
     const darkInk = Color(0xFF071222);
     final darkInkContrast = _contrastRatio(adjusted, darkInk);
     final whiteContrast = _contrastRatio(adjusted, Colors.white);
-    final onPrimary = darkInkContrast >= whiteContrast ? darkInk : Colors.white;
+    final onPrimary =
+        (whiteContrast >= 4.0 || whiteContrast >= darkInkContrast)
+        ? Colors.white
+        : darkInk;
     var page = base.page;
     var card = base.card;
     var block = base.block;
@@ -170,26 +170,26 @@ class AppColors {
         case AppColorStyle.vivid:
           break;
         case AppColorStyle.atmospheric:
-          page = Color.lerp(base.page, adjusted, isDark ? 0.08 : 0.035)!;
-          card = Color.lerp(base.card, adjusted, isDark ? 0.07 : 0.02)!;
-          block = Color.lerp(base.block, adjusted, isDark ? 0.10 : 0.05)!;
-          inset = Color.lerp(base.inset, adjusted, isDark ? 0.12 : 0.07)!;
+          page = Color.lerp(base.page, adjusted, isDark ? 0.07 : 0.028)!;
+          card = Color.lerp(base.card, adjusted, isDark ? 0.06 : 0.006)!;
+          block = Color.lerp(base.block, adjusted, isDark ? 0.09 : 0.05)!;
+          inset = Color.lerp(base.inset, adjusted, isDark ? 0.11 : 0.07)!;
           break;
         case AppColorStyle.soft:
           page = Color.lerp(
             base.page,
-            isDark ? Colors.white : Colors.white,
-            isDark ? 0.035 : 0.24,
+            Colors.white,
+            isDark ? 0.03 : 0.16,
           )!;
-          card = Color.lerp(base.card, Colors.white, isDark ? 0.06 : 0.08)!;
-          block = Color.lerp(base.block, Colors.white, isDark ? 0.08 : 0.18)!;
-          inset = Color.lerp(base.inset, Colors.white, isDark ? 0.10 : 0.12)!;
+          card = Color.lerp(base.card, Colors.white, isDark ? 0.05 : 0.0)!;
+          block = Color.lerp(base.block, Colors.white, isDark ? 0.07 : 0.12)!;
+          inset = Color.lerp(base.inset, Colors.white, isDark ? 0.09 : 0.08)!;
           break;
         case AppColorStyle.monochrome:
-          page = isDark ? const Color(0xFF07080A) : const Color(0xFFF1F2F4);
-          card = isDark ? const Color(0xFF121318) : const Color(0xFFFFFFFF);
-          block = isDark ? const Color(0xFF1C1E24) : const Color(0xFFE9EBEF);
-          inset = isDark ? const Color(0xFF282B33) : const Color(0xFFDDE1E7);
+          page = isDark ? const Color(0xFF0B0B0E) : const Color(0xFFF1F1F3);
+          card = isDark ? const Color(0xFF17181C) : const Color(0xFFFFFFFF);
+          block = isDark ? const Color(0xFF24262C) : const Color(0xFFE7E7EB);
+          inset = isDark ? const Color(0xFF32343D) : const Color(0xFFDADAE0);
           break;
       }
     }
@@ -211,95 +211,94 @@ class AppColors {
   }
 
   static const AppColors light = AppColors(
-    page: Color(0xFFF3F5F9),
+    page: Color(0xFFF2F2F7),
     card: Color(0xFFFFFFFF),
-    block: Color(0xFFEDF1F7),
-    inset: Color(0xFFE2E8F2),
-    text: Color(0xFF111827),
-    text2: Color(0xFF4B5563),
-    text3: Color(0xFF667085),
-    divider: Color(0x24111827),
-    outline: Color(0xFF6B7280),
-    primary: Color(0xFF2563EB),
+    block: Color(0xFFE9E9F0),
+    inset: Color(0xFFDDDDE6),
+    text: Color(0xFF18181C),
+    text2: Color(0xFF5C5C68),
+    text3: Color(0xFF8E8E9A),
+    divider: Color(0xFFEAEAF0),
+    outline: Color(0xFFA0A0AD),
+    primary: Color(0xFF007AFF),
     onPrimary: Color(0xFFFFFFFF),
-    primaryContainer: Color(0xFFDBEAFE),
-    onPrimaryContainer: Color(0xFF1E3A8A),
-    income: Color(0xFF047857),
-    incomeSoft: Color(0xFFD1FAE5),
-    expense: Color(0xFFDC2626),
-    expenseSoft: Color(0xFFFEE2E2),
-    warning: Color(0xFFB45309),
-    warningSoft: Color(0xFFFEF3C7),
+    primaryContainer: Color(0xFFE6F1FF),
+    onPrimaryContainer: Color(0xFF0055CC),
+    income: Color(0xFF0F9D6B),
+    incomeSoft: Color(0xFFE6F7F0),
+    expense: Color(0xFFE53935),
+    expenseSoft: Color(0xFFFDECEC),
+    warning: Color(0xFFE68A00),
+    warningSoft: Color(0xFFFFF4E0),
     chart: [
-      Color(0xFF2563EB),
-      Color(0xFF60A5FA),
-      Color(0xFF047857),
-      Color(0xFFDC2626),
-      Color(0xFFB45309),
-      Color(0xFF94A3B8),
+      Color(0xFF007AFF),
+      Color(0xFF5856D6),
+      Color(0xFF0F9D6B),
+      Color(0xFFFF9500),
+      Color(0xFFE53935),
+      Color(0xFFAF52DE),
     ],
     isDark: false,
   );
 
   static const AppColors dark = AppColors(
-    page: Color(0xFF0B1120),
-    card: Color(0xFF151D2E),
-    block: Color(0xFF1E293B),
-    inset: Color(0xFF273449),
-    text: Color(0xFFF8FAFC),
-    text2: Color(0xFFC7D2E5),
-    text3: Color(0xFF97A8C0),
-    divider: Color(0x24F8FAFC),
-    outline: Color(0xFF94A3B8),
-    primary: Color(0xFF6D9EFF),
-    // 浅蓝主色上用深色文字，避免白字只有约 2.6:1 的对比度。
-    onPrimary: Color(0xFF071222),
-    primaryContainer: Color(0xFF1E3A8A),
-    onPrimaryContainer: Color(0xFFDBEAFE),
+    page: Color(0xFF111114),
+    card: Color(0xFF1E1F24),
+    block: Color(0xFF2A2C33),
+    inset: Color(0xFF373A44),
+    text: Color(0xFFF5F5F7),
+    text2: Color(0xFFA6A8B2),
+    text3: Color(0xFF757885),
+    divider: Color(0xFF2A2C34),
+    outline: Color(0xFF6F7380),
+    primary: Color(0xFF479BFF),
+    onPrimary: Color(0xFF061326),
+    primaryContainer: Color(0xFF1A3159),
+    onPrimaryContainer: Color(0xFFD6E8FF),
     income: Color(0xFF34D399),
-    incomeSoft: Color(0xFF064E3B),
+    incomeSoft: Color(0xFF12382B),
     expense: Color(0xFFF87171),
-    expenseSoft: Color(0xFF7F1D1D),
-    warning: Color(0xFFE3A63C),
-    warningSoft: Color(0xFF3E2A0C),
+    expenseSoft: Color(0xFF421E21),
+    warning: Color(0xFFFBBF24),
+    warningSoft: Color(0xFF3D2E14),
     chart: [
-      Color(0xFF6D9EFF),
-      Color(0xFF93C5FD),
+      Color(0xFF479BFF),
+      Color(0xFF8B89F8),
       Color(0xFF34D399),
-      Color(0xFFF87171),
       Color(0xFFFBBF24),
-      Color(0xFF94A3B8),
+      Color(0xFFF87171),
+      Color(0xFFC084FC),
     ],
     isDark: true,
   );
 
   static const AppColors darkPureBlack = AppColors(
     page: Color(0xFF000000),
-    card: Color(0xFF0B0B0F),
-    block: Color(0xFF15151B),
-    inset: Color(0xFF22222A),
+    card: Color(0xFF121317),
+    block: Color(0xFF1E2027),
+    inset: Color(0xFF2A2D36),
     text: Color(0xFFF7F7FA),
     text2: Color(0xFFC4C4CF),
     text3: Color(0xFF8D8D9B),
-    divider: Color(0x24FFFFFF),
-    outline: Color(0xFF9A9AA8),
-    primary: Color(0xFF6D9EFF),
-    onPrimary: Color(0xFF071222),
-    primaryContainer: Color(0xFF1E3A8A),
-    onPrimaryContainer: Color(0xFFDBEAFE),
+    divider: Color(0xFF1D2028),
+    outline: Color(0xFF787C87),
+    primary: Color(0xFF479BFF),
+    onPrimary: Color(0xFF061326),
+    primaryContainer: Color(0xFF1A3159),
+    onPrimaryContainer: Color(0xFFD6E8FF),
     income: Color(0xFF34D399),
-    incomeSoft: Color(0xFF064E3B),
+    incomeSoft: Color(0xFF12382B),
     expense: Color(0xFFF87171),
-    expenseSoft: Color(0xFF7F1D1D),
-    warning: Color(0xFFE3A63C),
-    warningSoft: Color(0xFF3E2A0C),
+    expenseSoft: Color(0xFF421E21),
+    warning: Color(0xFFFBBF24),
+    warningSoft: Color(0xFF3D2E14),
     chart: [
-      Color(0xFF6D9EFF),
-      Color(0xFF93C5FD),
+      Color(0xFF479BFF),
+      Color(0xFF8B89F8),
       Color(0xFF34D399),
-      Color(0xFFF87171),
       Color(0xFFFBBF24),
-      Color(0xFF94A3B8),
+      Color(0xFFF87171),
+      Color(0xFFC084FC),
     ],
     isDark: true,
   );
@@ -313,17 +312,17 @@ double _contrastRatio(Color a, Color b) {
   return (lighter + 0.05) / (darker + 0.05);
 }
 
-/// 圆角。所有容器与胶囊都走超椭圆，不用普通圆角矩形。
+/// FlClash 风格连续曲率超椭圆圆角刻度。
 abstract final class Radii {
-  static const double xs = 4;
-  static const double sm = 8;
-  static const double md = 16;
-  static const double lg = 20;
-  static const double xl = 24;
+  static const double xs = 6;
+  static const double sm = 10;
+  static const double md = 14;
+  static const double lg = 18;
+  static const double xl = 22;
   static const double xxl = 28;
-  static const double hero = 32;
-  static const double alert = 34;
-  static const double card = 28;
+  static const double hero = 26;
+  static const double alert = 32;
+  static const double card = 22;
   static const double pill = 999;
 
   static const BorderRadius cardRadius = BorderRadius.all(
@@ -380,14 +379,14 @@ abstract final class Gaps {
   static const double xl = 24;
   static const double xxl = 32;
 
-  /// 卡片之间的间距（FlClash 移动端实测 8）。
-  static const double cardGap = 8;
+  /// 卡片之间的呼吸间距。
+  static const double cardGap = 10;
 
   /// 页面左右内边距。
   static const double page = 16;
 
   /// 主页面标题栏高度（不含状态栏）。
-  static const double headerHeight = 72;
+  static const double headerHeight = 60;
 }
 
 /// 主题扩展：把令牌挂到 `ThemeData.extensions`，组件里用 `context.tokens` 取。
@@ -406,51 +405,39 @@ class AppTokens extends ThemeExtension<AppTokens> {
   static const AppTokens lightTokens = AppTokens(
     colors: AppColors.light,
     shadows: [
-      // 贴边：定义轮廓，几乎不扩散
-      BoxShadow(color: Color(0x0A0F172A), blurRadius: 1.5, offset: Offset(0, 1)),
-      // 主体：卡片离底面的高度
       BoxShadow(
-        color: Color(0x0D0F172A),
-        blurRadius: 10,
-        spreadRadius: -2,
+        color: Color(0x09000000),
+        blurRadius: 16,
         offset: Offset(0, 4),
       ),
-      // 环境：大面积柔光，只做氛围不参与塑形
       BoxShadow(
-        color: Color(0x12101828),
-        blurRadius: 30,
-        spreadRadius: -10,
-        offset: Offset(0, 14),
+        color: Color(0x05000000),
+        blurRadius: 3,
+        offset: Offset(0, 1),
       ),
     ],
     floatingShadows: [
       BoxShadow(
-        color: Color(0x2E000000),
-        blurRadius: 32,
-        offset: Offset(0, 12),
+        color: Color(0x1C000000),
+        blurRadius: 28,
+        offset: Offset(0, 10),
       ),
-      BoxShadow(color: Color(0x14000000), blurRadius: 6, offset: Offset(0, 2)),
+      BoxShadow(color: Color(0x0C000000), blurRadius: 6, offset: Offset(0, 2)),
     ],
   );
 
   static const AppTokens darkTokens = AppTokens(
     colors: AppColors.dark,
     shadows: [
-      BoxShadow(color: Color(0x66000000), blurRadius: 2, offset: Offset(0, 1)),
-      BoxShadow(
-        color: Color(0x99000000),
-        blurRadius: 28,
-        spreadRadius: -8,
-        offset: Offset(0, 12),
-      ),
+      BoxShadow(color: Color(0x2E000000), blurRadius: 14, offset: Offset(0, 4)),
     ],
     floatingShadows: [
       BoxShadow(
-        color: Color(0x80000000),
-        blurRadius: 32,
-        offset: Offset(0, 12),
+        color: Color(0x5C000000),
+        blurRadius: 28,
+        offset: Offset(0, 10),
       ),
-      BoxShadow(color: Color(0x4D000000), blurRadius: 6, offset: Offset(0, 2)),
+      BoxShadow(color: Color(0x2A000000), blurRadius: 6, offset: Offset(0, 2)),
     ],
   );
 
@@ -488,14 +475,8 @@ extension AppTokensX on BuildContext {
   List<BoxShadow> get floatingShadows => tokens.floatingShadows;
 }
 
-/// 页面滚动内容的底部留白。
-///
-/// 手机底部有悬浮 Dock，需要预留约一个 Dock 的高度；宽屏使用侧栏后
-/// Dock 不再出现，只保留系统手势区和少量呼吸空间。
-///
-/// 键盘弹出时改按键盘高度留白：AppShell 关掉了 `resizeToAvoidBottomInset`
-/// （否则悬浮 Dock 会被顶到键盘上方），所以这一层必须自己把内容
-/// 顶到键盘之上，否则列表底部会一直藏在键盘后面。
+/// 页面滚动内容的底部留白：让内容延伸到悬浮液态玻璃底栏之下产生折射，
+/// 同时滚到底部时最后一张卡片能完全越过底栏。
 double pageBottomInset(BuildContext context) {
   final keyboard = MediaQuery.viewInsetsOf(context).bottom;
   final system = MediaQuery.paddingOf(context).bottom;
@@ -504,20 +485,26 @@ double pageBottomInset(BuildContext context) {
     final safeInset = system + 24;
     return keyboardInset > safeInset ? keyboardInset : safeInset;
   }
-  return system + (MediaQuery.sizeOf(context).width >= 720 ? 24 : 104);
+  final wide = MediaQuery.sizeOf(context).width >= 720;
+  return wide ? system + 28 : system + 124;
 }
 
 /// 构建 ThemeData。
-///
-/// 字体走平台系统字体（FlClash 的移动端字形），不打包品牌字体；
-/// 数字由各组件显式启用 tabular figures。
-ThemeData buildAppTheme(AppColors colors, AppTokens tokens) {
+ThemeData buildAppTheme(
+  AppColors colors,
+  AppTokens tokens, {
+  String? fontFamily,
+}) {
+  final effectiveFont = (fontFamily != null && fontFamily.isNotEmpty)
+      ? fontFamily
+      : null;
   final base = ThemeData(
     brightness: colors.isDark ? Brightness.dark : Brightness.light,
     useMaterial3: true,
+    fontFamily: effectiveFont,
     scaffoldBackgroundColor: colors.page,
     canvasColor: colors.page,
-    splashFactory: NoSplash.splashFactory,
+    splashFactory: LiquidInkHighlight.splashFactory,
     highlightColor: Colors.transparent,
     hoverColor: colors.text.withValues(alpha: 0.04),
     colorScheme: ColorScheme(
@@ -646,6 +633,7 @@ ThemeData buildAppTheme(AppColors colors, AppTokens tokens) {
   // 主题层统一关闭文字装饰；弹层还会提供透明 Material，避免 MaterialApp
   // 的 fallback 错误样式（黄色双下划线）泄漏到正文。
   final normalizedTextTheme = textTheme.apply(
+    fontFamily: effectiveFont,
     decoration: TextDecoration.none,
     decorationColor: Colors.transparent,
   );
@@ -674,17 +662,36 @@ ThemeData buildAppTheme(AppColors colors, AppTokens tokens) {
       thumbColor: WidgetStateProperty.resolveWith(
         (states) => states.contains(WidgetState.selected)
             ? colors.onPrimary
-            : colors.card,
+            : (colors.isDark ? colors.text2 : Colors.white),
       ),
       trackColor: WidgetStateProperty.resolveWith(
-        (states) => states.contains(WidgetState.selected)
-            ? colors.primary
-            : colors.inset,
+        (states) {
+          if (states.contains(WidgetState.disabled)) {
+            return colors.block;
+          }
+          return states.contains(WidgetState.selected)
+              ? colors.primary
+              : colors.inset;
+        },
       ),
-      trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
+      trackOutlineColor: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.selected)
+            ? Colors.transparent
+            : colors.cardBorder,
+      ),
+      trackOutlineWidth: const WidgetStatePropertyAll(1),
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
       overlayColor: WidgetStatePropertyAll(
         colors.primary.withValues(alpha: 0.10),
       ),
+    ),
+    sliderTheme: SliderThemeData(
+      trackHeight: 4,
+      activeTrackColor: colors.primary,
+      inactiveTrackColor: colors.inset,
+      thumbColor: colors.primary,
+      overlayColor: colors.primary.withValues(alpha: 0.12),
+      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,

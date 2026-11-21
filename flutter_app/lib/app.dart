@@ -1,46 +1,34 @@
 import 'dart:async';
-import 'dart:ffi' show Abi;
-import 'dart:io' show Platform;
 import 'dart:math' as math;
 import 'dart:ui' show ImageFilter;
 
+import 'package:fluid_glass/fluid_glass.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:fluid_glass/fluid_glass.dart';
 
 import 'core/glass_policy.dart';
+import 'core/measure_unit.dart';
 import 'core/motion.dart';
 import 'core/settings.dart';
 import 'core/theme_tokens.dart';
 import 'features/ledger/ledger_view.dart';
 import 'features/mine/my_view.dart';
+import 'features/mine/stats_page.dart';
 import 'features/work/month_view.dart';
 import 'platform/back_navigation.dart';
 import 'state/app_controller.dart';
+import 'state/timer_controller.dart';
 import 'ui/widgets.dart';
 
-const bool _plainGlassBuild = bool.fromEnvironment('MYHOURS_PLAIN_GLASS');
-
-/// 折射着色器在 Android x86_64 模拟器上会拖慢冷启动，
-/// 真机 ARM/ARM64 才启用液态镜片；其余平台退回普通高斯玻璃。
-bool get _liquidDockSupported {
-  if (_plainGlassBuild || !Platform.isAndroid) return false;
-  final abi = Abi.current();
-  if (abi != Abi.androidArm64) return false;
-  // 低端机即使 ABI 支持，也不做全屏折射；省下持续的背景采样。
-  return GlassDeviceTier.instance.quality.hasRefraction;
-}
-
-/// 三个 tab。`HOURS_ONLY` 变体只保留记工与我的。
-enum AppTab { work, ledger, mine }
+/// 四个核心入口：工时 / 账本 / 统计 / 我的（HOURS_ONLY 省略账本）。
+enum AppTab { work, ledger, stats, mine }
 
 class AppShell extends StatefulWidget {
   const AppShell({
     super.key,
     required this.hoursOnly,
     required this.largeText,
-    required this.onLargeTextChanged,
     this.dockStyle = AppDockStyle.floating,
     this.tabTransition = AppTabTransition.slide,
     this.glassPreference = AppGlassPreference.standard,
@@ -48,7 +36,6 @@ class AppShell extends StatefulWidget {
 
   final bool hoursOnly;
   final bool largeText;
-  final ValueChanged<bool> onLargeTextChanged;
   final AppDockStyle dockStyle;
   final AppTabTransition tabTransition;
   final AppGlassPreference glassPreference;
@@ -58,15 +45,12 @@ class AppShell extends StatefulWidget {
 }
 
 class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
+  final LayerBackdrop _backdrop = LayerBackdrop();
   AppTab _tab = AppTab.work;
   String? _exitHint;
   DateTime? _lastBackAt;
   Timer? _exitTimer;
-  Timer? _dockEntranceTimer;
   bool _ledgerOpening = false;
-  bool _dockEntered = false;
-  final LayerBackdrop _backdrop = LayerBackdrop(preferPictureReplay: true);
-  final Set<AppTab> _builtTabs = {AppTab.work};
   final Map<AppTab, Widget> _pageCache = {};
   final Map<AppTab, ScrollController> _tabScrolls = {
     for (final tab in AppTab.values) tab: ScrollController(),
@@ -76,29 +60,28 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    // 首帧不构建 Dock：ARM 真机首次创建液态镜片时要编译折射程序，
-    // 放在首帧会拖慢冷启动。先让页面出图，下一帧后再独立上浮。
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _dockEntranceTimer = Timer(const Duration(milliseconds: 80), () {
-        if (mounted) setState(() => _dockEntered = true);
-      });
+      unawaited(
+        ProviderScope.containerOf(
+          context,
+          listen: false,
+        ).read(timerProvider.notifier).syncNotification(),
+      );
     });
   }
 
   List<AppTab> get _tabs => widget.hoursOnly
-      ? const [AppTab.work, AppTab.mine]
-      : const [AppTab.work, AppTab.ledger, AppTab.mine];
+      ? const [AppTab.work, AppTab.stats, AppTab.mine]
+      : const [AppTab.work, AppTab.ledger, AppTab.stats, AppTab.mine];
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _exitTimer?.cancel();
-    _dockEntranceTimer?.cancel();
     for (final controller in _tabScrolls.values) {
       controller.dispose();
     }
-    _backdrop.dispose();
     super.dispose();
   }
 
@@ -129,7 +112,6 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     HapticFeedback.selectionClick();
     setState(() {
       _tab = tab;
-      _builtTabs.add(tab);
     });
   }
 
@@ -155,7 +137,6 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     ).read(selectedMonthProvider.notifier).setMonth(targetMonth);
     setState(() {
       _tab = AppTab.ledger;
-      _builtTabs.add(AppTab.ledger);
     });
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) {
@@ -200,10 +181,8 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           onOpenLedger: widget.hoursOnly ? null : _openLedgerForDate,
         ),
         AppTab.ledger => const LedgerView(),
-        AppTab.mine => MyView(
-          largeText: widget.largeText,
-          onLargeTextChanged: widget.onLargeTextChanged,
-        ),
+        AppTab.stats => const StatsPage(),
+        AppTab.mine => const MyView(),
       };
     });
     return PrimaryScrollController(controller: _tabScrolls[tab]!, child: page);
@@ -213,6 +192,17 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    final glassPolicy = resolveGlassEffectPolicy(
+      widget.glassPreference,
+      liquidSupported: GlassDeviceTier.instance.quality == GlassQuality.liquid,
+      reduceEffects: disable,
+    );
+    final floatingDock = widget.dockStyle == AppDockStyle.floating;
+    final bottomPad = MediaQuery.paddingOf(context).bottom;
+    final dockClearance =
+        (floatingDock ? math.max(16.0, bottomPad + 6.0) : bottomPad) +
+        _BottomNavBar.dockHeight +
+        10;
 
     return PopScope(
       canPop: false,
@@ -222,125 +212,52 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       },
       child: Scaffold(
         backgroundColor: colors.page,
-        extendBody: true,
-        extendBodyBehindAppBar: true,
-        // 键盘弹出时不压缩 body。
-        //
-        // Dock 是 body 里 `Positioned(bottom: 0)` 的悬浮层，默认的
-        // `resizeToAvoidBottomInset: true` 会把 body 顶到键盘上方，
-        // 于是 Dock 跟着「抬起来」浮在半空。关掉之后 Dock 留在原位被键盘
-        // 盖住，页面也不跟着上移；需要避让的滚动留白由 `pageBottomInset`
-        // 单独加 keyboard inset 处理。
         resizeToAvoidBottomInset: false,
         body: LayoutBuilder(
           builder: (context, constraints) {
             final showSidebar = constraints.maxWidth >= 720;
             final showLabels = constraints.maxWidth >= 900;
-            final dockEntered = disable || _dockEntered;
-            final glassPolicy = resolveGlassEffectPolicy(
-              widget.glassPreference,
-              liquidSupported: _liquidDockSupported,
-              reduceEffects: disable,
-            );
-            final liquidDock = glassPolicy.liquidDock && !showSidebar;
-            final tabView = _FadeTabView(
+            final tabView = _FlClashTabView(
               tabs: _tabs,
               active: _tab,
-              builtTabs: _builtTabs,
               slide: widget.tabTransition == AppTabTransition.slide,
+              animate: !showSidebar,
               builder: _pageFor,
             );
-            final tabContent = Stack(
-              fit: StackFit.expand,
-              children: [
-                tabView,
-                if (!showSidebar)
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    height: 108 + MediaQuery.paddingOf(context).bottom,
-                    child: IgnorePointer(
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [
-                              colors.page.withValues(alpha: 0),
-                              colors.page.withValues(
-                                alpha: colors.isDark ? 0.72 : 0.82,
-                              ),
-                              colors.page.withValues(alpha: 0.96),
-                            ],
-                            stops: const [0, 0.62, 1],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            );
 
-            final content = Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Positioned.fill(
-                  child: liquidDock
-                      ? BackdropLayer(
-                          backdrop: _backdrop,
-                          changeMargin: 24,
-                          motionPixelRatio: math.min(
-                            MediaQuery.devicePixelRatioOf(context),
-                            1.25,
-                          ),
-                          child: tabContent,
-                        )
-                      : tabContent,
-                ),
-                if (!showSidebar)
+            final mainArea = AppBackdropScope(
+              backdrop: _backdrop,
+              child: Stack(
+                fit: StackFit.expand,
+                clipBehavior: Clip.none,
+                children: [
+                  BackdropLayer(
+                    backdrop: _backdrop,
+                    child: tabView,
+                  ),
+                  if (!showSidebar)
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      child: _BottomNavBar(
+                        key: const ValueKey('app-dock'),
+                        tabs: _tabs,
+                        active: _tab,
+                        backdrop: _backdrop,
+                        glassQuality: glassPolicy.dockQuality,
+                        floating: floatingDock,
+                        onSelect: _selectTab,
+                        onReselect: _reselectTab,
+                      ),
+                    ),
                   Positioned(
                     left: 0,
                     right: 0,
-                    bottom: 0,
-                    child: AnimatedSlide(
-                      offset: dockEntered ? Offset.zero : const Offset(0, 0.25),
-                      duration: disable ? Duration.zero : Timings.slow,
-                      curve: Curves2.out,
-                      child: AnimatedOpacity(
-                        opacity: dockEntered ? 1 : 0,
-                        duration: disable ? Duration.zero : Timings.fast,
-                        child: dockEntered
-                            ? _AppDock(
-                                tabs: _tabs,
-                                active: _tab,
-                                backdrop: _backdrop,
-                                glassQuality: glassPolicy.dockQuality,
-                                floating:
-                                    widget.dockStyle == AppDockStyle.floating,
-                                onSelect: _selectTab,
-                                onReselect: _reselectTab,
-                              )
-                            : const SizedBox.shrink(),
-                      ),
-                    ),
+                    bottom: showSidebar ? 16 : dockClearance,
+                    child: const _SaveStatusBanner(),
                   ),
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: showSidebar
-                      ? 16
-                      : (widget.dockStyle == AppDockStyle.floating
-                                ? math.max(
-                                    20.0,
-                                    MediaQuery.paddingOf(context).bottom + 8,
-                                  )
-                                : MediaQuery.paddingOf(context).bottom) +
-                            _AppDock._height +
-                            10,
-                  child: const _SaveStatusBanner(),
-                ),
-                Positioned(
+                  Positioned(
                   top: 0,
                   left: 0,
                   right: 0,
@@ -394,10 +311,11 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                     ),
                   ),
                 ),
-              ],
+                ],
+              ),
             );
 
-            if (!showSidebar) return content;
+            if (!showSidebar) return mainArea;
             return Row(
               children: [
                 _AppSidebar(
@@ -406,7 +324,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                   showLabels: showLabels,
                   onSelect: _selectTab,
                 ),
-                Expanded(child: content),
+                Expanded(child: mainArea),
               ],
             );
           },
@@ -416,132 +334,238 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   }
 }
 
-/// 保活页面 + 220ms 交叉淡入。隐藏页不接收指针与焦点，ticker 也停掉。
-class _FadeTabView extends StatelessWidget {
-  const _FadeTabView({
+/// FlClash 双模式 PageView 标签切换：
+/// - 滑动模式：整屏水平滑动（320ms Curves2.out），跨 >1 页时先临时换位到相邻槽位，
+///   绝不构建和绘制中间路过的页面；
+/// - 淡入模式：在同一 PageView 上抵消位移做原地交叉淡入（200ms Curves2.inOut），
+///   且离位运动中的页由 SnapshotWidget 冻结重绘，保证 120fps 不掉帧。
+class _FlClashTabView extends StatefulWidget {
+  const _FlClashTabView({
     required this.tabs,
     required this.active,
-    required this.builtTabs,
     required this.slide,
+    required this.animate,
     required this.builder,
   });
 
   final List<AppTab> tabs;
   final AppTab active;
-  final Set<AppTab> builtTabs;
   final bool slide;
+  final bool animate;
   final Widget Function(AppTab tab) builder;
 
   @override
-  Widget build(BuildContext context) {
-    final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
-    final activeIndex = tabs.indexOf(active);
-    return ClipRect(
-      child: Stack(
-        children: [
-          for (final tab in tabs)
-            if (builtTabs.contains(tab))
-              Positioned.fill(
-                child: IgnorePointer(
-                  ignoring: tab != active,
-                  child: ExcludeSemantics(
-                    excluding: tab != active,
-                    child: ExcludeFocus(
-                      excluding: tab != active,
-                      child: _TabPane(
-                        key: ValueKey(tab),
-                        active: tab == active,
-                        slideOffset: !slide || tab == active
-                            ? Offset.zero
-                            : Offset(
-                                (tabs.indexOf(tab) - activeIndex).sign * 0.028,
-                                0,
-                              ),
-                        duration: motionDuration(
-                          Timings.fast,
-                          disableAnimations: disable,
-                        ),
-                        child: RepaintBoundary(child: builder(tab)),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-        ],
-      ),
-    );
+  State<_FlClashTabView> createState() => _FlClashTabViewState();
+}
+
+class _FlClashTabViewState extends State<_FlClashTabView> {
+  late final PageController _pageController = PageController(
+    initialPage: _indexOf(widget.active),
+  );
+  List<int>? _order;
+  int _transitionToken = 0;
+
+  int _indexOf(AppTab tab) {
+    final index = widget.tabs.indexOf(tab);
+    return index < 0 ? 0 : index;
   }
-}
-
-/// 单个 Tab 的进出场。淡出结束后才设为 Offstage，既保留过渡，又让隐藏页
-/// 彻底退出布局、绘制与 ticker 调度。
-class _TabPane extends StatefulWidget {
-  const _TabPane({
-    super.key,
-    required this.active,
-    required this.slideOffset,
-    required this.duration,
-    required this.child,
-  });
-
-  final bool active;
-  final Offset slideOffset;
-  final Duration duration;
-  final Widget child;
 
   @override
-  State<_TabPane> createState() => _TabPaneState();
-}
-
-class _TabPaneState extends State<_TabPane> {
-  late bool _offstage = !widget.active;
-
-  @override
-  void didUpdateWidget(covariant _TabPane oldWidget) {
+  void didUpdateWidget(covariant _FlClashTabView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.active && _offstage) {
-      _offstage = false;
-    } else if (!widget.active && widget.duration == Duration.zero) {
-      _offstage = true;
+    if (oldWidget.tabs.length != widget.tabs.length ||
+        !_sameTabs(oldWidget.tabs, widget.tabs)) {
+      _order = null;
+      final target = _indexOf(widget.active);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _pageController.hasClients) {
+          _pageController.jumpToPage(target);
+        }
+      });
+      return;
+    }
+    if (oldWidget.active != widget.active) {
+      unawaited(_navigateTo(widget.active));
+    }
+  }
+
+  bool _sameTabs(List<AppTab> a, List<AppTab> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+
+  Future<void> _navigateTo(AppTab tab) async {
+    if (!mounted || !_pageController.hasClients) return;
+    final target = _indexOf(tab);
+    final token = ++_transitionToken;
+    final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    final rawPage = _pageController.page?.round() ?? target;
+    final current = (_order != null && rawPage < _order!.length)
+        ? _order![rawPage]
+        : rawPage.clamp(0, widget.tabs.length - 1);
+
+    if (_order != null) {
+      setState(() => _order = null);
+      _pageController.jumpToPage(current);
+    }
+
+    if (disable || !widget.animate || current == target) {
+      _pageController.jumpToPage(target);
+      return;
+    }
+
+    if ((target - current).abs() > 1) {
+      final adjacent = target > current ? target - 1 : target + 1;
+      final swapped = List<int>.generate(widget.tabs.length, (i) => i);
+      swapped[adjacent] = current;
+      swapped[current] = adjacent;
+      setState(() => _order = swapped);
+      _pageController.jumpToPage(adjacent);
+    }
+
+    await _pageController.animateToPage(
+      target,
+      duration: widget.slide ? Timings.slow : Timings.fast,
+      curve: widget.slide ? Curves2.out : Curves2.inOut,
+    );
+    if (mounted && token == _transitionToken && _order != null) {
+      setState(() => _order = null);
+      if (_pageController.hasClients) {
+        _pageController.jumpToPage(target);
+      }
     }
   }
 
   @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Offstage(
-      offstage: _offstage,
-      child: AnimatedSlide(
-        offset: widget.slideOffset,
-        duration: widget.duration,
-        curve: Curves2.out,
-        child: AnimatedOpacity(
-          opacity: widget.active ? 1 : 0,
-          duration: widget.duration,
-          curve: Curves2.inOut,
-          onEnd: () {
-            if (!widget.active && !_offstage) {
-              setState(() => _offstage = true);
-            }
-          },
-          child: TickerMode(
-            enabled: widget.active || !_offstage,
-            child: ColoredBox(
-              color: Theme.of(context).scaffoldBackgroundColor,
-              child: widget.child,
-            ),
-          ),
-        ),
-      ),
+    return PageView.builder(
+      controller: _pageController,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: widget.tabs.length,
+      findChildIndexCallback: (key) {
+        if (key is! ValueKey<AppTab>) return null;
+        final logical = widget.tabs.indexOf(key.value);
+        if (logical == -1) return null;
+        return _order?.indexOf(logical) ?? logical;
+      },
+      itemBuilder: (context, slotIndex) {
+        final logicalIndex = _order?[slotIndex] ?? slotIndex;
+        final tab = widget.tabs[logicalIndex];
+        return _FlClashTabPage(
+          key: ValueKey<AppTab>(tab),
+          controller: _pageController,
+          slotIndex: slotIndex,
+          active: tab == widget.active,
+          fadeMode: !widget.slide,
+          child: widget.builder(tab),
+        );
+      },
     );
   }
 }
 
-/// 移动端 Dock：FluidGlass 的 `LiquidBottomTabs`。
-///
-/// 选中镜片支持按住膨胀、跟手拖动、跨 Tab 弹簧回位；镜片本身通过
-/// `DrawBackdrop` 对页面做折射与色散，并放大下方 Tab 的高亮副本。
-class _AppDock extends StatelessWidget {
-  const _AppDock({
+class _FlClashTabPage extends StatefulWidget {
+  const _FlClashTabPage({
+    super.key,
+    required this.controller,
+    required this.slotIndex,
+    required this.active,
+    required this.fadeMode,
+    required this.child,
+  });
+
+  final PageController controller;
+  final int slotIndex;
+  final bool active;
+  final bool fadeMode;
+  final Widget child;
+
+  @override
+  State<_FlClashTabPage> createState() => _FlClashTabPageState();
+}
+
+class _FlClashTabPageState extends State<_FlClashTabPage>
+    with AutomaticKeepAliveClientMixin<_FlClashTabPage> {
+  final SnapshotController _snapshot = SnapshotController();
+
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  void dispose() {
+    _snapshot.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    final body = RepaintBoundary(
+      child: ColoredBox(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        child: widget.child,
+      ),
+    );
+
+    return AnimatedBuilder(
+      animation: widget.controller,
+      child: SnapshotWidget(
+        controller: _snapshot,
+        mode: SnapshotMode.permissive,
+        child: body,
+      ),
+      builder: (context, child) {
+        final hasPage =
+            widget.controller.hasClients &&
+            widget.controller.position.hasContentDimensions;
+        final page = hasPage
+            ? (widget.controller.page ?? widget.slotIndex.toDouble())
+            : widget.slotIndex.toDouble();
+        final delta = (page - widget.slotIndex).clamp(-1.0, 1.0);
+        final moving = !disable && delta.abs() > 0.001;
+        _snapshot.allowSnapshotting = moving;
+
+        final gated = TickerMode(
+          enabled: widget.active || moving,
+          child: IgnorePointer(
+            ignoring: !widget.active,
+            child: ExcludeSemantics(
+              excluding: !widget.active,
+              child: ExcludeFocus(
+                excluding: !widget.active,
+                child: child!,
+              ),
+            ),
+          ),
+        );
+
+        if (!widget.fadeMode || disable) return gated;
+        return FractionalTranslation(
+          translation: Offset(delta, 0),
+          child: Opacity(
+            opacity: (1.0 - delta.abs()).clamp(0.0, 1.0),
+            child: gated,
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// 落定式底部导航栏：实底卡片面 + 1px 顶分割线，永不遮挡日历或列表内容。
+class _BottomNavBar extends StatelessWidget {
+  const _BottomNavBar({
+    super.key,
     required this.tabs,
     required this.active,
     required this.backdrop,
@@ -551,6 +575,13 @@ class _AppDock extends StatelessWidget {
     required this.onReselect,
   });
 
+  static const double dockHeight = 64;
+  static const double _maxWidth = 372;
+  static final ImageFilter _fixedBarBlur = ImageFilter.blur(
+    sigmaX: 22,
+    sigmaY: 22,
+  );
+
   final List<AppTab> tabs;
   final AppTab active;
   final Backdrop backdrop;
@@ -559,18 +590,24 @@ class _AppDock extends StatelessWidget {
   final ValueChanged<AppTab> onSelect;
   final VoidCallback onReselect;
 
-  static const double _height = 68;
-  static const double _maxWidth = 356;
-
-  static const _labels = {
-    AppTab.work: '计时',
-    AppTab.ledger: '记账',
-    AppTab.mine: '我的',
+  static String labelOf(BuildContext context, AppTab tab) => switch (tab) {
+    AppTab.work => context.unit.quantity,
+    AppTab.ledger => '账本',
+    AppTab.stats => '统计',
+    AppTab.mine => '我的',
   };
 
   static const _icons = {
-    AppTab.work: Icons.calendar_month_rounded,
+    AppTab.work: Icons.schedule_outlined,
+    AppTab.ledger: Icons.account_balance_wallet_outlined,
+    AppTab.stats: Icons.insights_outlined,
+    AppTab.mine: Icons.person_outline_rounded,
+  };
+
+  static const _activeIcons = {
+    AppTab.work: Icons.schedule_rounded,
     AppTab.ledger: Icons.account_balance_wallet_rounded,
+    AppTab.stats: Icons.insights_rounded,
     AppTab.mine: Icons.person_rounded,
   };
 
@@ -578,63 +615,116 @@ class _AppDock extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
-    final safeBottom = MediaQuery.paddingOf(context).bottom;
-    final bottom = floating ? math.max(20.0, safeBottom + 8) : safeBottom;
-    final index = tabs.indexOf(active);
-    final Widget dockBar;
-    if (glassQuality == GlassQuality.plain) {
-      dockBar = _PlainDockBar(
-        tabs: tabs,
-        active: active,
-        height: _height,
-        onSelect: onSelect,
-        onReselect: onReselect,
-      );
-    } else {
-      final bar = LiquidBottomTabs(
-        selectedTabIndex: index,
-        onTabSelected: (next) => onSelect(tabs[next]),
-        backdrop: backdrop,
-        tabsCount: tabs.length,
-        height: _height,
-        isInteractive: !disable,
-        onTabReselected: (_) => onReselect(),
-        children: [
-          for (final tab in tabs)
-            LiquidBottomTab(
-              onPressed: () => onSelect(tab),
-              children: [_DockTabContent(tab: tab)],
+    final highContrast = MediaQuery.maybeOf(context)?.highContrast ?? false;
+    final activeIndex = tabs.indexOf(active).clamp(0, tabs.length - 1);
+
+    if (!floating) {
+      final barColor = highContrast
+          ? colors.card
+          : (colors.isDark
+              ? colors.card.withValues(alpha: 0.78)
+              : Colors.white.withValues(alpha: 0.80));
+      final barSurface = DecoratedBox(
+        decoration: BoxDecoration(
+          color: barColor,
+          border: Border(
+            top: BorderSide(
+              color: colors.isDark
+                  ? Colors.white.withValues(alpha: 0.10)
+                  : Colors.black.withValues(alpha: 0.06),
+              width: 0.8,
             ),
-        ],
+          ),
+        ),
+        child: SafeArea(
+          top: false,
+          child: SizedBox(
+            height: 60,
+            child: Row(
+              children: [
+                for (final tab in tabs)
+                  Expanded(
+                    child: Pressable(
+                      onTap: () {
+                        if (tab == active) {
+                          onReselect();
+                        } else {
+                          onSelect(tab);
+                        }
+                      },
+                      haptic: false,
+                      shape: Radii.pillShape,
+                      child: _DockTabContent(
+                        tab: tab,
+                        selected: tab == active,
+                        disableAnimations: disable,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
       );
-      dockBar = GlassQualityScope(quality: glassQuality, child: bar);
+      if (highContrast) return barSurface;
+      return ClipRect(
+        child: BackdropFilter(
+          filter: _fixedBarBlur,
+          child: barSurface,
+        ),
+      );
     }
 
+    final bottomPad = MediaQuery.paddingOf(context).bottom;
+    final bottomOffset = math.max(16.0, bottomPad + 6.0);
+
     return Padding(
-      padding: EdgeInsets.fromLTRB(
-        floating ? 20 : 0,
-        0,
-        floating ? 20 : 0,
-        bottom,
-      ),
+      padding: EdgeInsets.fromLTRB(18, 0, 18, bottomOffset),
       child: Center(
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: floating ? _maxWidth : 720),
-          child: LiquidGlassTheme(
-            colors:
-                LiquidGlassColors.forBrightness(
-                  colors.isDark ? Brightness.dark : Brightness.light,
-                ).copyWith(
-                  accent: colors.primary,
-                  container: colors.isDark
-                      ? colors.card.withValues(alpha: 0.38)
-                      : Colors.white.withValues(alpha: 0.34),
-                  content: colors.text,
-                  track: colors.inset,
-                ),
-            child: KeyedSubtree(
-              key: const ValueKey('app-dock'),
-              child: dockBar,
+          constraints: const BoxConstraints(maxWidth: _maxWidth),
+          child: GlassQualityScope(
+            quality: highContrast ? GlassQuality.plain : glassQuality,
+            child: LiquidGlassTheme(
+              colors: LiquidGlassTheme.of(context).copyWith(
+                accent: colors.primary,
+                content: colors.text,
+                container: colors.isDark
+                    ? const Color(0xFF202229).withValues(
+                        alpha: highContrast ? 1.0 : 0.72,
+                      )
+                    : Colors.white.withValues(
+                        alpha: highContrast ? 1.0 : 0.72,
+                      ),
+              ),
+              child: LiquidBottomTabs(
+                selectedTabIndex: activeIndex,
+                onTabSelected: (index) {
+                  if (index >= 0 && index < tabs.length) {
+                    onSelect(tabs[index]);
+                  }
+                },
+                onTabReselected: (_) => onReselect(),
+                backdrop: backdrop,
+                tabsCount: tabs.length,
+                height: dockHeight,
+                isInteractive: !disable,
+                children: [
+                  for (final tab in tabs)
+                    LiquidBottomTab(
+                      onPressed: () {
+                        if (tab == active) {
+                          onReselect();
+                        } else {
+                          onSelect(tab);
+                        }
+                      },
+                      children: [
+                        _LiquidTabFace(tab: tab),
+                      ],
+                    ),
+                ],
+              ),
             ),
           ),
         ),
@@ -643,176 +733,104 @@ class _AppDock extends StatelessWidget {
   }
 }
 
-/// 不支持折射时的轻量 Dock：一层高斯模糊 + 白高光内描边，
-/// 不再编译 FluidGlass 的折射程序，冷启动和持续功耗都更稳。
-class _PlainDockBar extends StatelessWidget {
-  const _PlainDockBar({
-    required this.tabs,
-    required this.active,
-    required this.height,
-    required this.onSelect,
-    required this.onReselect,
-  });
+class _LiquidTabFace extends StatelessWidget {
+  const _LiquidTabFace({required this.tab});
 
-  final List<AppTab> tabs;
-  final AppTab active;
-  final double height;
-  final ValueChanged<AppTab> onSelect;
-  final VoidCallback onReselect;
+  final AppTab tab;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final radius = height / 2;
-    final shape = Radii.shape(radius);
-    return SizedBox(
-      height: height,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final tabWidth = constraints.maxWidth / tabs.length;
-          const inset = 6.0;
-          final index = tabs.indexOf(active);
-          return Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Positioned.fill(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(radius),
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-                    child: DecoratedBox(
-                      decoration: ShapeDecoration(
-                        color: colors.card.withValues(
-                          alpha: colors.isDark ? 0.62 : 0.58,
-                        ),
-                        shape: shape,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: DecoratedBox(
-                    decoration: ShapeDecoration(
-                      shape: RoundedSuperellipseBorder(
-                        borderRadius: BorderRadius.circular(radius),
-                        side: BorderSide(
-                          color: Colors.white.withValues(
-                            alpha: colors.isDark ? 0.16 : 0.72,
-                          ),
-                          width: 1,
-                        ),
-                      ),
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.white.withValues(
-                            alpha: colors.isDark ? 0.08 : 0.16,
-                          ),
-                          Colors.transparent,
-                          Colors.white.withValues(
-                            alpha: colors.isDark ? 0.03 : 0.05,
-                          ),
-                        ],
-                        stops: const [0, 0.55, 1],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              AnimatedPositioned(
-                duration: MediaQuery.maybeDisableAnimationsOf(context) ?? false
-                    ? Duration.zero
-                    : const Duration(milliseconds: 260),
-                curve: Curves2.out,
-                left: tabWidth * index + inset,
-                top: inset,
-                width: tabWidth - inset * 2,
-                height: height - inset * 2,
-                child: IgnorePointer(
-                  child: DecoratedBox(
-                    decoration: ShapeDecoration(
-                      color: colors.primaryContainer.withValues(
-                        alpha: colors.isDark ? 0.64 : 0.88,
-                      ),
-                      shape: Radii.pillShape,
-                      shadows: [
-                        BoxShadow(
-                          color: colors.primary.withValues(alpha: 0.10),
-                          blurRadius: 10,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              Positioned.fill(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: inset),
-                  child: Row(
-                    children: [
-                      for (final tab in tabs)
-                        Expanded(
-                          child: Pressable(
-                            onTap: () {
-                              if (tab == active) {
-                                onReselect();
-                              } else {
-                                onSelect(tab);
-                              }
-                            },
-                            haptic: false,
-                            shape: Radii.pillShape,
-                            pressedScale: 0.95,
-                            child: _DockTabContent(
-                              tab: tab,
-                              selected: tab == active,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          );
-        },
-      ),
+    final inAccentCopy =
+        context.getElementForInheritedWidgetOfExactType<LiquidBottomTabScale>() !=
+        null;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      spacing: 2,
+      children: [
+        Icon(
+          inAccentCopy
+              ? _BottomNavBar._activeIcons[tab]
+              : _BottomNavBar._icons[tab],
+          size: 22,
+          color: colors.text2,
+        ),
+        Text(
+          _BottomNavBar.labelOf(context, tab),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 10.5,
+            height: 1.15,
+            fontWeight: inAccentCopy ? FontWeight.w700 : FontWeight.w500,
+            color: colors.text2,
+          ),
+        ),
+      ],
     );
   }
 }
 
 class _DockTabContent extends StatelessWidget {
-  const _DockTabContent({required this.tab, this.selected = false});
+  const _DockTabContent({
+    required this.tab,
+    required this.selected,
+    required this.disableAnimations,
+  });
 
   final AppTab tab;
   final bool selected;
+  final bool disableAnimations;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          _AppDock._icons[tab],
-          size: 24.5,
-          color: selected ? colors.primary : colors.text2,
-        ),
-        Text(
-          _AppDock._labels[tab]!,
-          style: TextStyle(
-            fontSize: TypeScale.micro,
-            height: 1.35,
-            fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-            color: selected ? colors.primary : colors.text2,
+    final label = _BottomNavBar.labelOf(context, tab);
+    final icon = selected
+        ? _BottomNavBar._activeIcons[tab]!
+        : _BottomNavBar._icons[tab]!;
+    return Semantics(
+      selected: selected,
+      button: true,
+      label: label,
+      excludeSemantics: true,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AnimatedContainer(
+            duration: motionDuration(
+              Timings.fast,
+              disableAnimations: disableAnimations,
+            ),
+            curve: Curves2.out,
+            width: selected ? 48 : 34,
+            height: 28,
+            decoration: ShapeDecoration(
+              color: selected ? colors.primaryContainer : Colors.transparent,
+              shape: Radii.pillShape,
+            ),
+            child: Icon(
+              icon,
+              size: 21,
+              color: selected ? colors.primary : colors.text3,
+            ),
           ),
-        ),
-      ],
+          const SizedBox(height: 2),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 11,
+              height: 1.2,
+              fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+              color: selected ? colors.primary : colors.text3,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -925,11 +943,10 @@ class _AppSidebar extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final width = showLabels ? 220.0 : 76.0;
-    final chrome = colors.isDark ? const Color(0xFF111A2D) : colors.inset;
     return Container(
       width: width,
       decoration: BoxDecoration(
-        color: chrome,
+        color: colors.card,
         border: Border(right: BorderSide(color: colors.divider)),
       ),
       child: SafeArea(
@@ -1069,16 +1086,18 @@ class _AppSidebar extends StatelessWidget {
                         ),
                         SizedBox(width: showLabels ? 11 : 0),
                         Icon(
-                          _AppDock._icons[tab],
-                          size: 22,
+                          tab == active
+                              ? _BottomNavBar._activeIcons[tab]
+                              : _BottomNavBar._icons[tab],
+                          size: 21,
                           color: tab == active ? colors.primary : colors.text2,
                         ),
                         if (showLabels) ...[
                           const SizedBox(width: 12),
                           Text(
-                            _AppDock._labels[tab]!,
+                            _BottomNavBar.labelOf(context, tab),
                             style: TextStyle(
-                              fontSize: 15,
+                              fontSize: 14.5,
                               fontWeight: FontWeight.w600,
                               color: tab == active
                                   ? colors.primary

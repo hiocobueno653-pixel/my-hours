@@ -34,11 +34,11 @@ class TimerService : Service() {
         const val EXTRA_RUNNING = "running"
 
         /**
-         * 胶囊收起时显示的短文本是**静态字符串**，不会自己走秒。
-         * 每 10 秒重发一次通知让它跟上——再密就是白耗电，
-         * 再疏用户会觉得「卡住了」。
+         * 流体云、焦点通知等通道读取的是静态短文本，不会使用
+         * Chronometer 自己走秒；因此服务每秒重发一次通知，
+         * 让所有渠道看到的已用时间一致。
          */
-        private const val REFRESH_MS = 10_000L
+        private const val REFRESH_MS = 1_000L
 
         fun start(context: Context, elapsedMs: Long, label: String, running: Boolean) {
             val intent = Intent(context, TimerService::class.java).apply {
@@ -90,6 +90,11 @@ class TimerService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent == null) {
+            // 系统重启服务却拿不到计时快照时，不要从 0 开始假计时。
+            stopSelf()
+            return START_NOT_STICKY
+        }
         baseElapsedMs = intent?.getLongExtra(EXTRA_ELAPSED, 0L) ?: 0L
         label = intent?.getStringExtra(EXTRA_LABEL) ?: "正在计时"
         running = intent?.getBooleanExtra(EXTRA_RUNNING, true) ?: true
@@ -107,7 +112,7 @@ class TimerService : Service() {
         handler.removeCallbacks(refreshTask)
         if (running) handler.postDelayed(refreshTask, REFRESH_MS)
 
-        return START_STICKY
+        return START_NOT_STICKY
     }
 
     override fun onDestroy() {
@@ -152,7 +157,8 @@ class TimerService : Service() {
         )
 
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            // 通知栏小图标必须是单色矢量，彩色 launcher 会被系统压成灰块。
+            .setSmallIcon(R.drawable.ic_timer_stat)
             .setContentTitle(label)
             .setContentIntent(openApp)
             .setOngoing(true)

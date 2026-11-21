@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/formatters.dart';
+import '../../core/measure_unit.dart';
 import '../../core/theme_tokens.dart';
 import '../../data/backup.dart';
 import '../../data/constants.dart';
@@ -73,16 +74,30 @@ class _BackupPageState extends ConsumerState<BackupPage> {
     try {
       final state = ref.read(appControllerProvider);
       final csv = switch (kind) {
-        'hours' => buildMonthCsv(_month, state.records),
+        'hours' => buildMonthCsv(
+          _month,
+          state.records,
+          quantity: context.unit.quantity,
+        ),
         'ledger' => buildLedgerCsv(
           _month,
           state.entries,
           records: state.records,
+          quantity: context.unit.quantity,
+          unitName: context.unit.name,
         ),
-        _ => buildMonthOverviewCsv(_month, state.records, state.entries),
+        _ => buildMonthOverviewCsv(
+          _month,
+          state.records,
+          state.entries,
+          quantity: context.unit.quantity,
+        ),
       };
       final name = switch (kind) {
-        'hours' => ExportService.stampedName('时页-工时表-$_month', 'csv'),
+        'hours' => ExportService.stampedName(
+          '时页-${context.unit.quantity}表-$_month',
+          'csv',
+        ),
         'ledger' => ExportService.stampedName('时页-账本-$_month', 'csv'),
         _ => ExportService.stampedName('时页-月概览-$_month', 'csv'),
       };
@@ -124,7 +139,8 @@ class _BackupPageState extends ConsumerState<BackupPage> {
       context,
       title: '导入会替换当前全部数据',
       description:
-          '备份包含 ${parsed.records.length} 条工时、${parsed.entries.length} 条账目。'
+          '备份包含 ${parsed.records.length} 条${context.unit.quantity}、'
+          '${parsed.entries.length} 条账目。'
           '${parsed.droppedItems > 0 ? '其中 ${parsed.droppedItems} 条无法识别的数据将被跳过。' : ''}'
           '导入后会在下方给出对账结果；不一致会明确标红。',
       confirmLabel: '导入',
@@ -177,7 +193,8 @@ class _BackupPageState extends ConsumerState<BackupPage> {
       context,
       title: '恢复本机快照？',
       description:
-          '快照包含 ${parsed.records.length} 条工时、${parsed.entries.length} 条账目。'
+          '快照包含 ${parsed.records.length} 条${context.unit.quantity}、'
+          '${parsed.entries.length} 条账目。'
           '${parsed.droppedItems > 0 ? '其中 ${parsed.droppedItems} 条无法识别的数据将被跳过。' : ''}'
           '恢复前会先为当前数据再留一份现场，然后替换为这份快照。',
       confirmLabel: '恢复',
@@ -226,13 +243,18 @@ class _BackupPageState extends ConsumerState<BackupPage> {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final state = ref.watch(appControllerProvider);
-    return Stack(
+    return Scaffold(
+      backgroundColor: colors.page,
+      body: Stack(
       children: [
         Positioned.fill(
           child: ListView(
+            physics: const BouncingScrollPhysics(
+              parent: AlwaysScrollableScrollPhysics(),
+            ),
             padding: EdgeInsets.only(
-              top: PinnedSubHeader.totalHeight(context) + 8,
-              bottom: 40,
+              top: PinnedSubHeader.totalHeight(context) + 12,
+              bottom: MediaQuery.paddingOf(context).bottom + 36,
             ),
             children: [
               Padding(
@@ -241,6 +263,8 @@ class _BackupPageState extends ConsumerState<BackupPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     GlassCard(
+                      radius: Radii.hero,
+                      padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -252,11 +276,11 @@ class _BackupPageState extends ConsumerState<BackupPage> {
                               color: colors.text2,
                             ),
                           ),
-                          const SizedBox(height: Gaps.sm),
+                          const SizedBox(height: Gaps.md),
                           Row(
                             children: [
                               _Count(
-                                label: '工时记录',
+                                label: '${context.unit.quantity}记录',
                                 value: state.records.length,
                               ),
                               _Count(label: '账目', value: state.entries.length),
@@ -273,23 +297,24 @@ class _BackupPageState extends ConsumerState<BackupPage> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: Gaps.md),
+                    const SizedBox(height: Gaps.cardGap),
                     GlassCard(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
                             children: [
-                              Icon(
-                                Icons.history_rounded,
-                                size: 19,
-                                color: colors.accent,
+                              AppIconBadge(
+                                icon: Icons.history_rounded,
+                                color: colors.primary,
+                                size: 30,
+                                iconSize: 17,
                               ),
-                              const SizedBox(width: 8),
+                              const SizedBox(width: 10),
                               Text(
                                 '本机自动快照',
                                 style: TextStyle(
-                                  fontSize: 13,
+                                  fontSize: 14,
                                   fontWeight: FontWeight.w600,
                                   color: colors.text,
                                 ),
@@ -390,7 +415,7 @@ class _BackupPageState extends ConsumerState<BackupPage> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: Gaps.md),
+                    const SizedBox(height: Gaps.cardGap),
                     GlassCard(
                       padding: const EdgeInsets.symmetric(vertical: Gaps.xs),
                       child: Column(
@@ -398,55 +423,75 @@ class _BackupPageState extends ConsumerState<BackupPage> {
                           ListRow(
                             title: '保存数据备份（JSON）',
                             subtitle: 'v4 格式，可直接用于本版导入',
-                            leading: Icon(
-                              Icons.save_alt_rounded,
-                              size: 20,
-                              color: colors.accent,
+                            leading: AppIconBadge(
+                              icon: Icons.save_alt_rounded,
+                              color: colors.primary,
                             ),
+                            showChevron: true,
                             onTap: _exportJson,
                           ),
-                          Divider(height: 1, color: colors.divider),
+                          Divider(
+                            height: 1,
+                            color: colors.divider,
+                            indent: 64,
+                            endIndent: 16,
+                          ),
                           ListRow(
-                            title: '导出本月工时表（CSV）',
-                            subtitle: '含星期、工时、备注与月总计',
-                            leading: Icon(
-                              Icons.table_rows_rounded,
-                              size: 20,
-                              color: colors.text2,
+                            title: '导出本月${context.unit.quantity}表（CSV）',
+                            subtitle: '含星期、${context.unit.name}、备注与月总计',
+                            leading: AppIconBadge(
+                              icon: Icons.table_rows_rounded,
+                              color: colors.income,
                             ),
+                            showChevron: true,
                             onTap: () => _exportCsv('hours'),
                           ),
-                          Divider(height: 1, color: colors.divider),
+                          Divider(
+                            height: 1,
+                            color: colors.divider,
+                            indent: 64,
+                            endIndent: 16,
+                          ),
                           ListRow(
                             title: '导出本月账本（CSV）',
                             subtitle: '含类型、分类、金额与月结余',
-                            leading: Icon(
-                              Icons.receipt_long_rounded,
-                              size: 20,
-                              color: colors.text2,
+                            leading: const AppIconBadge(
+                              icon: Icons.receipt_long_rounded,
+                              color: Color(0xFF0EA5E9),
                             ),
+                            showChevron: true,
                             onTap: () => _exportCsv('ledger'),
                           ),
-                          Divider(height: 1, color: colors.divider),
+                          Divider(
+                            height: 1,
+                            color: colors.divider,
+                            indent: 64,
+                            endIndent: 16,
+                          ),
                           ListRow(
                             title: '导出月中概览（CSV）',
-                            subtitle: '工时 + 收支 + 分类小计',
-                            leading: Icon(
-                              Icons.assessment_outlined,
-                              size: 20,
-                              color: colors.text2,
+                            subtitle: '${context.unit.quantity} + 收支 + 分类小计',
+                            leading: const AppIconBadge(
+                              icon: Icons.assessment_outlined,
+                              color: Color(0xFF5856D6),
                             ),
+                            showChevron: true,
                             onTap: () => _exportCsv('overview'),
                           ),
-                          Divider(height: 1, color: colors.divider),
+                          Divider(
+                            height: 1,
+                            color: colors.divider,
+                            indent: 64,
+                            endIndent: 16,
+                          ),
                           ListRow(
                             title: '加载备份数据',
                             subtitle: '导入会替换当前全部数据',
-                            leading: Icon(
-                              Icons.file_open_rounded,
-                              size: 20,
-                              color: colors.text2,
+                            leading: AppIconBadge(
+                              icon: Icons.file_open_rounded,
+                              color: colors.warning,
                             ),
+                            showChevron: true,
                             onTap: _import,
                           ),
                         ],
@@ -468,6 +513,7 @@ class _BackupPageState extends ConsumerState<BackupPage> {
                     if (_report != null) ...[
                       const SizedBox(height: Gaps.md),
                       GlassCard(
+                        flat: true,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -604,6 +650,7 @@ class _BackupPageState extends ConsumerState<BackupPage> {
           child: PinnedSubHeader(title: '数据与备份', onBack: widget.onBack),
         ),
       ],
+      ),
     );
   }
 }

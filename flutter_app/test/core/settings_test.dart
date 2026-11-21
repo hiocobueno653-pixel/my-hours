@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/material.dart';
+import 'package:my_hours/core/dashboard_layout.dart';
 import 'package:my_hours/core/settings.dart';
 import 'package:my_hours/core/theme_tokens.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -44,5 +45,25 @@ void main() {
     expect(reloaded.tabTransition, AppTabTransition.fade);
     expect(reloaded.glassPreference, AppGlassPreference.extreme);
     expect(reloaded.textScale, 1.2);
+  });
+
+  test('首页卡片顺序可持久化，并过滤未知项与重复项', () async {
+    SharedPreferences.setMockInitialValues({});
+    final settings = await AppSettings.load();
+    expect(settings.dashboardCards, DashboardCardIds.defaults);
+
+    await settings.setDashboardCards([
+      DashboardCardIds.ledgerBalance,
+      'unknown',
+      DashboardCardIds.monthSalary,
+      DashboardCardIds.ledgerBalance,
+    ]);
+
+    expect(settings.dashboardCards, [
+      DashboardCardIds.ledgerBalance,
+      DashboardCardIds.monthSalary,
+    ]);
+    final reloaded = await AppSettings.load();
+    expect(reloaded.dashboardCards, settings.dashboardCards);
   });
 }

@@ -10,17 +10,21 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
+import 'package:fluid_glass/fluid_glass.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:my_hours/app.dart';
+import 'package:my_hours/core/settings.dart';
 import 'package:my_hours/core/theme_tokens.dart';
 import 'package:my_hours/data/constants.dart';
 import 'package:my_hours/data/models.dart';
 import 'package:my_hours/data/persistence.dart';
-import 'package:my_hours/features/ledger/ledger_view.dart';
+import 'package:my_hours/features/mine/backup_page.dart';
+import 'package:my_hours/features/mine/settings_page.dart';
+import 'package:my_hours/features/mine/theme_page.dart';
 import 'package:my_hours/features/onboarding/welcome_screen.dart';
-import 'package:my_hours/features/mine/my_view.dart';
-import 'package:my_hours/features/work/month_view.dart';
 import 'package:my_hours/state/app_controller.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 const String _family = 'CaptureSans';
 const String _shotKey = 'shot-root';
@@ -41,6 +45,21 @@ Future<void> _loadFonts() async {
     loader.addFont(_readFont('C:/Windows/Fonts/Dengb.ttf'));
   }
   await loader.load();
+
+  final flutterRoot = Platform.environment['FLUTTER_ROOT'];
+  final iconCandidates = <String>[
+    if (flutterRoot != null && flutterRoot.isNotEmpty)
+      '$flutterRoot/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf',
+    'E:/tools/flutter/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf',
+  ];
+  for (final path in iconCandidates) {
+    if (File(path).existsSync()) {
+      final iconLoader = FontLoader('MaterialIcons');
+      iconLoader.addFont(_readFont(path));
+      await iconLoader.load();
+      break;
+    }
+  }
 }
 
 String _pad(int v) => v.toString().padLeft(2, '0');
@@ -71,11 +90,7 @@ void _seed(ProviderContainer container) {
   }
   hours[9] = 9.5; // 加班
   hours[15] = 5.5; // 今天
-  const remarks = <int, String>{
-    4: '收尾，提前走',
-    9: '加班两小时',
-    13: '半天',
-  };
+  const remarks = <int, String>{4: '收尾，提前走', 9: '加班两小时', 13: '半天'};
   hours.forEach((date, value) {
     if (!valid(date)) return;
     controller.saveDay(
@@ -123,18 +138,43 @@ Widget _app({required Widget child, required bool dark}) {
   final theme = buildAppTheme(colors, tokens);
   return RepaintBoundary(
     key: const ValueKey(_shotKey),
-    child: MaterialApp(
-      debugShowCheckedModeBanner: false,
-      theme: theme.copyWith(
-        textTheme: theme.textTheme.apply(fontFamily: _family),
+    child: LiquidGlassTheme(
+      colors: dark
+          ? LiquidGlassColors.dark.copyWith(
+              accent: colors.primary,
+              toggleAccent: colors.primary,
+              content: colors.text,
+              track: const Color(0xFF3E4150),
+            )
+          : LiquidGlassColors.light.copyWith(
+              accent: colors.primary,
+              toggleAccent: colors.primary,
+              content: colors.text,
+              track: const Color(0xFFD6DCE6),
+            ),
+      child: MaterialApp(
+        debugShowCheckedModeBanner: false,
+        theme: theme.copyWith(
+          textTheme: theme.textTheme.apply(fontFamily: _family),
+        ),
+        builder: (context, widget) => DefaultTextStyle.merge(
+          style: const TextStyle(fontFamily: _family),
+          child: widget ?? const SizedBox.shrink(),
+        ),
+        home: child,
       ),
-      home: Scaffold(backgroundColor: colors.page, body: child),
     ),
   );
 }
 
 Future<void> _capture(WidgetTester tester, String name) async {
-  await tester.pump();
+  // RevealOnMount 最晚 80ms 才开始，再跑 200ms；多给一帧余量，
+  // 否则右侧两张月卡会停在 opacity 0，被误读成布局缺卡。
+  await tester.pumpAndSettle(
+    const Duration(milliseconds: 16),
+    EnginePhase.sendSemanticsUpdate,
+    const Duration(seconds: 3),
+  );
   final boundary = tester.renderObject<RenderRepaintBoundary>(
     find.byKey(const ValueKey(_shotKey)),
   );
@@ -142,17 +182,24 @@ Future<void> _capture(WidgetTester tester, String name) async {
     final image = await boundary.toImage(pixelRatio: 2);
     final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
     final dir = Directory('shots')..createSync(recursive: true);
-    File('${dir.path}/$name.png')
-        .writeAsBytesSync(bytes!.buffer.asUint8List());
+    File('${dir.path}/$name.png').writeAsBytesSync(bytes!.buffer.asUint8List());
     image.dispose();
   });
 }
 
-Future<ProviderContainer> _boot(WidgetTester tester, Widget child,
-    {bool dark = false}) async {
+Future<ProviderContainer> _boot(
+  WidgetTester tester,
+  Widget child, {
+  bool dark = false,
+}) async {
+  SharedPreferences.setMockInitialValues({});
+  final settings = await AppSettings.load();
   final dir = Directory.systemTemp.createTempSync('my_hours_shot_');
   final container = ProviderContainer(
-    overrides: [storeProvider.overrideWithValue(LocalStore(dir))],
+    overrides: [
+      storeProvider.overrideWithValue(LocalStore(dir)),
+      settingsProvider.overrideWithValue(settings),
+    ],
   );
   addTearDown(container.dispose);
   addTearDown(() {
@@ -185,7 +232,7 @@ void main() {
     tester.view.physicalSize = const Size(390 * 2, 844 * 2);
     tester.view.devicePixelRatio = 2;
     addTearDown(tester.view.reset);
-    await _boot(tester, const MonthView());
+    await _boot(tester, const AppShell(hoursOnly: false, largeText: false));
     await _capture(tester, 'work-light');
   });
 
@@ -193,7 +240,11 @@ void main() {
     tester.view.physicalSize = const Size(390 * 2, 844 * 2);
     tester.view.devicePixelRatio = 2;
     addTearDown(tester.view.reset);
-    await _boot(tester, const MonthView(), dark: true);
+    await _boot(
+      tester,
+      const AppShell(hoursOnly: false, largeText: false),
+      dark: true,
+    );
     await _capture(tester, 'work-dark');
   });
 
@@ -201,19 +252,134 @@ void main() {
     tester.view.physicalSize = const Size(390 * 2, 844 * 2);
     tester.view.devicePixelRatio = 2;
     addTearDown(tester.view.reset);
-    await _boot(tester, const LedgerView());
+    await _boot(tester, const AppShell(hoursOnly: false, largeText: false));
+    await tester.tap(
+      find.descendant(of: find.byKey(const ValueKey('app-dock')), matching: find.text('账本')).first,
+    );
+    await tester.pump(const Duration(milliseconds: 300));
     await _capture(tester, 'ledger-light');
+  });
+
+  testWidgets('记账页 · 暗色', (tester) async {
+    tester.view.physicalSize = const Size(390 * 2, 844 * 2);
+    tester.view.devicePixelRatio = 2;
+    addTearDown(tester.view.reset);
+    await _boot(
+      tester,
+      const AppShell(hoursOnly: false, largeText: false),
+      dark: true,
+    );
+    await tester.tap(
+      find.descendant(of: find.byKey(const ValueKey('app-dock')), matching: find.text('账本')).first,
+    );
+    await tester.pump(const Duration(milliseconds: 300));
+    await _capture(tester, 'ledger-dark');
+  });
+
+  testWidgets('统计页 · 亮色', (tester) async {
+    tester.view.physicalSize = const Size(390 * 2, 844 * 2);
+    tester.view.devicePixelRatio = 2;
+    addTearDown(tester.view.reset);
+    await _boot(tester, const AppShell(hoursOnly: false, largeText: false));
+    await tester.tap(
+      find.descendant(of: find.byKey(const ValueKey('app-dock')), matching: find.text('统计')).first,
+    );
+    await tester.pump(const Duration(milliseconds: 300));
+    await _capture(tester, 'stats-light');
+  });
+
+  testWidgets('统计页 · 暗色', (tester) async {
+    tester.view.physicalSize = const Size(390 * 2, 844 * 2);
+    tester.view.devicePixelRatio = 2;
+    addTearDown(tester.view.reset);
+    await _boot(
+      tester,
+      const AppShell(hoursOnly: false, largeText: false),
+      dark: true,
+    );
+    await tester.tap(
+      find.descendant(of: find.byKey(const ValueKey('app-dock')), matching: find.text('统计')).first,
+    );
+    await tester.pump(const Duration(milliseconds: 300));
+    await _capture(tester, 'stats-dark');
   });
 
   testWidgets('我的页 · 亮色', (tester) async {
     tester.view.physicalSize = const Size(390 * 2, 844 * 2);
     tester.view.devicePixelRatio = 2;
     addTearDown(tester.view.reset);
+    await _boot(tester, const AppShell(hoursOnly: false, largeText: false));
+    await tester.tap(
+      find.descendant(of: find.byKey(const ValueKey('app-dock')), matching: find.text('我的')).first,
+    );
+    await tester.pump(const Duration(milliseconds: 300));
+    await _capture(tester, 'mine-light');
+  });
+
+  testWidgets('我的页 · 暗色', (tester) async {
+    tester.view.physicalSize = const Size(390 * 2, 844 * 2);
+    tester.view.devicePixelRatio = 2;
+    addTearDown(tester.view.reset);
     await _boot(
       tester,
-      MyView(largeText: false, onLargeTextChanged: (_) {}),
+      const AppShell(hoursOnly: false, largeText: false),
+      dark: true,
     );
-    await _capture(tester, 'mine-light');
+    await tester.tap(
+      find.descendant(of: find.byKey(const ValueKey('app-dock')), matching: find.text('我的')).first,
+    );
+    await tester.pump(const Duration(milliseconds: 300));
+    await _capture(tester, 'mine-dark');
+  });
+
+  testWidgets('设置页 · 亮色', (tester) async {
+    tester.view.physicalSize = const Size(390 * 2, 844 * 2);
+    tester.view.devicePixelRatio = 2;
+    addTearDown(tester.view.reset);
+    await _boot(tester, SettingsPage(onBack: () {}));
+    await _capture(tester, 'settings-light');
+  });
+
+  testWidgets('设置页 · 暗色', (tester) async {
+    tester.view.physicalSize = const Size(390 * 2, 844 * 2);
+    tester.view.devicePixelRatio = 2;
+    addTearDown(tester.view.reset);
+    await _boot(tester, SettingsPage(onBack: () {}), dark: true);
+    await _capture(tester, 'settings-dark');
+  });
+
+  testWidgets('主题页 · 亮色', (tester) async {
+    tester.view.physicalSize = const Size(390 * 2, 844 * 2);
+    tester.view.devicePixelRatio = 2;
+    addTearDown(tester.view.reset);
+    await _boot(tester, ThemePage(onBack: () {}));
+    await _capture(tester, 'theme-light');
+  });
+
+  testWidgets('主题页 · 暗色', (tester) async {
+    tester.view.physicalSize = const Size(390 * 2, 844 * 2);
+    tester.view.devicePixelRatio = 2;
+    addTearDown(tester.view.reset);
+    await _boot(tester, ThemePage(onBack: () {}), dark: true);
+    await _capture(tester, 'theme-dark');
+  });
+
+  testWidgets('备份页 · 亮色', (tester) async {
+    tester.view.physicalSize = const Size(390 * 2, 844 * 2);
+    tester.view.devicePixelRatio = 2;
+    addTearDown(tester.view.reset);
+    await _boot(tester, BackupPage(onBack: () {}));
+    await _capture(tester, 'backup-light');
+  });
+
+  testWidgets('日记录编辑弹窗 · 亮色', (tester) async {
+    tester.view.physicalSize = const Size(390 * 2, 844 * 2);
+    tester.view.devicePixelRatio = 2;
+    addTearDown(tester.view.reset);
+    await _boot(tester, const AppShell(hoursOnly: false, largeText: false));
+    await tester.tap(find.text('编辑').first);
+    await tester.pump(const Duration(milliseconds: 350));
+    await _capture(tester, 'day-editor-light');
   });
 
   testWidgets('欢迎页 · 亮色', (tester) async {
@@ -221,8 +387,12 @@ void main() {
     tester.view.devicePixelRatio = 2;
     addTearDown(tester.view.reset);
     await _boot(tester, WelcomeScreen(onStart: () async {}));
-    // 入场 820ms，等它落定再抓图，否则拍到的是半透明的中间帧。
-    await tester.pump(const Duration(milliseconds: 900));
+    await tester.runAsync(() async {
+      final ctx = tester.element(find.byType(WelcomeScreen));
+      await precacheImage(const AssetImage('assets/brand/app_icon.png'), ctx);
+      await precacheImage(const AssetImage('assets/brand/wordmark.png'), ctx);
+    });
+    await tester.pumpAndSettle();
     await _capture(tester, 'welcome-light');
   });
 
@@ -231,7 +401,15 @@ void main() {
     tester.view.devicePixelRatio = 2;
     addTearDown(tester.view.reset);
     await _boot(tester, WelcomeScreen(onStart: () async {}), dark: true);
-    await tester.pump(const Duration(milliseconds: 900));
+    await tester.runAsync(() async {
+      final ctx = tester.element(find.byType(WelcomeScreen));
+      await precacheImage(const AssetImage('assets/brand/app_icon.png'), ctx);
+      await precacheImage(
+        const AssetImage('assets/brand/wordmark_dark.png'),
+        ctx,
+      );
+    });
+    await tester.pumpAndSettle();
     await _capture(tester, 'welcome-dark');
   });
 }

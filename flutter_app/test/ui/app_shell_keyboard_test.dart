@@ -29,11 +29,7 @@ void main() {
         container: container,
         child: MaterialApp(
           theme: buildAppTheme(AppColors.light, AppTokens.lightTokens),
-          home: AppShell(
-            hoursOnly: false,
-            largeText: false,
-            onLargeTextChanged: (_) {},
-          ),
+          home: AppShell(hoursOnly: false, largeText: false),
         ),
       ),
     );

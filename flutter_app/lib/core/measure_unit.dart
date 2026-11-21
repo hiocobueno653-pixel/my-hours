@@ -28,6 +28,12 @@ class MeasureUnit {
   /// 数量本身的名词：「本月工时」「本月学时」「本月页数」。
   final String quantity;
 
+  /// 每个计量单位对应的价格名称。小时保留熟悉说法「时薪」。
+  String get rateName => id == 'hours' ? '时薪' : '单价';
+
+  /// 价格后缀的短写：「元/时」「元/节」「元/章」。
+  String get rateShort => id == 'hours' ? '时' : short;
+
   static const hours = MeasureUnit(
     id: 'hours',
     name: '小时',
@@ -74,6 +80,27 @@ class MeasureUnit {
     kilometers,
   ];
 
+  /// Bento 快捷录入的三档。最后一档是「设为本日完整量」，
+  /// 前两档在当前记录上累加。
+  List<double> get quickSteps => switch (id) {
+    'school_hours' => const [1.0, 2.0, 8.0],
+    'sessions' => const [1.0, 2.0, 4.0],
+    'chapters' => const [1.0, 2.0, 5.0],
+    'pages' => const [1.0, 5.0, 20.0],
+    'kilometers' => const [0.5, 1.0, 10.0],
+    _ => const [0.5, 1.0, 8.0],
+  };
+
+  /// 日编辑器里的快捷档位。0 统一渲染为「休息」。
+  List<double> get editorSteps => switch (id) {
+    'school_hours' => const [0, 1, 2, 4, 6, 8],
+    'sessions' => const [0, 1, 2, 3, 4, 6],
+    'chapters' => const [0, 1, 2, 3, 5, 8],
+    'pages' => const [0, 1, 5, 10, 20, 50, 100],
+    'kilometers' => const [0, 1, 3, 5, 10, 20, 42],
+    _ => const [0, 4, 6, 8, 8.5, 10, 12],
+  };
+
   static MeasureUnit byId(String? id) {
     for (final unit in presets) {
       if (unit.id == id) return unit;
@@ -86,16 +113,13 @@ class MeasureUnit {
 ///
 /// 放在 `MaterialApp` 外层，所有页面用 `MeasureUnitScope.of(context)` 取。
 class MeasureUnitScope extends InheritedWidget {
-  const MeasureUnitScope({
-    super.key,
-    required this.unit,
-    required super.child,
-  });
+  const MeasureUnitScope({super.key, required this.unit, required super.child});
 
   final MeasureUnit unit;
 
   static MeasureUnit of(BuildContext context) {
-    final scope = context.dependOnInheritedWidgetOfExactType<MeasureUnitScope>();
+    final scope = context
+        .dependOnInheritedWidgetOfExactType<MeasureUnitScope>();
     return scope?.unit ?? MeasureUnit.hours;
   }
 

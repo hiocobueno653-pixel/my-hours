@@ -1,6 +1,18 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+const _timerChannel = MethodChannel('com.myhours.app/timer');
+
+Future<void> openAppNotificationSettings() async {
+  try {
+    await _timerChannel.invokeMethod<void>('notificationSettings');
+  } on MissingPluginException {
+    // 非 Android 平台没有这个设置页。
+  } on PlatformException {
+    // 系统拒绝打开时保持当前页面。
+  }
+}
+
 /// 这台设备能不能把计时通知放进状态栏胶囊。
 ///
 /// 分界线是 Android 16（API 36）的 Live Updates：
@@ -12,11 +24,13 @@ class LiveUpdateCapability {
     required this.sdkInt,
     required this.manufacturer,
     required this.model,
+    this.notificationsGranted = true,
   });
 
   final int sdkInt;
   final String manufacturer;
   final String model;
+  final bool notificationsGranted;
 
   /// 系统原生支持胶囊。
   bool get supported => sdkInt >= 36;
@@ -37,6 +51,9 @@ class LiveUpdateCapability {
   }
 
   String get summary {
+    if (!notificationsGranted) {
+      return '通知权限未授予，计时仍会运行但不显示通知';
+    }
     if (supported) return '已支持状态栏胶囊（Android 16+）';
     final vendor = vendorChannel;
     final base = 'Android $sdkInt · 仅常驻通知';
@@ -47,25 +64,27 @@ class LiveUpdateCapability {
     sdkInt: 0,
     manufacturer: '',
     model: '',
+    notificationsGranted: true,
   );
 }
 
-final liveUpdateCapabilityProvider =
-    FutureProvider<LiveUpdateCapability>((ref) async {
-      try {
-        const channel = MethodChannel('com.myhours.app/timer');
-        final raw = await channel.invokeMapMethod<String, Object?>(
-          'capabilities',
-        );
-        if (raw == null) return LiveUpdateCapability.fallback;
-        return LiveUpdateCapability(
-          sdkInt: (raw['sdkInt'] as num?)?.toInt() ?? 0,
-          manufacturer: raw['manufacturer'] as String? ?? '',
-          model: raw['model'] as String? ?? '',
-        );
-      } on MissingPluginException {
-        return LiveUpdateCapability.fallback;
-      } on PlatformException {
-        return LiveUpdateCapability.fallback;
-      }
-    });
+final liveUpdateCapabilityProvider = FutureProvider<LiveUpdateCapability>((
+  ref,
+) async {
+  try {
+    final raw = await _timerChannel.invokeMapMethod<String, Object?>(
+      'capabilities',
+    );
+    if (raw == null) return LiveUpdateCapability.fallback;
+    return LiveUpdateCapability(
+      sdkInt: (raw['sdkInt'] as num?)?.toInt() ?? 0,
+      manufacturer: raw['manufacturer'] as String? ?? '',
+      model: raw['model'] as String? ?? '',
+      notificationsGranted: raw['notificationsGranted'] as bool? ?? true,
+    );
+  } on MissingPluginException {
+    return LiveUpdateCapability.fallback;
+  } on PlatformException {
+    return LiveUpdateCapability.fallback;
+  }
+});

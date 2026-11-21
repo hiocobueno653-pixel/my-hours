@@ -95,8 +95,8 @@ $env:CAPTURE_SHOTS='1'
 - **品牌**：中文「时页」、英文 `TIMEPAGE`、Slogan「记录时间，记下生活。」
   品牌色 `#2563EB`，色板、素材来源与数据兼容性见
   `../docs/adr/0006-timepage-brand.md`。字体仍走平台系统字体，未新增字体族。
-- **启动链路**：Android 原生图标/字标 splash → Flutter TIMEPAGE 擦除加载页
-  （1900ms 一个周期，最低停留 2000ms）→ 首次欢迎页或主页。原生启动
+- **启动链路**：Android 原生图标/字标 splash 等待本地数据准备完成，然后
+  直接进入首次欢迎页或主页；Flutter 内不显示第二段循环加载动画。原生启动
   在 Android 12+ 同时显示 `windowSplashScreenBrandingImage`；深色系统
   会自动切换深蓝底浅色字标。
 - **首启欢迎页**：使用 `assets/brand/wordmark.png` 的三段式字标、三张能力
@@ -112,7 +112,7 @@ $env:CAPTURE_SHOTS='1'
 - **视觉基线**：FlClash_UI 蒸馏的版式与层叠关系，加上时页品牌色板（page/card/block/inset、`#2563EB`、28–34 超椭圆、72px bar、68px Dock）；只取数值，不引入 GPL 代码，见 `docs/adr/0004-flclash-visual-language.md` 与 `docs/adr/0006-timepage-brand.md`。
 - **液态玻璃**：Dock 使用 FluidGlass（Apache-2.0）的 `LayerBackdrop` + `LiquidBottomTabs`，支持长按膨胀、跟手拖动、弹簧回位、放大副本、边缘折射与色散；arm64 真机启用液态层，x86_64 模拟器与不支持 runtime shader 的设备自动退化为高斯模糊玻璃。顶层 Tab 保持中性色，蓝色只由移动镜片里的放大副本显示，拖动后不会在原位置留下蓝色残影。Dock 高 68、最大宽 356、左右 20，底部为 `max(20, safeBottom + 8)`；图标 24.5、标签 10.5。见 `docs/adr/0005-fluid-glass.md` 与 `THIRD_PARTY_NOTICES.md`。
 - **沉浸式**：`SystemUiMode.edgeToEdge` + 透明状态栏/导航栏，图标亮度随主题切换（`lib/main.dart` 的 `AnnotatedRegion`）。不做这一步，Android 会给窗口加不透明 scrim，顶部出现一条与页面断开的色带。
-- **吸顶顶栏（视频参考版）**：`lib/ui/pinned_header.dart`。单一 sigma 16 高斯模糊 + 白/页面色 98%→0 的纵向渐隐，从物理顶部覆盖完整标题区；标题 26/32.5 w700，内容从白色雾层下穿过。空白遮罩用 `AbsorbPointer`，不会误触背后内容；高对比度模式退回实色。
+- **吸顶顶栏（视频参考版）**：`lib/ui/pinned_header.dart`。单一高斯模糊层（plain 15 / liquid 20 / 减少动效 12）+ 页面色 98%→0 的纵向渐隐，从物理顶部覆盖完整标题区；标题 26/32.5 w700，内容从雾层下穿过。空白遮罩用 `AbsorbPointer`，不会误触背后内容；高对比度模式退回实色。
 - **顶栏材质**：`HeaderGlassSurface` 统一所有顶栏按钮——浅色用 block 面色、深色用更亮 block 面色，加轻投影、白色内高光与超椭圆边，不再给按钮套第二层 `BackdropFilter`。月份翻页合并为一颗 44px 玻璃胶囊，仍保留在标题行原位置；下载/新增/分类/导出与二级页返回均为 44px 圆钮，sheet 关闭为 36px 紧凑档。
 - **内容按钮**：`PrimaryButton`、`GhostButton`（FluidGlass `LiquidButton`，质量钉为 `plain` 以免每颗按钮编译折射 shader）、`_DialogButton` 都是独立按压面，分别处理 0.94/0.97 缩放、10% 墨迹和 140–220ms 动效。
 - **分段控件**：单块品牌色指示器按 `AnimatedPositioned` 滑到选中段，文字颜色用 `AnimatedDefaultTextStyle` 同步淡变；分类筛选、月份格与年份快捷块同样使用 180–220ms 颜色过渡。
@@ -120,12 +120,12 @@ $env:CAPTURE_SHOTS='1'
 - **日编辑**：标题行保留日期两侧箭头，可切前一天/后一天；跨月时同步月份上下文，切到今天后禁用后一天，有未保存输入时先确认。
 - **年度统计**：点击每月收支柱状图的月份槽位，会切换下方分类占比月份；选中月份有浅色底带、加粗标签和 `selectionClick` 触觉。
 - **导航复用**：再次点击当前 Tab 会滚动该页回顶部（340ms），Tab 切换与回顶带 `selectionClick` 轻触觉；每页用独立 `ScrollController`，切换后保留原滚动位置。
-- **弹窗**：确认框全屏 `BackdropFilter` 高斯模糊（sigma 18），180ms 淡入 + 0.92→1 缩放；底部 sheet 高斯模糊 sigma 20，300ms 淡入 + 8% 上滑。sheet 根节点提供透明 `Material`，防止 `MaterialApp` 的 fallback 错误样式给正文加黄色双下划线（已有 widget 测试）。
+- **弹窗**：确认框与底部 sheet 背景只做全屏渐暗，不对背景做高斯模糊；遮罩只变化透明度，不跟随面板上下移动。面板从触发位置/底部进入，关闭沿原路返回。sheet 根节点提供透明 `Material`，防止 `MaterialApp` 的 fallback 错误样式给正文加黄色双下划线（已有 widget 测试）。
 - **弹层关闭**：`SheetScaffold` 的 `canPop` 绑定 `_allowPop || !_dirty`；无未保存内容时下滑/遮罩/返回键直接关闭，有未保存内容时先弹「放弃未保存的修改？」确认。禁止再用「`canPop: false` + 手动 `maybePop()`」写法——那会让 `Navigator.pop()` 反过来触发 `onPopInvokedWithResult`，形成关不掉的递归。
 - **本机自动快照**：每次打开/保存自动留每日一份 v4 快照（保留 7 天）；「数据与备份」可查看并恢复，恢复前会再保留当前现场。清空全部数据会同时删除自动快照和导入前现场副本。
 - **弹层手势**：标题/拖拽条支持跟手向下拖动；超过 84px 或快速下滑关闭，未保存内容不会走这条捷径。
 - **无障碍**：系统字号 × 应用大字模式，统一上限 1.30；柱图/环图/趋势图/进度条都有可朗读摘要；主页面月份箭头也有「上个月/下个月」语义。
-- **二级页**：`PinnedSubHeader` 与主页面同一套模糊吸顶；三个二级页统一 `Stack + Positioned.fill(ListView) + 顶部浮层`。
+- **二级页**：`PinnedSubHeader` 与主页面同一套模糊吸顶；“我的”页入口使用 `OpenContainer`（无 elevation、20px 起点圆角、`fadeThrough`），开启时从入口行长成页面，返回缩回原行。
 - **日期选择**：`lib/ui/date_wheel.dart` 自绘年月日三列滚轮（`CupertinoPicker`），替代 Material 日历对话框，避免与整体设计语言割裂；月份变化时天数自动 clamp（闰年 2 月 29 天有测试覆盖）。
 
 ### 代码审查后修的 7 个缺陷

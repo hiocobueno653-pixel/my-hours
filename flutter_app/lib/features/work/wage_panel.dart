@@ -56,7 +56,7 @@ class WagePanelSheet extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                formatAmount(summary.total),
+                formatAmount(summary.total, withSymbol: true),
                 style: TextStyle(
                   fontSize: 34,
                   height: 1,
@@ -69,7 +69,7 @@ class WagePanelSheet extends ConsumerWidget {
               Padding(
                 padding: const EdgeInsets.only(left: 4, bottom: 4),
                 child: Text(
-                  '元应得',
+                  '应得工资',
                   style: TextStyle(fontSize: 12.5, color: colors.text2),
                 ),
               ),
@@ -81,12 +81,12 @@ class WagePanelSheet extends ConsumerWidget {
           Row(
             children: [
               Text(
-                '已结算 ${formatAmount(summary.settled)}',
+                '已结算 ${formatAmount(summary.settled, withSymbol: true)}',
                 style: TextStyle(fontSize: 12.5, color: colors.text2),
               ),
               const Spacer(),
               Text(
-                '待结算 ${formatAmount(summary.pending)}',
+                '待结算 ${formatAmount(summary.pending, withSymbol: true)}',
                 style: TextStyle(fontSize: 12.5, color: colors.text2),
               ),
             ],
@@ -120,7 +120,7 @@ class WagePanelSheet extends ConsumerWidget {
                       ),
                     ),
                     Text(
-                      formatAmount(row.pay),
+                      formatAmount(row.pay, withSymbol: true),
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
@@ -173,7 +173,7 @@ class WagePanelSheet extends ConsumerWidget {
               const SizedBox(width: Gaps.md),
               Expanded(
                 child: GhostButton(
-                  label: '工作与时薪',
+                  label: '工作与${context.unit.rateName}',
                   icon: Icons.work_outline_rounded,
                   expand: true,
                   onPressed: () {
@@ -318,7 +318,7 @@ class _WorkManagerSheetState extends ConsumerState<WorkManagerSheet> {
     final confirmed = await showConfirmDialog(
       context,
       title: '删除「${profile.name}」？',
-      description: '关联记录会归回默认工作，历史时薪快照保留。',
+      description: '关联记录会归回默认工作，历史${context.unit.rateName}快照保留。',
       confirmLabel: '删除',
       danger: true,
     );
@@ -333,13 +333,14 @@ class _WorkManagerSheetState extends ConsumerState<WorkManagerSheet> {
     final colors = context.colors;
     final state = ref.watch(appControllerProvider);
     return SheetScaffold(
-      title: '工作与时薪',
+      title: '工作与${context.unit.rateName}',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '每条记录会保存当时的时薪快照；之后改时薪不影响历史工资。'
-            '点任意一行可改名称与时薪。',
+            '每条记录会保存当时的${context.unit.rateName}快照；'
+            '之后改${context.unit.rateName}不影响历史工资。'
+            '点任意一行可改名称与${context.unit.rateName}。',
             style: TextStyle(fontSize: 12.5, color: colors.text2, height: 1.6),
           ),
           const SizedBox(height: Gaps.lg),
@@ -367,7 +368,7 @@ class _WorkManagerSheetState extends ConsumerState<WorkManagerSheet> {
                 child: TextField(
                   controller: _name,
                   maxLength: maxWorkNameLength,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     counterText: '',
                     hintText: '名称',
                     isDense: true,
@@ -382,8 +383,8 @@ class _WorkManagerSheetState extends ConsumerState<WorkManagerSheet> {
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
                   ),
-                  decoration: const InputDecoration(
-                    hintText: '时薪',
+                  decoration: InputDecoration(
+                    hintText: context.unit.rateName,
                     isDense: true,
                   ),
                 ),
@@ -431,8 +432,8 @@ class _WorkManagerSheetState extends ConsumerState<WorkManagerSheet> {
                 alignment: Alignment.centerRight,
                 child: Text(
                   profile.hourlyRate > 0
-                      ? '${formatAmount(profile.hourlyRate)} 元/时'
-                      : '未设时薪',
+                      ? '¥${formatRate(profile.hourlyRate)}/${context.unit.rateShort}'
+                      : '未设${context.unit.rateName}',
                   style: TextStyle(
                     fontSize: 12.5,
                     color: profile.hourlyRate > 0 ? colors.text2 : colors.text3,
@@ -507,8 +508,8 @@ class _WorkManagerSheetState extends ConsumerState<WorkManagerSheet> {
                     decimal: true,
                   ),
                   textInputAction: TextInputAction.done,
-                  decoration: const InputDecoration(
-                    hintText: '时薪',
+                  decoration: InputDecoration(
+                    hintText: context.unit.rateName,
                     isDense: true,
                   ),
                   onSubmitted: (_) => _saveEdit(profile),
@@ -519,8 +520,8 @@ class _WorkManagerSheetState extends ConsumerState<WorkManagerSheet> {
           const SizedBox(height: 6),
           Text(
             profile.id == defaultWorkId
-                ? '默认工作不可删除；改时薪只影响未结算记录'
-                : '改时薪只影响未结算记录，已结算保留旧价',
+                ? '默认工作不可删除；改${context.unit.rateName}只影响未结算记录'
+                : '改${context.unit.rateName}只影响未结算记录，已结算保留旧价',
             style: TextStyle(fontSize: 11.5, color: colors.text3, height: 1.4),
           ),
           const SizedBox(height: Gaps.sm),

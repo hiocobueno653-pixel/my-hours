@@ -4,23 +4,25 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/formatters.dart';
+import '../../core/measure_unit.dart';
 import '../../core/motion.dart';
 import '../../core/theme_tokens.dart';
 import '../../data/constants.dart';
 import '../../data/dates.dart';
 import '../../data/models.dart';
+import '../../data/profiles.dart';
+import '../../data/records.dart';
 import '../../data/stats.dart';
 import '../../state/app_controller.dart';
 import '../../ui/pinned_header.dart';
 import '../../ui/widgets.dart';
 import '../charts/charts.dart';
-import '../../core/measure_unit.dart';
 
-/// 年度统计：全年工时/工资趋势、月度收支、分类占比。
+/// 统计页：可作为一级 Tab（onBack == null）或二级页面（onBack != null）。
 class StatsPage extends ConsumerStatefulWidget {
-  const StatsPage({super.key, required this.onBack});
+  const StatsPage({super.key, this.onBack});
 
-  final VoidCallback onBack;
+  final VoidCallback? onBack;
 
   @override
   ConsumerState<StatsPage> createState() => _StatsPageState();
@@ -36,7 +38,6 @@ class _StatsPageState extends ConsumerState<StatsPage> {
   @override
   void initState() {
     super.initState();
-    // 用 parseMonthKey 而不是 split + int.parse：异常月份键会让后者抛异常。
     _year =
         parseMonthKey(ref.read(selectedMonthProvider))?.year ??
         DateTime.now().year;
@@ -46,10 +47,34 @@ class _StatsPageState extends ConsumerState<StatsPage> {
     setState(() => _year = (_year + delta).clamp(_minYear, _maxYear).toInt());
   }
 
+  List<WorkBreakdownRow> _yearWorkBreakdown(
+    List<WorkDayRecord> records,
+    List<WorkProfile> profiles,
+    int year,
+  ) {
+    final prefix = '$year-';
+    final map = <String, WorkBreakdownRow>{};
+    for (final record in records) {
+      if (!record.date.startsWith(prefix)) continue;
+      final pay = recordPay(record, profiles);
+      if (record.hours <= 0 && pay <= 0) continue;
+      final id = record.workId ?? defaultWorkId;
+      final name = workNameOf(record, profiles);
+      final existing = map[id];
+      map[id] = WorkBreakdownRow(
+        workId: id,
+        name: name,
+        hours: roundMoney((existing?.hours ?? 0) + record.hours),
+        pay: roundMoney((existing?.pay ?? 0) + pay),
+      );
+    }
+    final list = map.values.toList()..sort((a, b) => b.hours.compareTo(a.hours));
+    return list;
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     final state = ref.watch(appControllerProvider);
     final hoursTrend = getYearHoursTrend(
       state.records,
@@ -63,8 +88,15 @@ class _StatsPageState extends ConsumerState<StatsPage> {
       _year,
       state.workProfiles,
     );
-    // 分类占比跟随年份：切到别的年份时用「同名月份 + 该年」，
-    // 否则头部与趋势已切年，唯独占比还停在共享的 selectedMonth（另一个年份）。
+    final workBreakdown = _yearWorkBreakdown(
+      state.records,
+      state.workProfiles,
+      _year,
+    );
+    final totalWorkDays = hoursTrend.fold<int>(
+      0,
+      (sum, point) => sum + point.workDays,
+    );
     final selectedMonth = ref.watch(selectedMonthProvider);
     final categoryMonth =
         '$_year-${(parseMonthKey(selectedMonth)?.month ?? DateTime.now().month).toString().padLeft(2, '0')}';
@@ -76,112 +108,161 @@ class _StatsPageState extends ConsumerState<StatsPage> {
       0,
       (sum, row) => sum + row.total,
     );
+    final isSubpage = widget.onBack != null;
+    final headerHeight = isSubpage
+        ? PinnedSubHeader.totalHeight(context)
+        : PinnedHeader.totalHeight(context);
 
-    return Stack(
+    final body = Stack(
       children: [
         Positioned.fill(
           child: ListView(
+            physics: const BouncingScrollPhysics(
+              parent: AlwaysScrollableScrollPhysics(),
+            ),
             padding: EdgeInsets.only(
-              top: PinnedSubHeader.totalHeight(context) + 8,
-              bottom: 40,
+              top: headerHeight + 12,
+              bottom: isSubpage ? 28 : pageBottomInset(context),
             ),
             children: [
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: Gaps.lg),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Row(
-                      children: [
-                        _YearStepper(
-                          icon: Icons.chevron_left_rounded,
-                          label: '上一年',
-                          onTap: () => _shiftYear(-1),
+                    if (isSubpage) ...[
+                      Align(
+                        alignment: Alignment.center,
+                        child: _YearSwitchPill(
+                          year: _year,
+                          onShift: _shiftYear,
                         ),
-                        Expanded(
-                          child: Center(
-                            child: AnimatedSwitcher(
-                              duration: motionDuration(
-                                Timings.fast,
-                                disableAnimations: disable,
-                              ),
-                              switchInCurve: Curves2.out,
-                              switchOutCurve: Curves2.out,
-                              transitionBuilder: (child, animation) {
-                                return FadeTransition(
-                                  opacity: animation,
-                                  child: ScaleTransition(
-                                    scale: Tween<double>(
-                                      begin: 0.94,
-                                      end: 1,
-                                    ).animate(animation),
-                                    child: child,
-                                  ),
-                                );
-                              },
-                              child: Text(
-                                '$_year 年',
-                                key: ValueKey(_year),
-                                style: TextStyle(
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.w700,
-                                  color: colors.text,
-                                  fontFeatures: tabularFigures,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        _YearStepper(
-                          icon: Icons.chevron_right_rounded,
-                          label: '下一年',
-                          onTap: () => _shiftYear(1),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: Gaps.sm),
+                      ),
+                      const SizedBox(height: Gaps.md),
+                    ],
                     GlassCard(
-                      child: Row(
+                      radius: Radii.hero,
+                      padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+                      child: Column(
                         children: [
-                          _YearMetric(
-                            label: '总${context.unit.quantity}',
-                            value: formatHoursValue(summary.totalHours),
-                            unit: 'h',
-                            color: colors.accent,
+                          Row(
+                            children: [
+                              _YearMetric(
+                                label: '全年${context.unit.quantity}',
+                                numericValue: summary.totalHours,
+                                formatter: (v) =>
+                                    formatHoursValue(v.toDouble()),
+                                unit: context.unit.short,
+                                color: colors.primary,
+                              ),
+                              _YearMetric(
+                                label: '出勤天数',
+                                numericValue: totalWorkDays,
+                                formatter: (v) => '${v.round()}',
+                                unit: '天',
+                                color: colors.text,
+                              ),
+                              if (!kHoursOnly)
+                                _YearMetric(
+                                  label: '全年工资',
+                                  numericValue: summary.totalPay,
+                                  formatter: (v) => formatAmount(
+                                    v.toDouble(),
+                                    withSymbol: true,
+                                  ),
+                                  unit: '',
+                                  color: colors.income,
+                                ),
+                            ],
                           ),
-                          _YearMetric(
-                            label: '总工资',
-                            value: formatAmount(summary.totalPay),
-                            unit: '元',
-                            color: colors.income,
-                          ),
-                          _YearMetric(
-                            label: '收支净额',
-                            value: formatAmount(
-                              summary.totalIncome - summary.totalExpense,
+                          if (!kHoursOnly) ...[
+                            const SizedBox(height: 14),
+                            Container(
+                              padding: const EdgeInsets.fromLTRB(
+                                12,
+                                11,
+                                12,
+                                11,
+                              ),
+                              decoration: ShapeDecoration(
+                                color: colors.block.withValues(
+                                  alpha: colors.isDark ? 0.62 : 0.70,
+                                ),
+                                shape: Radii.shape(Radii.md),
+                              ),
+                              child: Row(
+                                children: [
+                                  _YearMetric(
+                                    label: '全年收入',
+                                    numericValue: summary.totalIncome,
+                                    formatter: (v) => formatAmount(
+                                      v.toDouble(),
+                                      withSymbol: true,
+                                    ),
+                                    unit: '',
+                                    color: colors.income,
+                                    compact: true,
+                                  ),
+                                  _YearMetric(
+                                    label: '全年支出',
+                                    numericValue: summary.totalExpense,
+                                    formatter: (v) => formatAmount(
+                                      v.toDouble(),
+                                      withSymbol: true,
+                                    ),
+                                    unit: '',
+                                    color: colors.expense,
+                                    compact: true,
+                                  ),
+                                  _YearMetric(
+                                    label: '年度净结余',
+                                    numericValue:
+                                        summary.totalIncome -
+                                        summary.totalExpense,
+                                    formatter: (v) => formatAmount(
+                                      v.toDouble(),
+                                      withSymbol: true,
+                                    ),
+                                    unit: '',
+                                    color:
+                                        summary.totalIncome >=
+                                            summary.totalExpense
+                                        ? colors.text
+                                        : colors.expense,
+                                    compact: true,
+                                  ),
+                                ],
+                              ),
                             ),
-                            unit: '元',
-                            color: summary.totalIncome >= summary.totalExpense
-                                ? colors.text
-                                : colors.expense,
-                          ),
+                          ],
                         ],
                       ),
                     ),
-                    const SizedBox(height: Gaps.md),
+                    const SizedBox(height: Gaps.cardGap),
                     GlassCard(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            '全年${context.unit.quantity}趋势',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: colors.text2,
-                            ),
+                          Row(
+                            children: [
+                              AppIconBadge(
+                                icon: Icons.show_chart_rounded,
+                                color: colors.primary,
+                                size: 28,
+                                iconSize: 16,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                '每月${context.unit.quantity}趋势',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: colors.text,
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: Gaps.sm),
+                          const SizedBox(height: Gaps.md),
                           TrendChart(
                             values: [
                               for (final point in hoursTrend) point.hours,
@@ -190,80 +271,134 @@ class _StatsPageState extends ConsumerState<StatsPage> {
                               for (final point in hoursTrend)
                                 '${int.parse(point.yearMonth.split('-')[1])}',
                             ],
-                            color: colors.accent,
+                            color: colors.primary,
                             semanticLabel: '全年${context.unit.quantity}趋势',
                             seriesName: context.unit.quantity,
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: Gaps.md),
-                    GlassCard(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Text(
-                                '每月收支',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: colors.text2,
-                                ),
-                              ),
-                              const Spacer(),
-                              _Legend(color: colors.income, label: '收入'),
-                              const SizedBox(width: Gaps.md),
-                              _Legend(color: colors.expense, label: '支出'),
-                            ],
-                          ),
-                          const SizedBox(height: Gaps.sm),
-                          BarPairChart(
-                            labels: [
-                              for (final point in ledgerTrend)
-                                '${int.parse(point.yearMonth.split('-')[1])}',
-                            ],
-                            seriesA: [for (final p in ledgerTrend) p.income],
-                            seriesB: [for (final p in ledgerTrend) p.expense],
-                            colorA: colors.income,
-                            colorB: colors.expense,
-                            valueFormatter: formatAmount,
-                            semanticLabel: '每月收入与支出',
-                            seriesAName: '收入',
-                            seriesBName: '支出',
-                            selectedIndex: ledgerTrend.indexWhere(
-                              (point) => point.yearMonth == categoryMonth,
-                            ),
-                            onSelected: (index) {
-                              if (index < 0 || index >= ledgerTrend.length) {
-                                return;
-                              }
-                              ref
-                                  .read(selectedMonthProvider.notifier)
-                                  .setMonth(ledgerTrend[index].yearMonth);
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: Gaps.md),
-                    SizedBox(
-                      width: double.infinity,
-                      child: GlassCard(
+                    if (workBreakdown.isNotEmpty) ...[
+                      const SizedBox(height: Gaps.cardGap),
+                      GlassCard(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Row(
                               children: [
+                                const AppIconBadge(
+                                  icon: Icons.pie_chart_outline_rounded,
+                                  color: Color(0xFF5856D6),
+                                  size: 28,
+                                  iconSize: 16,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  '按工作构成（$_year 年）',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: colors.text,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: Gaps.md),
+                            for (var i = 0; i < workBreakdown.length; i++) ...[
+                              if (i > 0) const SizedBox(height: 10),
+                              _WorkBreakdownBar(
+                                row: workBreakdown[i],
+                                totalHours: summary.totalHours,
+                                unitName: context.unit.short,
+                                color: colors.chart[i % colors.chart.length],
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                    if (!kHoursOnly) ...[
+                      const SizedBox(height: Gaps.cardGap),
+                      GlassCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                AppIconBadge(
+                                  icon: Icons.bar_chart_rounded,
+                                  color: colors.income,
+                                  size: 28,
+                                  iconSize: 16,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  '每月收支对比',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: colors.text,
+                                  ),
+                                ),
+                                const Spacer(),
+                                _Legend(color: colors.income, label: '收入'),
+                                const SizedBox(width: Gaps.md),
+                                _Legend(color: colors.expense, label: '支出'),
+                              ],
+                            ),
+                            const SizedBox(height: Gaps.md),
+                            BarPairChart(
+                              labels: [
+                                for (final point in ledgerTrend)
+                                  '${int.parse(point.yearMonth.split('-')[1])}',
+                              ],
+                              seriesA: [for (final p in ledgerTrend) p.income],
+                              seriesB: [for (final p in ledgerTrend) p.expense],
+                              colorA: colors.income,
+                              colorB: colors.expense,
+                              valueFormatter: formatAmount,
+                              semanticLabel: '每月收入与支出',
+                              seriesAName: '收入',
+                              seriesBName: '支出',
+                              selectedIndex: ledgerTrend.indexWhere(
+                                (point) => point.yearMonth == categoryMonth,
+                              ),
+                              onSelected: (index) {
+                                if (index < 0 || index >= ledgerTrend.length) {
+                                  return;
+                                }
+                                ref
+                                    .read(selectedMonthProvider.notifier)
+                                    .setMonth(ledgerTrend[index].yearMonth);
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: Gaps.cardGap),
+                      GlassCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                AppIconBadge(
+                                  icon: Icons.donut_large_rounded,
+                                  color: _categoryType == LedgerType.expense
+                                      ? colors.expense
+                                      : colors.income,
+                                  size: 28,
+                                  iconSize: 16,
+                                ),
+                                const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
                                     '${formatMonthLabel(categoryMonth)} '
                                     '${_categoryType == LedgerType.expense ? '支出' : '收入'}分类',
                                     style: TextStyle(
-                                      fontSize: 13,
+                                      fontSize: 14,
                                       fontWeight: FontWeight.w600,
-                                      color: colors.text2,
+                                      color: colors.text,
                                     ),
                                   ),
                                 ),
@@ -277,18 +412,18 @@ class _StatsPageState extends ConsumerState<StatsPage> {
                             const SizedBox(height: Gaps.md),
                             if (categories.isEmpty)
                               Text(
-                                '本月还没有${_categoryType == LedgerType.expense ? '支出' : '收入'}记录',
+                                '该月还没有${_categoryType == LedgerType.expense ? '支出' : '收入'}记录',
                                 style: TextStyle(
                                   fontSize: 12.5,
                                   color: colors.text3,
                                 ),
                               )
-                            else ...[
+                            else
                               LayoutBuilder(
                                 builder: (context, constraints) {
                                   final donutSize = math.min(
-                                    150.0,
-                                    constraints.maxWidth * 0.42,
+                                    138.0,
+                                    constraints.maxWidth * 0.40,
                                   );
                                   return Row(
                                     children: [
@@ -316,6 +451,7 @@ class _StatsPageState extends ConsumerState<StatsPage> {
                                             '${_categoryType == LedgerType.expense ? '支出' : '收入'}分类占比',
                                         centerValue: formatAmount(
                                           categoryTotal,
+                                          withSymbol: true,
                                         ),
                                         centerLabel:
                                             _categoryType == LedgerType.expense
@@ -334,7 +470,7 @@ class _StatsPageState extends ConsumerState<StatsPage> {
                                               Padding(
                                                 padding:
                                                     const EdgeInsets.symmetric(
-                                                      vertical: 3,
+                                                      vertical: 3.5,
                                                     ),
                                                 child: Row(
                                                   children: [
@@ -342,8 +478,8 @@ class _StatsPageState extends ConsumerState<StatsPage> {
                                                       width: 8,
                                                       height: 8,
                                                       decoration: BoxDecoration(
-                                                        color:
-                                                            colors.chart[i %
+                                                        color: colors
+                                                            .chart[i %
                                                                 colors
                                                                     .chart
                                                                     .length],
@@ -358,18 +494,21 @@ class _StatsPageState extends ConsumerState<StatsPage> {
                                                         overflow: TextOverflow
                                                             .ellipsis,
                                                         style: TextStyle(
-                                                          fontSize: 12,
-                                                          color: colors.text2,
+                                                          fontSize: 12.5,
+                                                          color: colors.text,
                                                         ),
                                                       ),
                                                     ),
                                                     Text(
                                                       formatAmount(
                                                         categories[i].total,
+                                                        withSymbol: true,
                                                       ),
                                                       style: TextStyle(
-                                                        fontSize: 12,
-                                                        color: colors.text3,
+                                                        fontSize: 12.5,
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                        color: colors.text,
                                                         fontFeatures:
                                                             tabularFigures,
                                                       ),
@@ -384,12 +523,10 @@ class _StatsPageState extends ConsumerState<StatsPage> {
                                   );
                                 },
                               ),
-                            ],
                           ],
                         ),
                       ),
-                    ),
-                    const SizedBox(height: Gaps.xxl),
+                    ],
                   ],
                 ),
               ),
@@ -400,8 +537,80 @@ class _StatsPageState extends ConsumerState<StatsPage> {
           top: 0,
           left: 0,
           right: 0,
-          child: PinnedSubHeader(title: '年度统计', onBack: widget.onBack),
+          child: isSubpage
+              ? PinnedSubHeader(title: '年度统计', onBack: widget.onBack!)
+              : PinnedHeader(
+                  title: '统计',
+                  actions: [
+                    _YearSwitchPill(year: _year, onShift: _shiftYear),
+                  ],
+                ),
         ),
+      ],
+    );
+    if (isSubpage) {
+      return Scaffold(backgroundColor: colors.page, body: body);
+    }
+    return body;
+  }
+}
+
+class _WorkBreakdownBar extends StatelessWidget {
+  const _WorkBreakdownBar({
+    required this.row,
+    required this.totalHours,
+    required this.unitName,
+    required this.color,
+  });
+
+  final WorkBreakdownRow row;
+  final double totalHours;
+  final String unitName;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final ratio =
+        totalHours <= 0 ? 0.0 : (row.hours / totalHours).clamp(0.0, 1.0);
+    final percent = (ratio * 100).round();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 7,
+              height: 7,
+              margin: const EdgeInsets.only(right: 7),
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+            ),
+            Expanded(
+              child: Text(
+                row.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: colors.text,
+                ),
+              ),
+            ),
+            Text(
+              '$percent% · ${formatHoursValue(row.hours)}$unitName'
+              '${!kHoursOnly && row.pay > 0 ? ' · ${formatAmount(row.pay, withSymbol: true)}' : ''}',
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: colors.text2,
+                fontFeatures: tabularFigures,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 5),
+        ProgressBar(ratio: ratio, color: color, height: 4.5),
       ],
     );
   }
@@ -416,21 +625,19 @@ class _CategoryTypeToggle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     Widget item(LedgerType type, String label) {
       final selected = value == type;
       return Pressable(
         onTap: () => onChanged(type),
         shape: Radii.pillShape,
+        pressedScale: 0.95,
         child: AnimatedContainer(
           duration: motionDuration(
-            const Duration(milliseconds: 180),
-            disableAnimations: disable,
+            Timings.fast,
+            disableAnimations: MediaQuery.maybeDisableAnimationsOf(context) ?? false,
           ),
           curve: Curves2.out,
-          height: 32,
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
           decoration: ShapeDecoration(
             color: selected ? colors.primary : Colors.transparent,
             shape: Radii.pillShape,
@@ -438,7 +645,7 @@ class _CategoryTypeToggle extends StatelessWidget {
           child: Text(
             label,
             style: TextStyle(
-              fontSize: 11.5,
+              fontSize: 12,
               fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
               color: selected ? colors.onPrimary : colors.text2,
             ),
@@ -448,9 +655,11 @@ class _CategoryTypeToggle extends StatelessWidget {
     }
 
     return Container(
-      height: 44,
-      padding: const EdgeInsets.all(4),
-      decoration: ShapeDecoration(color: colors.inset, shape: Radii.pillShape),
+      padding: const EdgeInsets.all(3),
+      decoration: ShapeDecoration(
+        color: colors.block,
+        shape: Radii.pillShape,
+      ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -462,46 +671,66 @@ class _CategoryTypeToggle extends StatelessWidget {
   }
 }
 
-/// 年份步进按钮：圆形块面，与年份文字之间由 `Expanded` 自动留白。
-///
-/// 之前是贴着文字的 44×44 圆角方块，两个灰块夹住年份、没有呼吸空间，
-/// 小屏上看起来像压在「年」字上。
-class _YearStepper extends StatelessWidget {
-  const _YearStepper({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
+class _YearSwitchPill extends StatelessWidget {
+  const _YearSwitchPill({required this.year, required this.onShift});
 
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
+  final int year;
+  final ValueChanged<int> onShift;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    return Semantics(
-      button: true,
-      label: label,
-      onTap: onTap,
-      excludeSemantics: true,
-      child: Pressable(
-        onTap: onTap,
-        shape: const CircleBorder(),
-        pressedScale: 0.90,
-        child: Container(
-          // 44dp 是移动端最小触控尺寸；40 会让单次点击的可达性下降。
-          width: 44,
-          height: 44,
-          alignment: Alignment.center,
-          decoration: ShapeDecoration(
-            // 用 inset 而不是 block：浅色主题下 block 与 page 同为 #EFEDF0，
-            // 按钮会整个隐形，只剩图标浮在页底上。
-            color: colors.inset,
-            shape: const CircleBorder(),
+    final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    Widget step(IconData icon, String label, int delta) {
+      return Semantics(
+        button: true,
+        label: label,
+        onTap: () => onShift(delta),
+        excludeSemantics: true,
+        child: Pressable(
+          onTap: () => onShift(delta),
+          shape: Radii.pillShape,
+          pressedScale: 0.92,
+          child: SizedBox(
+            width: 32,
+            height: 40,
+            child: Icon(icon, size: 18, color: colors.text2),
           ),
-          child: Icon(icon, size: 20, color: colors.text2),
         ),
+      );
+    }
+
+    return HeaderGlassSurface(
+      height: 40,
+      radius: Radii.pill,
+      bright: true,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          step(Icons.chevron_left_rounded, '上一年', -1),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: AnimatedSwitcher(
+              duration: motionDuration(
+                Timings.fast,
+                disableAnimations: disable,
+              ),
+              switchInCurve: Curves2.out,
+              switchOutCurve: Curves2.out,
+              child: Text(
+                '$year 年',
+                key: ValueKey(year),
+                style: TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w600,
+                  color: colors.text,
+                  fontFeatures: tabularFigures,
+                ),
+              ),
+            ),
+          ),
+          step(Icons.chevron_right_rounded, '下一年', 1),
+        ],
       ),
     );
   }
@@ -510,15 +739,19 @@ class _YearStepper extends StatelessWidget {
 class _YearMetric extends StatelessWidget {
   const _YearMetric({
     required this.label,
-    required this.value,
+    required this.numericValue,
+    required this.formatter,
     required this.unit,
     required this.color,
+    this.compact = false,
   });
 
   final String label;
-  final String value;
+  final num numericValue;
+  final String Function(num value) formatter;
   final String unit;
   final Color color;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -527,32 +760,36 @@ class _YearMetric extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: TextStyle(fontSize: 12, color: colors.text2)),
-          const SizedBox(height: 3),
+          Text(label, style: TextStyle(fontSize: 11.5, color: colors.text3)),
+          const SizedBox(height: 4),
           FittedBox(
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerLeft,
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Text(
-                  value,
+                AnimatedNumericText(
+                  value: numericValue,
+                  formatter: formatter,
                   style: TextStyle(
-                    fontSize: 22,
-                    height: 1,
+                    fontSize: compact ? TypeScale.body : 21,
+                    height: 1.05,
                     fontWeight: FontWeight.w700,
-                    letterSpacing: -0.02,
+                    letterSpacing: -0.3,
                     color: color,
-                    fontFeatures: tabularFigures,
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.only(left: 2, bottom: 1),
-                  child: Text(
-                    unit,
-                    style: TextStyle(fontSize: TypeScale.micro, color: colors.text2),
+                if (unit.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 2, bottom: 1),
+                    child: Text(
+                      unit,
+                      style: TextStyle(
+                        fontSize: TypeScale.micro,
+                        color: colors.text2,
+                      ),
+                    ),
                   ),
-                ),
               ],
             ),
           ),
@@ -574,8 +811,8 @@ class _Legend extends StatelessWidget {
     return Row(
       children: [
         Container(
-          width: 8,
-          height: 8,
+          width: 7,
+          height: 7,
           decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
         const SizedBox(width: 4),

@@ -1,78 +1,37 @@
-/// 吸顶顶栏：单层高斯模糊 + 纵向染色渐隐。
-///
-/// 只用一层原生 BackdropFilter。顶部用高不透明度页面色压住背后的卡片
-/// 轮廓，向下逐渐降低透明度，让内容从模糊里化开，而不是露出一个白色圆角块。
+/// 吸顶顶栏：FlClash 悬浮液态玻璃岛 + 顶部柔和渐隐遮罩 + 胶囊变形搜索。
 library;
 
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
-import 'package:fluid_glass/fluid_glass.dart';
+import 'package:flutter/services.dart';
 
+import '../core/motion.dart';
 import '../core/theme_tokens.dart';
 import 'widgets.dart';
 
-class _HeaderGlass extends StatelessWidget {
-  const _HeaderGlass();
+/// 顶部羽化渐隐遮罩：压住状态栏文字对比度，向下化开，让下方卡片自然滑入玻璃岛背后。
+class _HeaderScrim extends StatelessWidget {
+  const _HeaderScrim();
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final reduceEffects = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
-    final quality =
-        GlassQualityScope.maybeOf(context) ?? GlassDeviceTier.instance.quality;
-    final plain = quality == GlassQuality.plain;
-    final sigma = reduceEffects ? 12.0 : (plain ? 15.0 : 20.0);
-    final opaque = MediaQuery.of(context).highContrast;
-    if (opaque) return ColoredBox(color: colors.page);
-
-    final veil = Color.lerp(
-      colors.page,
-      Colors.white,
-      colors.isDark ? 0.02 : 0.16,
-    )!;
-    return ClipRect(
-      child: ShaderMask(
-        // 整个玻璃层一起羽化，不再只让染色淡出而把模糊硬切在顶栏底边。
-        shaderCallback: (bounds) => const LinearGradient(
+    final highContrast = MediaQuery.maybeOf(context)?.highContrast ?? false;
+    if (highContrast) return ColoredBox(color: colors.page);
+    final base = colors.page;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Color(0xFFFFFFFF), Color(0xFFFFFFFF), Color(0x00FFFFFF)],
-          stops: [0, 0.80, 1],
-        ).createShader(bounds),
-        blendMode: BlendMode.dstIn,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            // 单层原生模糊：分组多次采样在滚动时会缓存上一帧背景，
-            // 顶栏下方出现旧文字残影；一层模糊 + 纵向染色羽化更稳、
-            // 也更省电。
-            Positioned.fill(
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
-                child: const SizedBox.expand(),
-              ),
-            ),
-            Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      veil,
-                      veil,
-                      veil,
-                      veil.withValues(alpha: colors.isDark ? 0.78 : 0.86),
-                      veil.withValues(alpha: colors.isDark ? 0.34 : 0.42),
-                      veil.withValues(alpha: 0),
-                    ],
-                    stops: const [0, 0.45, 0.78, 0.88, 0.97, 1],
-                  ),
-                ),
-              ),
-            ),
+          colors: [
+            base.withValues(alpha: 0.94),
+            base.withValues(alpha: 0.86),
+            base.withValues(alpha: 0.52),
+            base.withValues(alpha: 0.0),
           ],
+          stops: const [0.0, 0.56, 0.82, 1.0],
         ),
       ),
     );
@@ -88,6 +47,9 @@ class PinnedHeader extends StatelessWidget {
     this.height = Gaps.headerHeight,
     this.bottom,
     this.bottomHeight = 48,
+    this.animateTitle = false,
+    this.onTitleLongPress,
+    this.titleHint,
   });
 
   final String title;
@@ -96,6 +58,9 @@ class PinnedHeader extends StatelessWidget {
   final double height;
   final Widget? bottom;
   final double bottomHeight;
+  final bool animateTitle;
+  final void Function(Offset globalPosition)? onTitleLongPress;
+  final String? titleHint;
 
   /// 顶栏占据的总高度（状态栏 + 标题行 + 可选副行）。
   static double totalHeight(
@@ -121,10 +86,13 @@ class PinnedHeader extends StatelessWidget {
     );
 
     return SizedBox(
-      height: total,
+      height: total + 12,
       child: Stack(
+        clipBehavior: Clip.none,
         children: [
-          Positioned.fill(child: const AbsorbPointer(child: _HeaderGlass())),
+          const Positioned.fill(
+            child: IgnorePointer(child: _HeaderScrim()),
+          ),
           Positioned(
             top: topInset,
             left: 0,
@@ -142,17 +110,13 @@ class PinnedHeader extends StatelessWidget {
                     const SizedBox(width: Gaps.sm),
                   ],
                   Expanded(
-                    child: Text(
-                      title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: compact ? 24 : 26,
-                        height: 1.25,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: -0.01,
-                        color: colors.text,
-                      ),
+                    child: _HeaderTitle(
+                      title: title,
+                      compact: compact,
+                      animate: animateTitle,
+                      onLongPress: onTitleLongPress,
+                      hint: titleHint,
+                      color: colors.text,
                     ),
                   ),
                   if (actions != null) ...[
@@ -181,12 +145,90 @@ class PinnedHeader extends StatelessWidget {
   }
 }
 
-/// 二级页顶栏：返回按钮 + 标题，同一套实底渐变。
+class _HeaderTitle extends StatefulWidget {
+  const _HeaderTitle({
+    required this.title,
+    required this.compact,
+    required this.animate,
+    required this.onLongPress,
+    required this.hint,
+    required this.color,
+  });
+
+  final String title;
+  final bool compact;
+  final bool animate;
+  final void Function(Offset globalPosition)? onLongPress;
+  final String? hint;
+  final Color color;
+
+  @override
+  State<_HeaderTitle> createState() => _HeaderTitleState();
+}
+
+class _HeaderTitleState extends State<_HeaderTitle> {
+  bool _holding = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    final style = TextStyle(
+      fontSize: widget.compact ? 23 : 26,
+      height: 1.25,
+      fontWeight: FontWeight.w700,
+      letterSpacing: -0.3,
+      color: widget.color,
+    );
+    final textWidget = widget.animate
+        ? AnimatedMonthLabel(label: widget.title, style: style)
+        : Text(
+            widget.title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: style,
+          );
+    final onLongPress = widget.onLongPress;
+    if (onLongPress == null) return textWidget;
+    return Semantics(
+      header: true,
+      hint: widget.hint,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (_) => setState(() => _holding = true),
+        onTapUp: (_) => setState(() => _holding = false),
+        onTapCancel: () => setState(() => _holding = false),
+        onLongPressStart: (details) {
+          setState(() => _holding = false);
+          HapticFeedback.mediumImpact();
+          onLongPress(details.globalPosition);
+        },
+        child: AnimatedScale(
+          scale: _holding && !disable ? 0.96 : 1.0,
+          duration: motionDuration(Timings.press, disableAnimations: disable),
+          curve: Curves2.out,
+          alignment: Alignment.centerLeft,
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: textWidget,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 二级页顶栏：悬浮圆形液态玻璃返回钮 + 标题 + 可选右侧玻璃操作。
 class PinnedSubHeader extends StatelessWidget {
-  const PinnedSubHeader({super.key, required this.title, required this.onBack});
+  const PinnedSubHeader({
+    super.key,
+    required this.title,
+    required this.onBack,
+    this.actions,
+  });
 
   final String title;
   final VoidCallback onBack;
+  final List<Widget>? actions;
 
   static double totalHeight(BuildContext context) =>
       MediaQuery.paddingOf(context).top + Gaps.headerHeight;
@@ -197,17 +239,20 @@ class PinnedSubHeader extends StatelessWidget {
     final topInset = MediaQuery.paddingOf(context).top;
 
     return SizedBox(
-      height: totalHeight(context),
+      height: totalHeight(context) + 12,
       child: Stack(
+        clipBehavior: Clip.none,
         children: [
-          Positioned.fill(child: const AbsorbPointer(child: _HeaderGlass())),
+          const Positioned.fill(
+            child: IgnorePointer(child: _HeaderScrim()),
+          ),
           Positioned(
             top: topInset,
             left: 0,
             right: 0,
             height: Gaps.headerHeight,
             child: Padding(
-              padding: const EdgeInsets.only(left: Gaps.sm, right: Gaps.lg),
+              padding: const EdgeInsets.only(left: Gaps.lg, right: Gaps.lg),
               child: Row(
                 children: [
                   GlassIconButton(
@@ -217,7 +262,7 @@ class PinnedSubHeader extends StatelessWidget {
                     iconSize: 20,
                     bright: true,
                   ),
-                  const SizedBox(width: Gaps.sm),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       title,
@@ -226,13 +271,269 @@ class PinnedSubHeader extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 20,
                         height: 1.25,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.2,
                         color: colors.text,
                       ),
                     ),
                   ),
+                  if (actions != null) ...[
+                    const SizedBox(width: Gaps.sm),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      spacing: 8,
+                      children: actions!,
+                    ),
+                  ],
                 ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// FlClash 风格液态玻璃胶囊变形搜索顶栏：
+/// 常态为「标题 + 中间胶囊 + 右侧玻璃按钮组」；点击放大镜后，玻璃胶囊弹性展开为
+/// 全宽搜索框，右侧图标平滑切为圆形关闭钮，并伴随轻度高斯模糊过渡。
+class MorphingSearchHeader extends StatefulWidget {
+  const MorphingSearchHeader({
+    super.key,
+    required this.title,
+    required this.searching,
+    required this.controller,
+    required this.hintText,
+    required this.onSearchingChanged,
+    required this.onQueryChanged,
+    required this.onClearQuery,
+    this.middleAction,
+    this.trailingAction,
+    this.height = Gaps.headerHeight,
+  });
+
+  final String title;
+  final bool searching;
+  final TextEditingController controller;
+  final String hintText;
+  final ValueChanged<bool> onSearchingChanged;
+  final ValueChanged<String> onQueryChanged;
+  final VoidCallback onClearQuery;
+  final Widget? middleAction;
+  final Widget? trailingAction;
+  final double height;
+
+  static double totalHeight(
+    BuildContext context, {
+    double height = Gaps.headerHeight,
+  }) => MediaQuery.paddingOf(context).top + height;
+
+  @override
+  State<MorphingSearchHeader> createState() => _MorphingSearchHeaderState();
+}
+
+class _MorphingSearchHeaderState extends State<MorphingSearchHeader> {
+  final FocusNode _focusNode = FocusNode();
+
+  @override
+  void didUpdateWidget(covariant MorphingSearchHeader oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.searching && !oldWidget.searching) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _focusNode.requestFocus();
+      });
+    } else if (!widget.searching && oldWidget.searching) {
+      _focusNode.unfocus();
+    }
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _closeSearch() {
+    HapticFeedback.selectionClick();
+    widget.onClearQuery();
+    widget.onSearchingChanged(false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final topInset = MediaQuery.paddingOf(context).top;
+    final compact = MediaQuery.sizeOf(context).width < 360;
+    final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    final total = MorphingSearchHeader.totalHeight(
+      context,
+      height: widget.height,
+    );
+
+    return SizedBox(
+      height: total + 12,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          const Positioned.fill(
+            child: IgnorePointer(child: _HeaderScrim()),
+          ),
+          Positioned(
+            top: topInset,
+            left: 0,
+            right: 0,
+            height: widget.height,
+            child: Padding(
+              padding: EdgeInsets.only(
+                left: compact ? 16 : 20,
+                right: compact ? 12 : Gaps.lg,
+              ),
+              child: AnimatedSwitcher(
+                duration: motionDuration(
+                  Timings.toast,
+                  disableAnimations: disable,
+                ),
+                reverseDuration: motionDuration(
+                  Timings.base,
+                  disableAnimations: disable,
+                ),
+                switchInCurve: FlClashSprings.searchOpenCurve,
+                switchOutCurve: FlClashSprings.searchCloseCurve,
+                transitionBuilder: (child, animation) {
+                  if (disable) return child;
+                  return AnimatedBuilder(
+                    animation: animation,
+                    child: child,
+                    builder: (context, inner) {
+                      final raw = animation.value;
+                      final t = raw.clamp(0.0, 1.0);
+                      final blur = (1 - t) * 4.0;
+                      final scale = (0.94 + 0.06 * raw).clamp(0.90, 1.03);
+                      return Opacity(
+                        opacity: t,
+                        child: Transform.scale(
+                          scale: scale,
+                          alignment: Alignment.centerRight,
+                          child: blur > 0.15
+                              ? ImageFiltered(
+                                  imageFilter: ImageFilter.blur(
+                                    sigmaX: blur,
+                                    sigmaY: blur,
+                                  ),
+                                  child: inner,
+                                )
+                              : inner,
+                        ),
+                      );
+                    },
+                  );
+                },
+                child: widget.searching
+                    ? Row(
+                        key: const ValueKey('header-search-active'),
+                        children: [
+                          Expanded(
+                            child: LiquidGlassSurface(
+                              height: 44,
+                              radius: Radii.pill,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.search_rounded,
+                                    size: 19,
+                                    color: colors.primary,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: TextField(
+                                      controller: widget.controller,
+                                      focusNode: _focusNode,
+                                      onChanged: widget.onQueryChanged,
+                                      textInputAction: TextInputAction.search,
+                                      style: TextStyle(
+                                        fontSize: 14.5,
+                                        color: colors.text,
+                                      ),
+                                      decoration: InputDecoration(
+                                        isDense: true,
+                                        filled: false,
+                                        border: InputBorder.none,
+                                        enabledBorder: InputBorder.none,
+                                        focusedBorder: InputBorder.none,
+                                        contentPadding: EdgeInsets.zero,
+                                        hintText: widget.hintText,
+                                        hintStyle: TextStyle(
+                                          fontSize: 14,
+                                          color: colors.text3,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  if (widget.controller.text.isNotEmpty)
+                                    Pressable(
+                                      onTap: widget.onClearQuery,
+                                      shape: Radii.pillShape,
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(4),
+                                        child: Icon(
+                                          Icons.cancel_rounded,
+                                          size: 18,
+                                          color: colors.text3,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          GlassIconButton(
+                            icon: Icons.close_rounded,
+                            tooltip: '关闭搜索',
+                            onTap: _closeSearch,
+                          ),
+                        ],
+                      )
+                    : Row(
+                        key: const ValueKey('header-search-idle'),
+                        children: [
+                          Expanded(
+                            child: Text(
+                              widget.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: compact ? 23 : 26,
+                                height: 1.25,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: -0.3,
+                                color: colors.text,
+                              ),
+                            ),
+                          ),
+                          if (widget.middleAction != null) ...[
+                            const SizedBox(width: Gaps.sm),
+                            widget.middleAction!,
+                          ],
+                          const SizedBox(width: 8),
+                          GlassIconButton(
+                            icon: Icons.search_rounded,
+                            tooltip: '搜索',
+                            onTap: () {
+                              HapticFeedback.selectionClick();
+                              widget.onSearchingChanged(true);
+                            },
+                          ),
+                          if (widget.trailingAction != null) ...[
+                            const SizedBox(width: 8),
+                            widget.trailingAction!,
+                          ],
+                        ],
+                      ),
               ),
             ),
           ),

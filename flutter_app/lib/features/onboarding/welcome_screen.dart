@@ -24,7 +24,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _entryController = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 820),
+    duration: Timings.sheet,
   );
   bool _starting = false;
 
@@ -90,33 +90,27 @@ class _WelcomeScreenState extends State<WelcomeScreen>
         body: Stack(
           fit: StackFit.expand,
           children: [
-            DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: RadialGradient(
-                  center: const Alignment(0, -0.22),
-                  radius: 0.84,
-                  colors: [
-                    colors.primary.withValues(alpha: dark ? 0.16 : 0.09),
-                    background.withValues(alpha: 0),
-                  ],
-                ),
-              ),
-            ),
             SafeArea(
               child: Column(
                 children: [
                   Expanded(
-                    child: SingleChildScrollView(
-                      physics: const BouncingScrollPhysics(
-                        parent: AlwaysScrollableScrollPhysics(),
-                      ),
-                      padding: const EdgeInsets.fromLTRB(24, 26, 24, 32),
-                      child: Center(
+                    child: LayoutBuilder(
+                      builder: (context, constraints) => SingleChildScrollView(
+                        physics: const BouncingScrollPhysics(
+                          parent: AlwaysScrollableScrollPhysics(),
+                        ),
+                        padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
                         child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 430),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
+                          constraints: BoxConstraints(
+                            minHeight: math.max(0, constraints.maxHeight - 40),
+                          ),
+                          child: Center(
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 430),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
                               _StaggerReveal(
                                 controller: _entryController,
                                 begin: 0,
@@ -189,6 +183,8 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                               ),
                             ],
                           ),
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -228,14 +224,55 @@ class _WelcomeHeading extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final dark = colors.isDark;
-    final width = math.min(310.0, MediaQuery.sizeOf(context).width - 62);
+    final width = math.min(260.0, MediaQuery.sizeOf(context).width - 96);
     return Column(
       children: [
+        Container(
+          width: 72,
+          height: 72,
+          padding: const EdgeInsets.all(10),
+          decoration: ShapeDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: dark
+                  ? [const Color(0xFF232736), const Color(0xFF171A24)]
+                  : [Colors.white, const Color(0xFFF3F6FD)],
+            ),
+            shape: Radii.shape(20).copyWith(
+              side: BorderSide(
+                color: dark
+                    ? Colors.white.withValues(alpha: 0.14)
+                    : Colors.white,
+                width: 1.5,
+              ),
+            ),
+            shadows: [
+              BoxShadow(
+                color: colors.primary.withValues(alpha: dark ? 0.28 : 0.16),
+                blurRadius: 22,
+                offset: const Offset(0, 10),
+              ),
+              BoxShadow(
+                color: Colors.black.withValues(alpha: dark ? 0.30 : 0.05),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Image.asset(
+            'assets/brand/app_icon.png',
+            fit: BoxFit.contain,
+            filterQuality: FilterQuality.high,
+          ),
+        ),
+        const SizedBox(height: 16),
         Semantics(
           image: true,
           label: '时页 TIMEPAGE',
           child: SizedBox(
             width: width,
+            height: 68,
             child: Image.asset(
               dark
                   ? 'assets/brand/wordmark_dark.png'
@@ -245,18 +282,13 @@ class _WelcomeHeading extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
           decoration: ShapeDecoration(
-            color: colors.card.withValues(alpha: dark ? 0.74 : 0.88),
-            shape: RoundedSuperellipseBorder(
-              borderRadius: BorderRadius.circular(Radii.pill),
-              side: BorderSide(
-                color: dark
-                    ? Colors.white.withValues(alpha: 0.08)
-                    : Colors.white,
-              ),
+            color: colors.card,
+            shape: Radii.pillShape.copyWith(
+              side: BorderSide(color: colors.cardBorder),
             ),
           ),
           child: Row(
@@ -312,13 +344,10 @@ class _BentoPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    return Container(
+    return GlassCard(
+      flat: true,
+      radius: Radii.card,
       padding: const EdgeInsets.all(16),
-      decoration: ShapeDecoration(
-        color: colors.card,
-        shape: Radii.shape(24),
-        shadows: colors.isDark ? null : context.shadows.take(2).toList(),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -336,8 +365,8 @@ class _BentoPreview extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: ShapeDecoration(
-                  color: colors.inset,
-                  shape: Radii.pillShape,
+                  color: colors.block,
+                  shape: Radii.shape(Radii.sm),
                 ),
                 child: Text(
                   '示例',
@@ -372,8 +401,6 @@ class _BentoPreview extends StatelessWidget {
                     label: kHoursOnly ? '出勤' : '本周工资',
                     value: kHoursOnly ? '5' : '¥800',
                     unit: kHoursOnly ? '天' : '',
-                    // 暗色的 warningSoft(#3E2A0C) 压在卡片(#151D2E) 上几乎
-                    // 分不出来，改用半透明琥珀做底，块面才立得住。
                     background: kHoursOnly
                         ? colors.incomeSoft
                         : colors.isDark
@@ -417,7 +444,10 @@ class _PreviewMetric extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
-      decoration: ShapeDecoration(color: background, shape: Radii.shape(18)),
+      decoration: ShapeDecoration(
+        color: background,
+        shape: Radii.shape(Radii.md),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -505,20 +535,21 @@ class _LocalFirstCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    return Container(
+    return GlassCard(
+      flat: true,
+      radius: Radii.card,
       padding: const EdgeInsets.all(14),
-      decoration: ShapeDecoration(color: colors.card, shape: Radii.shape(22)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 36,
-            height: 36,
+            width: 34,
+            height: 34,
             decoration: ShapeDecoration(
               color: colors.incomeSoft,
-              shape: Radii.shape(12),
+              shape: Radii.shape(10),
             ),
-            child: Icon(Icons.shield_outlined, size: 19, color: colors.income),
+            child: Icon(Icons.shield_outlined, size: 18, color: colors.income),
           ),
           const SizedBox(height: 10),
           Text(
@@ -551,9 +582,10 @@ class _HoursPresetCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    return Container(
+    return GlassCard(
+      flat: true,
+      radius: Radii.card,
       padding: const EdgeInsets.all(14),
-      decoration: ShapeDecoration(color: colors.card, shape: Radii.shape(22)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -579,8 +611,8 @@ class _HoursPresetCard extends StatelessWidget {
                     height: 32,
                     alignment: Alignment.center,
                     decoration: ShapeDecoration(
-                      color: hours == 8 ? colors.primaryContainer : colors.inset,
-                      shape: Radii.pillShape,
+                      color: hours == 8 ? colors.primaryContainer : colors.block,
+                      shape: Radii.shape(Radii.sm),
                     ),
                     child: Text(
                       '${hours}h',
@@ -613,106 +645,11 @@ class _StartButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
-    final radius = BorderRadius.circular(28);
-    final bottom = Color.lerp(colors.primary, Colors.black, 0.24)!;
-    return Semantics(
-      button: true,
-      enabled: onPressed != null,
-      label: busy ? '正在进入' : '开始使用',
-      onTap: onPressed,
-      excludeSemantics: true,
-      child: SizedBox(
-        width: double.infinity,
-        height: 56,
-        child: Pressable(
-          onTap: onPressed,
-          haptic: false,
-          shape: RoundedSuperellipseBorder(borderRadius: radius),
-          pressedScale: 0.97,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              borderRadius: radius,
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [colors.primary, bottom],
-              ),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
-              boxShadow: [
-                BoxShadow(
-                  color: colors.primary.withValues(alpha: 0.22),
-                  blurRadius: 20,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: radius,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  Positioned(
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    height: 26,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            Colors.white.withValues(alpha: 0.16),
-                            Colors.transparent,
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  Center(
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (busy) ...[
-                          SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation(
-                                colors.onPrimary,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 9),
-                        ],
-                        Text(
-                          busy ? '正在进入…' : '开始使用',
-                          style: TextStyle(
-                            color: colors.onPrimary,
-                            fontSize: 17,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 0.2,
-                          ),
-                        ),
-                        if (!busy) ...[
-                          const SizedBox(width: 5),
-                          Icon(
-                            Icons.arrow_forward_rounded,
-                            size: 18,
-                            color: colors.onPrimary,
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
+    return PrimaryButton(
+      label: busy ? '正在进入…' : '开始使用',
+      icon: busy ? null : Icons.arrow_forward_rounded,
+      expand: true,
+      onPressed: onPressed,
     );
   }
 }

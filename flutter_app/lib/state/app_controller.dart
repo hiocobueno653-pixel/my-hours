@@ -14,6 +14,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/constants.dart';
+import '../data/dates.dart';
 import '../data/ledger.dart';
 import '../data/models.dart';
 import '../data/persistence.dart';
@@ -742,23 +743,23 @@ AppState resolveImportedState(ParsedBackupData data) {
 // ---- 派生 provider ----
 
 final recordsProvider = Provider<List<WorkDayRecord>>(
-  (ref) => ref.watch(appControllerProvider).records,
+  (ref) => ref.watch(appControllerProvider.select((s) => s.records)),
 );
 
 final entriesProvider = Provider<List<LedgerEntry>>(
-  (ref) => ref.watch(appControllerProvider).entries,
+  (ref) => ref.watch(appControllerProvider.select((s) => s.entries)),
 );
 
 final workProfilesProvider = Provider<List<WorkProfile>>(
-  (ref) => ref.watch(appControllerProvider).workProfiles,
+  (ref) => ref.watch(appControllerProvider.select((s) => s.workProfiles)),
 );
 
 final budgetTargetsProvider = Provider<BudgetTargets>(
-  (ref) => ref.watch(appControllerProvider).budgetTargets,
+  (ref) => ref.watch(appControllerProvider.select((s) => s.budgetTargets)),
 );
 
 final customCategoriesProvider = Provider<List<CustomLedgerCategory>>(
-  (ref) => ref.watch(appControllerProvider).customCategories,
+  (ref) => ref.watch(appControllerProvider.select((s) => s.customCategories)),
 );
 
 /// 当前选中的月份（`YYYY-MM`），三个页面共享（修正旧版各页独立月份的割裂）。
@@ -779,6 +780,90 @@ final currentMonthWorkSummaryProvider = Provider<MonthSummary>((ref) {
   final month = ref.watch(selectedMonthProvider);
   final records = ref.watch(appControllerProvider.select((s) => s.records));
   return getMonthSummary(records, month);
+});
+
+@immutable
+class MonthWorkViewData {
+  const MonthWorkViewData({
+    required this.month,
+    required this.dates,
+    required this.workdays,
+    required this.monthPay,
+    required this.settlement,
+    required this.monthDelta,
+    required this.underpaidDays,
+    required this.recordsByDate,
+  });
+
+  final String month;
+  final List<MonthDay> dates;
+  final int workdays;
+  final double monthPay;
+  final SettlementSummary settlement;
+  final ({double delta, double percent})? monthDelta;
+  final int underpaidDays;
+  final Map<String, WorkDayRecord> recordsByDate;
+}
+
+@immutable
+class MonthLedgerViewData {
+  const MonthLedgerViewData({
+    required this.month,
+    required this.summary,
+    required this.entriesByDate,
+  });
+
+  final String month;
+  final LedgerMonthSummary summary;
+  final Map<String, List<LedgerEntry>> entriesByDate;
+}
+
+/// 当前月工时页的派生视图数据：只在月份、记录或工种列表变化时重算，
+/// 日历点选日期触发 `setState` 时 O(1) 复用，不再扫描全量记录。
+final currentMonthWorkViewDataProvider = Provider<MonthWorkViewData>((ref) {
+  final month = ref.watch(selectedMonthProvider);
+  final records = ref.watch(recordsProvider);
+  final profiles = ref.watch(workProfilesProvider);
+  final dates = getMonthDates(month);
+  final parsed = parseMonthKey(month);
+  final workdays = parsed == null ? 0 : workdaysInMonth(parsed.year, parsed.month);
+  final prefix = '$month-';
+  final recordsByDate = <String, WorkDayRecord>{};
+  var underpaidDays = 0;
+  for (final record in records) {
+    if (!record.date.startsWith(prefix)) continue;
+    recordsByDate[record.date] = record;
+    if (record.hours > 0 && recordPay(record, profiles) <= 0) {
+      underpaidDays += 1;
+    }
+  }
+  return MonthWorkViewData(
+    month: month,
+    dates: dates,
+    workdays: workdays,
+    monthPay: getMonthPay(records, month, profiles),
+    settlement: getSettlementSummary(records, month, profiles),
+    monthDelta: getMonthDelta(records, month),
+    underpaidDays: underpaidDays,
+    recordsByDate: recordsByDate,
+  );
+});
+
+/// 当前月账本派生索引：只在月份或账目变化时重算。
+final currentMonthLedgerViewDataProvider = Provider<MonthLedgerViewData>((ref) {
+  final month = ref.watch(selectedMonthProvider);
+  final entries = ref.watch(entriesProvider);
+  final prefix = '$month-';
+  final entriesByDate = <String, List<LedgerEntry>>{};
+  for (final entry in entries) {
+    if (!entry.date.startsWith(prefix)) continue;
+    entriesByDate.putIfAbsent(entry.date, () => []).add(entry);
+  }
+  return MonthLedgerViewData(
+    month: month,
+    summary: getLedgerMonthSummary(entries, month),
+    entriesByDate: entriesByDate,
+  );
 });
 
 String _currentMonth() {

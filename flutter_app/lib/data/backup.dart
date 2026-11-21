@@ -103,9 +103,7 @@ ParsedBackupData parseBackupText(String text, {int? byteLength}) {
   // 「导入成功、跳过 0 条」地把整本账目清空。
   final entriesRaw = version == 1 ? const <Object?>[] : parsed['entries'];
   if (entriesRaw is! List) {
-    throw BackupParseException(
-      version == 1 ? '备份文件账目数据格式不正确' : '备份文件缺少账目数据',
-    );
+    throw BackupParseException(version == 1 ? '备份文件账目数据格式不正确' : '备份文件缺少账目数据');
   }
   final normalizedEntries = normalizeLedgerEntries(entriesRaw);
   droppedItems += entriesRaw.length - normalizedEntries.length;
@@ -192,10 +190,14 @@ String _row(List<String> cells) => cells.map(csvCell).join(',');
 
 String _joinCsv(List<String> lines) => '\uFEFF${lines.join('\r\n')}';
 
-/// 月工时表（CSV）。
-String buildMonthCsv(String yearMonth, List<WorkDayRecord> records) {
+/// 月计量表（CSV）。`quantity` 只影响表头，不改数据。
+String buildMonthCsv(
+  String yearMonth,
+  List<WorkDayRecord> records, {
+  String quantity = '工时',
+}) {
   final lines = <String>[
-    _row(['日期', '星期', '工时', '备注']),
+    _row(['日期', '星期', quantity, '备注']),
   ];
   for (final day in getMonthDates(yearMonth)) {
     final record = getRecordByDate(records, day.date);
@@ -220,14 +222,15 @@ String buildMonthCsv(String yearMonth, List<WorkDayRecord> records) {
   return _joinCsv(lines);
 }
 
-/// 月中概览（工时 + 收支 + 分类，CSV）。
+/// 月中概览（计量 + 收支 + 分类，CSV）。
 String buildMonthOverviewCsv(
   String yearMonth,
   List<WorkDayRecord> records,
-  List<LedgerEntry> entries,
-) {
+  List<LedgerEntry> entries, {
+  String quantity = '工时',
+}) {
   final lines = <String>[
-    _row(['日期', '星期', '工时', '备注', '收入', '支出']),
+    _row(['日期', '星期', quantity, '备注', '收入', '支出']),
   ];
   for (final day in getMonthDates(yearMonth)) {
     final record = getRecordByDate(records, day.date);
@@ -287,9 +290,11 @@ String buildLedgerCsv(
   String yearMonth,
   List<LedgerEntry> entries, {
   List<WorkDayRecord> records = const [],
+  String quantity = '工时',
+  String unitName = '小时',
 }) {
   final lines = <String>[
-    _row(['日期', '类型', '分类', '金额', '关联工时', '备注']),
+    _row(['日期', '类型', '分类', '金额', '关联$quantity', '备注']),
   ];
   final prefix = '$yearMonth-';
   final monthEntries = sortLedgerEntries([
@@ -305,7 +310,7 @@ String buildLedgerCsv(
         entry.type == LedgerType.income ? '收入' : '支出',
         entry.category,
         formatMoney(entry.amount),
-        linked == null ? '' : '${formatHours(linked.hours)}小时',
+        linked == null ? '' : '${formatHours(linked.hours)}$unitName',
         entry.remark,
       ]),
     );

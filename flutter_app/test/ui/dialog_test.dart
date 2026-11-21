@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:fluid_glass/fluid_glass.dart';
 import 'package:my_hours/core/motion_origin.dart';
 import 'package:my_hours/core/theme_tokens.dart';
 import 'package:my_hours/ui/dialog.dart';
@@ -28,7 +27,8 @@ void main() {
     await tester.tap(find.text('打开'));
     await tester.pumpAndSettle();
     expect(find.text('测试弹窗'), findsOneWidget);
-    expect(find.byType(LiquidButton), findsNWidgets(2));
+    expect(find.text('取消'), findsOneWidget);
+    expect(find.text('确定'), findsOneWidget);
     final scrim = find.byKey(const ValueKey('dialog-scrim'));
     expect(scrim, findsOneWidget);
     final logicalSize = tester.view.physicalSize / tester.view.devicePixelRatio;

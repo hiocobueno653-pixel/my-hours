@@ -59,7 +59,7 @@ class _MonthPickerSheetState extends State<_MonthPickerSheet> {
     final colors = context.colors;
     final now = DateTime.now();
     final colorDuration = motionDuration(
-      const Duration(milliseconds: 180),
+      Timings.micro,
       disableAnimations: MediaQuery.maybeDisableAnimationsOf(context) ?? false,
     );
     final years = [
@@ -81,8 +81,9 @@ class _MonthPickerSheetState extends State<_MonthPickerSheet> {
                 onTap: () => _shiftYear(-1),
               ),
               Expanded(
-                child: Text(
-                  '$_year 年',
+                child: AnimatedMonthLabel(
+                  label: '$_year 年',
+                  alignment: Alignment.center,
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 22,

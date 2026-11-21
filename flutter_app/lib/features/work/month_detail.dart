@@ -59,15 +59,22 @@ class MonthDetailSheet extends ConsumerWidget {
                   value: formatHoursValue(summary.totalHours),
                 ),
                 _Metric(label: '工作天数', value: '${summary.workDays}'),
-                _Metric(label: '月工资', value: formatAmount(pay)),
+                if (!kHoursOnly)
+                  _Metric(
+                    label: '月工资',
+                    value: formatAmount(pay, withSymbol: true),
+                  ),
               ],
             ),
           ),
           const SizedBox(height: Gaps.lg),
           if (records.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: Gaps.xxl),
-              child: EmptyState(title: '这个月还没有记录', description: '回到记工页点今天开始记。'),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: Gaps.xxl),
+              child: EmptyState(
+                title: '这个月还没有记录',
+                description: '回到${context.unit.quantity}页点今天开始记录。',
+              ),
             )
           else
             for (final record in records)
@@ -94,14 +101,19 @@ class MonthDetailSheet extends ConsumerWidget {
                         ),
                       ),
                       SizedBox(
-                        width: 54,
-                        child: Text(
-                          '${formatHoursValue(record.hours)}h',
-                          style: TextStyle(
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w600,
-                            color: colors.text,
-                            fontFeatures: tabularFigures,
+                        width: 62,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            '${formatHoursValue(record.hours)}'
+                            '${context.unit.short}',
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w600,
+                              color: colors.text,
+                              fontFeatures: tabularFigures,
+                            ),
                           ),
                         ),
                       ),
@@ -113,28 +125,32 @@ class MonthDetailSheet extends ConsumerWidget {
                           style: TextStyle(fontSize: 12.5, color: colors.text2),
                         ),
                       ),
-                      ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 110),
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: Alignment.centerRight,
-                          child: Text(
-                            formatAmount(recordPay(record, state.workProfiles)),
-                            style: TextStyle(
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.w600,
-                              color: colors.income,
-                              fontFeatures: tabularFigures,
+                      if (!kHoursOnly)
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 110),
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerRight,
+                            child: Text(
+                              formatAmount(
+                                recordPay(record, state.workProfiles),
+                                withSymbol: true,
+                              ),
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w600,
+                                color: colors.income,
+                                fontFeatures: tabularFigures,
+                              ),
                             ),
                           ),
                         ),
-                      ),
                       if (record.settled) ...[
                         const SizedBox(width: 6),
                         Icon(
                           Icons.check_circle_rounded,
                           size: 14,
-                          color: colors.warning,
+                          color: colors.income,
                         ),
                       ],
                     ],

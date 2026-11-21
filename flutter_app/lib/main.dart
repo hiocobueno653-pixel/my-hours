@@ -8,8 +8,8 @@ import 'package:fluid_glass/fluid_glass.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'app.dart';
-import 'core/measure_unit.dart';
 import 'core/glass_policy.dart';
+import 'core/measure_unit.dart';
 import 'core/motion.dart';
 import 'core/motion_origin.dart';
 import 'core/settings.dart';
@@ -19,11 +19,13 @@ import 'data/persistence.dart';
 import 'features/onboarding/welcome_screen.dart';
 import 'state/app_controller.dart';
 import 'ui/dialog.dart';
+import 'ui/theme_cross_fade.dart';
 import 'ui/widgets.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
+  unawaited(FluidGlass.ensureInitialized());
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -252,10 +254,12 @@ class MyHoursApp extends StatelessWidget {
           theme: buildAppTheme(
             lightColors,
             AppTokens.lightTokens.copyWith(colors: lightColors),
+            fontFamily: settings.fontFamily,
           ),
           darkTheme: buildAppTheme(
             darkColors,
             AppTokens.darkTokens.copyWith(colors: darkColors),
+            fontFamily: settings.fontFamily,
           ),
           themeMode: settings.themeMode,
           // 主题切换是状态变化，不是空间动画；不要整页渐变 200ms。
@@ -280,21 +284,30 @@ class MyHoursApp extends StatelessWidget {
               unit: settings.measureUnit,
               child: MediaQuery(
                 data: media.copyWith(
-                textScaler: AppTextScaler(
-                  media.textScaler,
-                  settings.textScale,
-                ).clamp(maxScaleFactor: 1.30),
-                disableAnimations: reduceEffects,
-                // 内容延伸到系统栏下方后，三页的吸顶栏自己消费 padding.top；
-                // 这里保留原始 padding，不做二次扣减。
-              ),
+                  textScaler: AppTextScaler(
+                    media.textScaler,
+                    settings.textScale,
+                  ).clamp(maxScaleFactor: 1.30),
+                  disableAnimations: reduceEffects,
+                  // 内容延伸到系统栏下方后，三页的吸顶栏自己消费 padding.top；
+                  // 这里保留原始 padding，不做二次扣减。
+                ),
                 child: child ?? const SizedBox.shrink(),
               ),
             );
             final gestureAwareContent = Listener(
               behavior: HitTestBehavior.translucent,
               onPointerDown: (event) => MotionOrigin.record(event.position),
-              child: appContent,
+              child: ThemeCrossFade(
+                signature: Object.hash(
+                  isDark,
+                  settings.pureBlack,
+                  settings.accentColor.toARGB32(),
+                  settings.colorStyle,
+                  settings.fontFamily,
+                ),
+                child: appContent,
+              ),
             );
             // 状态栏图标颜色必须跟随主题，否则深色模式会出现"黑底黑字"。
             return LiquidGlassTheme(
@@ -303,11 +316,14 @@ class MyHoursApp extends StatelessWidget {
                     isDark ? Brightness.dark : Brightness.light,
                   ).copyWith(
                     accent: colors.primary,
+                    toggleAccent: colors.primary,
                     content: colors.text,
                     container: colors.isDark
-                        ? colors.card.withValues(alpha: 0.46)
-                        : Colors.white.withValues(alpha: 0.62),
-                    track: colors.inset,
+                        ? colors.card.withValues(alpha: 0.56)
+                        : Colors.white.withValues(alpha: 0.72),
+                    track: colors.isDark
+                        ? const Color(0xFF3E4150)
+                        : const Color(0xFFD6DCE6),
                   ),
               child: AnnotatedRegion<SystemUiOverlayStyle>(
                 value: SystemUiOverlayStyle(
@@ -360,18 +376,16 @@ class _AppLaunchGate extends ConsumerWidget {
       builder: (context, _) {
         final content = AnimatedSwitcher(
           duration: motionDuration(
-            const Duration(milliseconds: 420),
+            Timings.toast,
             disableAnimations: disable,
           ),
-          switchInCurve: Curves.linear,
-          switchOutCurve: Curves.linear,
+          switchInCurve: Curves2.linear,
+          switchOutCurve: Curves2.linear,
           transitionBuilder: (child, animation) {
             final incomingShell = child.key == const ValueKey('app-shell');
             if (incomingShell) {
               final fade = animation.drive(
-                CurveTween(
-                  curve: const Interval(0.30, 1, curve: Curves2.out),
-                ),
+                CurveTween(curve: const Interval(0.30, 1, curve: Curves2.out)),
               );
               final scale = animation.drive(
                 Tween<double>(
@@ -385,9 +399,7 @@ class _AppLaunchGate extends ConsumerWidget {
               );
             }
             final fadeOut = animation.drive(
-              CurveTween(
-                curve: const Interval(0.50, 1, curve: Curves.easeOut),
-              ),
+              CurveTween(curve: const Interval(0.50, 1, curve: Curves2.out)),
             );
             final scaleOut = Tween<double>(
               begin: 0.96,
@@ -408,7 +420,6 @@ class _AppLaunchGate extends ConsumerWidget {
                   key: const ValueKey('app-shell'),
                   hoursOnly: hoursOnly,
                   largeText: settings.largeText,
-                  onLargeTextChanged: settings.setLargeText,
                   dockStyle: settings.dockStyle,
                   tabTransition: settings.tabTransition,
                   glassPreference: settings.glassPreference,

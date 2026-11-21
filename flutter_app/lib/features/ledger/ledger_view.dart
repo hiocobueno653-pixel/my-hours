@@ -1,12 +1,14 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter/semantics.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:fluid_glass/fluid_glass.dart';
 
 import '../../core/formatters.dart';
+import '../../core/measure_unit.dart';
 import '../../core/motion.dart';
 import '../../core/theme_tokens.dart';
 import '../../data/constants.dart';
@@ -16,18 +18,19 @@ import '../../data/models.dart';
 import '../../data/records.dart';
 import '../../data/wage_entries.dart';
 import '../../state/app_controller.dart';
-import '../../ui/sheet.dart';
-import '../../ui/widgets.dart';
 import '../../ui/date_wheel.dart';
 import '../../ui/dialog.dart';
 import '../../ui/export_sheet.dart';
 import '../../ui/glass_menu.dart';
 import '../../ui/month_picker.dart';
 import '../../ui/pinned_header.dart';
+import '../../ui/sheet.dart';
+import '../../ui/widgets.dart';
+import '../charts/charts.dart';
+import '../work/budget_panel.dart';
 import 'category_manager.dart';
-import '../../core/measure_unit.dart';
 
-/// 记账页：月份 + 收支汇总 + 搜索 + 明细列表。
+/// 账本页：月份切换与工时页统一 + 收支汇总 + 预算进度 + 按日分组流水。
 class LedgerView extends ConsumerStatefulWidget {
   const LedgerView({super.key});
 
@@ -40,6 +43,8 @@ class _LedgerViewState extends ConsumerState<LedgerView> {
   LedgerEntry? _undoEntry;
   Timer? _undoTimer;
   Timer? _searchTimer;
+  bool _searching = false;
+  bool _fabExpanded = true;
   String _searchQuery = '';
   String _categoryFilter = '';
 
@@ -69,11 +74,6 @@ class _LedgerViewState extends ConsumerState<LedgerView> {
     });
   }
 
-  /// 系统生成的工资账目（`wage-<date>`）：账本里只读。
-  ///
-  /// 它的金额来自结算那一刻的 `recordPay`，而 `syncWageEntries` 不会更新
-  /// 既有条目的金额。允许直接改金额/分类，会让工资面板的"已结算"与账本
-  /// 收入永久分叉；允许删除，则下次对账又悄悄把它建回来。
   bool _isManagedEntry(LedgerEntry entry) {
     final date = entry.workDate ?? entry.date;
     return isValidDateISO(date) && entry.id == getWageEntryId(date);
@@ -119,6 +119,78 @@ class _LedgerViewState extends ConsumerState<LedgerView> {
     await HapticFeedback.selectionClick();
   }
 
+  Future<void> _confirmDeleteEntry(LedgerEntry entry) async {
+    final confirmed = await showConfirmDialog(
+      context,
+      title: '删除这条账目？',
+      description: '删除后 6 秒内可撤销。',
+      confirmLabel: '删除',
+      danger: true,
+    );
+    if (confirmed != true || !mounted) return;
+    final removed = ref
+        .read(appControllerProvider.notifier)
+        .deleteLedgerEntry(entry.id);
+    if (removed != null) _showUndo(removed);
+  }
+
+  void _showEntryContextMenu(
+    BuildContext context, {
+    required LedgerEntry entry,
+    required bool managed,
+    required Offset globalPosition,
+  }) {
+    HapticFeedback.mediumImpact();
+    final items = managed
+        ? <GlassMenuAction>[
+            GlassMenuAction(
+              label: '查看同步说明',
+              icon: Icons.info_outline_rounded,
+              onSelected: _hintManagedEntry,
+            ),
+            GlassMenuAction(
+              label: '撤销该日结算',
+              icon: Icons.undo_rounded,
+              danger: true,
+              dividerBefore: true,
+              onSelected: () => unawaited(_revokeSettlement(entry)),
+            ),
+          ]
+        : <GlassMenuAction>[
+            GlassMenuAction(
+              label: '编辑账目',
+              icon: Icons.edit_outlined,
+              onSelected: () => showLedgerEditor(context, entry: entry),
+            ),
+            GlassMenuAction(
+              label: '再记一笔同分类',
+              icon: Icons.control_point_duplicate_rounded,
+              onSelected: () => showLedgerEditor(
+                context,
+                presetType: entry.type,
+                presetCategory: entry.category,
+              ),
+            ),
+            GlassMenuAction(
+              label: '删除账目',
+              icon: Icons.delete_outline_rounded,
+              danger: true,
+              dividerBefore: true,
+              onSelected: () => unawaited(_confirmDeleteEntry(entry)),
+            ),
+          ];
+    unawaited(
+      showDropletGlassMenu(
+        context,
+        anchorOffset: globalPosition,
+        panelWidth: 204,
+        preferRightAlign:
+            globalPosition.dx > MediaQuery.sizeOf(context).width * 0.48,
+        items: items,
+      ),
+    );
+  }
+
   Widget _entryRow(LedgerEntry entry, List<WorkDayRecord> records) {
     final managed = _isManagedEntry(entry);
     return _EntryRow(
@@ -131,35 +203,26 @@ class _LedgerViewState extends ConsumerState<LedgerView> {
       onTap: managed
           ? _hintManagedEntry
           : () => showLedgerEditor(context, entry: entry),
+      onLongPressStart: (details) => _showEntryContextMenu(
+        context,
+        entry: entry,
+        managed: managed,
+        globalPosition: details.globalPosition,
+      ),
       onDelete: managed
           ? () {
               unawaited(_revokeSettlement(entry));
             }
-          : () async {
-              final confirmed = await showConfirmDialog(
-                context,
-                title: '删除这条账目？',
-                description: '删除后 6 秒内可撤销。',
-                confirmLabel: '删除',
-                danger: true,
-              );
-              if (confirmed != true) return;
-              if (!context.mounted) return;
-              final removed = ref
-                  .read(appControllerProvider.notifier)
-                  .deleteLedgerEntry(entry.id);
-              if (removed != null) _showUndo(removed);
+          : () {
+              unawaited(_confirmDeleteEntry(entry));
             },
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
     final state = ref.watch(appControllerProvider);
     final month = ref.watch(selectedMonthProvider);
-    // 切月复位分类筛选：否则旧分类的 chip 会一直高亮，而新月份没有该分类
-    // 账目时列表为空，容易被读成「本月数据丢了」。
     ref.listen<String>(selectedMonthProvider, (previous, next) {
       if (previous != next && _categoryFilter.isNotEmpty) {
         setState(() => _categoryFilter = '');
@@ -167,7 +230,6 @@ class _LedgerViewState extends ConsumerState<LedgerView> {
     });
     final summary = getLedgerMonthSummary(state.entries, month);
     final budget = ref.watch(budgetTargetsProvider).monthlyExpenseBudget;
-    final overBudget = budget > 0 && summary.expense > budget;
     final keyword = _searchQuery;
     final baseEntries = getLedgerMonthEntries(state.entries, month);
     final filteredByCategory = baseEntries.where((entry) {
@@ -195,23 +257,29 @@ class _LedgerViewState extends ConsumerState<LedgerView> {
           entry.date.replaceAll('-', '').contains(dateKeyword) ||
           formatAmount(entry.amount).contains(keyword);
     }).toList();
+
     final seenCategories = <String>{};
-    final categoryChips = <({String key, String label})>[];
+    final categoryChips =
+        <({String key, String label, LedgerType? type})>[];
     for (final entry in baseEntries) {
       final key = 'cat:${ledgerTypeValue(entry.type)}:${entry.category}';
       if (seenCategories.add(key)) {
-        categoryChips.add((key: key, label: entry.category));
+        categoryChips.add((
+          key: key,
+          label: entry.category,
+          type: entry.type,
+        ));
       }
     }
-    final filterChips = <({String key, String label})>[
-      (key: '', label: '全部'),
-      if (!kHoursOnly) ...[
-        (key: 'type:income', label: '收入'),
-        (key: 'type:expense', label: '支出'),
-      ],
+    final filterChips = <({String key, String label, LedgerType? type})>[
+      (key: '', label: '全部', type: null),
+      (key: 'type:expense', label: '支出', type: null),
+      (key: 'type:income', label: '收入', type: null),
       ...categoryChips,
     ];
+
     final today = todayISO();
+    final yesterday = shiftDate(today, -1);
     final todayEntries = [
       for (final entry in state.entries)
         if (entry.date == today) entry,
@@ -226,285 +294,312 @@ class _LedgerViewState extends ConsumerState<LedgerView> {
       }
     }
 
+    // 按日期分组（保留原本的倒序）
+    final groupedDates = <String>[];
+    final entriesByDate = <String, List<LedgerEntry>>{};
+    for (final entry in monthEntries) {
+      if (!entriesByDate.containsKey(entry.date)) {
+        groupedDates.add(entry.date);
+        entriesByDate[entry.date] = [];
+      }
+      entriesByDate[entry.date]!.add(entry);
+    }
+
+    final wide = MediaQuery.sizeOf(context).width >= 720;
+    final bottomPad = MediaQuery.paddingOf(context).bottom;
+    final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    final fabBottom = wide
+        ? bottomPad + 20.0
+        : math.max(92.0, bottomPad + 84.0);
+
     return Stack(
       children: [
         Positioned.fill(
-          child: ListView(
-            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-            padding: EdgeInsets.only(
-              top: PinnedHeader.totalHeight(context) + 8,
-              bottom: pageBottomInset(context),
-            ),
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: Gaps.lg),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _BalanceCard(
-                      month: month,
-                      summary: summary,
-                      todayCount: todayEntries.length,
-                      todayIncome: todayIncome,
-                      todayExpense: todayExpense,
-                      onChanged: (value) => ref
-                          .read(selectedMonthProvider.notifier)
-                          .setMonth(value),
-                      onPick: () async {
-                        final picked = await showMonthPicker(
-                          context,
-                          initialMonth: month,
+          child: NotificationListener<UserScrollNotification>(
+            onNotification: (notification) {
+              if (notification.metrics.axis != Axis.vertical) return false;
+              if (notification.direction == ScrollDirection.reverse &&
+                  _fabExpanded) {
+                setState(() => _fabExpanded = false);
+              } else if (notification.direction == ScrollDirection.forward &&
+                  !_fabExpanded) {
+                setState(() => _fabExpanded = true);
+              }
+              return false;
+            },
+            child: CustomScrollView(
+              physics: const BouncingScrollPhysics(
+                parent: AlwaysScrollableScrollPhysics(),
+              ),
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              slivers: [
+                SliverPadding(
+                  padding: EdgeInsets.fromLTRB(
+                    Gaps.lg,
+                    MorphingSearchHeader.totalHeight(context) + 12,
+                    Gaps.lg,
+                    Gaps.md,
+                  ),
+                  sliver: SliverToBoxAdapter(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        RepaintBoundary(
+                          child: _BalanceSummaryCard(
+                            month: month,
+                            summary: summary,
+                            budget: budget,
+                            entryCount: baseEntries.length,
+                            todayCount: todayEntries.length,
+                            todayIncome: todayIncome,
+                            todayExpense: todayExpense,
+                            onOpenBudget: () => showBudgetPanel(context),
+                          ),
+                        ),
+                        const SizedBox(height: Gaps.cardGap),
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          physics: const BouncingScrollPhysics(),
+                          child: Row(
+                            children: [
+                              for (
+                                var index = 0;
+                                index < filterChips.length;
+                                index++
+                              ) ...[
+                                if (index == 3)
+                                  Container(
+                                    width: 1,
+                                    height: 16,
+                                    margin: const EdgeInsets.only(right: 8),
+                                    color: context.colors.divider,
+                                  ),
+                                Padding(
+                                  padding: const EdgeInsets.only(right: 6),
+                                  child: _FilterChipPill(
+                                    label: filterChips[index].label,
+                                    icon: filterChips[index].type == null
+                                        ? null
+                                        : _categoryVisual(
+                                            filterChips[index].label,
+                                            filterChips[index].type ==
+                                                LedgerType.income,
+                                            context.colors,
+                                          ).icon,
+                                    selected:
+                                        _categoryFilter == filterChips[index].key,
+                                    onTap: () => setState(
+                                      () => _categoryFilter =
+                                          filterChips[index].key,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                if (monthEntries.isEmpty)
+                  SliverPadding(
+                    padding: EdgeInsets.fromLTRB(
+                      Gaps.lg,
+                      0,
+                      Gaps.lg,
+                      pageBottomInset(context) + 76,
+                    ),
+                    sliver: SliverToBoxAdapter(
+                      child: GlassCard(
+                        child: EmptyState(
+                          title: baseEntries.isEmpty
+                              ? '${formatMonthLabel(month)} 还没有账目'
+                              : '没有匹配的账目',
+                          description: baseEntries.isEmpty
+                              ? '记录日常开销、外快或从${context.unit.quantity}页结算工资。'
+                              : '换个关键词或筛选条件试试。',
+                          action: baseEntries.isEmpty
+                              ? PrimaryButton(
+                                  label: '记一笔',
+                                  icon: Icons.add_rounded,
+                                  onPressed: () => showLedgerEditor(context),
+                                )
+                              : GhostButton(
+                                  label: '清除筛选',
+                                  onPressed: () {
+                                    _searchTimer?.cancel();
+                                    _search.clear();
+                                    setState(() {
+                                      _categoryFilter = '';
+                                      _searchQuery = '';
+                                      _searching = false;
+                                    });
+                                  },
+                                ),
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  SliverPadding(
+                    padding: EdgeInsets.fromLTRB(
+                      Gaps.lg,
+                      0,
+                      Gaps.lg,
+                      pageBottomInset(context) + 76,
+                    ),
+                    sliver: SliverList.builder(
+                      itemCount: groupedDates.length,
+                      itemBuilder: (context, index) {
+                        final date = groupedDates[index];
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: Gaps.cardGap),
+                          child: _DateGroupSection(
+                            date: date,
+                            today: today,
+                            yesterday: yesterday,
+                            entries: entriesByDate[date]!,
+                            buildRow: (entry) =>
+                                _entryRow(entry, state.records),
+                          ),
                         );
-                        if (picked != null && context.mounted) {
-                          ref
-                              .read(selectedMonthProvider.notifier)
-                              .setMonth(picked);
-                        }
                       },
                     ),
-                    if (overBudget) ...[
-                      const SizedBox(height: Gaps.md),
-                      _OverBudgetBar(expense: summary.expense, budget: budget),
-                    ],
-                    if (filterChips.length > 3) ...[
-                      const SizedBox(height: Gaps.md),
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                            for (final chip in filterChips)
-                              Padding(
-                                padding: const EdgeInsets.only(right: 6),
-                                child: Semantics(
-                                  button: true,
-                                  selected: _categoryFilter == chip.key,
-                                  label: chip.label,
-                                  onTap: () => setState(
-                                    () => _categoryFilter = chip.key,
-                                  ),
-                                  excludeSemantics: true,
-                                  child: Pressable(
-                                    onTap: () => setState(
-                                      () => _categoryFilter = chip.key,
-                                    ),
-                                    shape: Radii.pillShape,
-                                    child: AnimatedContainer(
-                                      duration: motionDuration(
-                                        const Duration(milliseconds: 200),
-                                        disableAnimations:
-                                            MediaQuery.maybeDisableAnimationsOf(
-                                              context,
-                                            ) ??
-                                            false,
-                                      ),
-                                      curve: Curves2.out,
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 13,
-                                        vertical: 8.5,
-                                      ),
-                                      decoration: ShapeDecoration(
-                                        color: _categoryFilter == chip.key
-                                            ? colors.primaryContainer
-                                            : colors.isDark
-                                            ? colors.block
-                                            : colors.inset,
-                                        shape: Radii.pillShape,
-                                      ),
-                                      child: AnimatedDefaultTextStyle(
-                                        duration: motionDuration(
-                                          const Duration(milliseconds: 200),
-                                          disableAnimations:
-                                              MediaQuery.maybeDisableAnimationsOf(
-                                                context,
-                                              ) ??
-                                              false,
-                                        ),
-                                        curve: Curves2.out,
-                                        style: TextStyle(
-                                          fontSize: 12.5,
-                                          fontWeight: FontWeight.w500,
-                                          color: _categoryFilter == chip.key
-                                              ? colors.onPrimaryContainer
-                                              : colors.text2,
-                                        ),
-                                        child: Text(chip.label),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: Gaps.md),
-                    Container(
-                      height: 44,
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
-                      decoration: ShapeDecoration(
-                        // block 与浅色 page 同值；放在页面上的输入框必须用
-                        // inset，否则会完全融进背景。
-                        color: colors.isDark ? colors.block : colors.inset,
-                        shape: Radii.shape(Radii.md),
-                      ),
-                      child: TextField(
-                        controller: _search,
-                        onChanged: _onSearchChanged,
-                        textInputAction: TextInputAction.search,
-                        autocorrect: false,
-                        style: TextStyle(fontSize: 14, color: colors.text),
-                        decoration: InputDecoration(
-                          filled: false,
-                          border: InputBorder.none,
-                          enabledBorder: InputBorder.none,
-                          focusedBorder: InputBorder.none,
-                          isDense: true,
-                          hintText: '搜索分类、备注、日期、金额',
-                          hintStyle: TextStyle(
-                            fontSize: 13,
-                            color: colors.text2,
-                          ),
-                          prefixIcon: Icon(
-                            Icons.search_rounded,
-                            size: 18,
-                            color: colors.text2,
-                          ),
-                          prefixIconConstraints: const BoxConstraints(
-                            minWidth: 34,
-                          ),
-                          suffixIcon: _search.text.isEmpty
-                              ? null
-                              : Tooltip(
-                                  message: '清除搜索',
-                                  child: Pressable(
-                                    onTap: () {
-                                      _searchTimer?.cancel();
-                                      _search.clear();
-                                      _searchQuery = '';
-                                      FocusScope.of(context).unfocus();
-                                      setState(() {});
-                                    },
-                                    shape: Radii.pillShape,
-                                    pressedScale: 0.90,
-                                    child: SizedBox(
-                                      width: 44,
-                                      height: 44,
-                                      child: Icon(
-                                        Icons.close_rounded,
-                                        size: 17,
-                                        color: colors.text3,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                          suffixIconConstraints: const BoxConstraints(
-                            minWidth: 36,
-                            minHeight: 36,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: Gaps.md),
-                    if (monthEntries.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: Gaps.xxl),
-                        child: EmptyState(
-                          title: keyword.isEmpty ? '这个月还没有账目' : '没有匹配的账目',
-                          description: keyword.isEmpty
-                              ? (_categoryFilter.isEmpty
-                                    ? '点右上角 + 开始记录。'
-                                    : '这个分类下还没有账目。')
-                              : '换个关键词或分类试试。',
-                        ),
-                      )
-                    else
-                      GlassCard(
-                        padding: const EdgeInsets.symmetric(
-                          vertical: Gaps.sm,
-                          horizontal: Gaps.md,
-                        ),
-                        child: Column(
-                          children: [
-                            for (final entry in monthEntries)
-                              _entryRow(entry, state.records),
-                          ],
-                        ),
-                      ),
-                    const SizedBox(height: Gaps.xxl),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        if (_undoEntry != null)
-          Positioned(
-            top: PinnedHeader.totalHeight(context) + 8,
-            left: 0,
-            right: 0,
-            child: UndoBar(
-              message:
-                  '已删除 ${_undoEntry!.category} ${formatAmount(_undoEntry!.amount)}',
-              onUndo: () {
-                _undoTimer?.cancel();
-                ref
-                    .read(appControllerProvider.notifier)
-                    .saveLedgerEntry(_undoEntry!);
-                setState(() => _undoEntry = null);
-              },
+                  ),
+              ],
             ),
           ),
+        ),
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: fabBottom + 56,
+          child: IgnorePointer(
+            ignoring: _undoEntry == null,
+            child: AnimatedSwitcher(
+              duration: motionDuration(
+                Timings.base,
+                disableAnimations: disable,
+              ),
+              reverseDuration: motionDuration(
+                Timings.fast,
+                disableAnimations: disable,
+              ),
+              switchInCurve: Curves2.out,
+              switchOutCurve: Curves2.out,
+              transitionBuilder: (child, animation) => FadeTransition(
+                opacity: animation,
+                child: SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(0, 0.32),
+                    end: Offset.zero,
+                  ).animate(animation),
+                  child: child,
+                ),
+              ),
+              child: _undoEntry == null
+                  ? const SizedBox.shrink(key: ValueKey('undo-empty'))
+                  : UndoBar(
+                      key: ValueKey('undo-${_undoEntry!.id}'),
+                      message:
+                          '已删除 ${_undoEntry!.category} ${formatAmount(_undoEntry!.amount, withSymbol: true)}',
+                      onUndo: () {
+                        _undoTimer?.cancel();
+                        ref
+                            .read(appControllerProvider.notifier)
+                            .saveLedgerEntry(_undoEntry!);
+                        setState(() => _undoEntry = null);
+                      },
+                    ),
+            ),
+          ),
+        ),
+        Positioned(
+          right: 16,
+          bottom: fabBottom,
+          child: _AddLedgerFab(
+            expanded: _fabExpanded,
+            onTap: () => showLedgerEditor(context),
+          ),
+        ),
         Positioned(
           top: 0,
           left: 0,
           right: 0,
-          child: PinnedHeader(
-            title: '记账',
-            actions: [
-              BarActionButton(
-                icon: Icons.add_rounded,
-                tooltip: '记一笔',
-                bright: true,
-                onTap: () => showLedgerEditor(context),
-              ),
-              GlassMenuButton(
-                items: [
-                  LiquidMenuItem(
-                    label: '分类管理',
-                    icon: Icons.sell_outlined,
-                    onSelected: () => showCategoryManager(context),
+          child: MorphingSearchHeader(
+            title: '账本',
+            searching: _searching,
+            controller: _search,
+            hintText: '搜索分类、备注、金额或日期',
+            onSearchingChanged: (value) => setState(() => _searching = value),
+            onQueryChanged: _onSearchChanged,
+            onClearQuery: () {
+              _searchTimer?.cancel();
+              _search.clear();
+              setState(() => _searchQuery = '');
+            },
+            middleAction: MonthSwitchPill(
+              month: month,
+              onChanged: (value) =>
+                  ref.read(selectedMonthProvider.notifier).setMonth(value),
+              onPick: () async {
+                final picked = await showMonthPicker(
+                  context,
+                  initialMonth: month,
+                );
+                if (picked != null && context.mounted) {
+                  ref.read(selectedMonthProvider.notifier).setMonth(picked);
+                }
+              },
+            ),
+            trailingAction: GlassMenuButton(
+              tooltip: '更多操作',
+              items: [
+                GlassMenuAction(
+                  label: '导出本月账本',
+                  icon: Icons.download_rounded,
+                  onSelected: () => showExportSheet(
+                    context,
+                    month: month,
+                    records: state.records,
+                    entries: state.entries,
                   ),
-                  LiquidMenuItem(
-                    label: '回到本月',
-                    icon: Icons.today_rounded,
-                    onSelected: () => ref
-                        .read(selectedMonthProvider.notifier)
-                        .setMonth(currentMonthKey()),
-                  ),
-                  LiquidMenuItem(
+                ),
+                GlassMenuAction(
+                  label: '回到本月',
+                  icon: Icons.today_rounded,
+                  onSelected: () => ref
+                      .read(selectedMonthProvider.notifier)
+                      .setMonth(currentMonthKey()),
+                ),
+                GlassMenuAction(
+                  label: '分类管理',
+                  icon: Icons.sell_outlined,
+                  dividerBefore: true,
+                  sectionTitle: '快捷管理',
+                  onSelected: () => showCategoryManager(context),
+                ),
+                GlassMenuAction(
+                  label: '预算设置',
+                  icon: Icons.track_changes_rounded,
+                  onSelected: () => showBudgetPanel(context),
+                ),
+                if (_categoryFilter.isNotEmpty || _searchQuery.isNotEmpty)
+                  GlassMenuAction(
                     label: '清除筛选',
                     icon: Icons.filter_alt_off_rounded,
+                    dividerBefore: true,
                     onSelected: () => setState(() {
                       _searchTimer?.cancel();
                       _categoryFilter = '';
                       _search.clear();
                       _searchQuery = '';
+                      _searching = false;
                     }),
                   ),
-                ],
-              ),
-              BarActionButton(
-                icon: Icons.download_rounded,
-                tooltip: '导出本月账本',
-                bright: true,
-                onTap: () => showExportSheet(
-                  context,
-                  month: month,
-                  records: state.records,
-                  entries: state.entries,
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ],
@@ -512,201 +607,202 @@ class _LedgerViewState extends ConsumerState<LedgerView> {
   }
 }
 
-class _OverBudgetBar extends StatelessWidget {
-  const _OverBudgetBar({required this.expense, required this.budget});
-
-  final double expense;
-  final double budget;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
-    final over = expense - budget;
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: ShapeDecoration(
-        color: colors.warningSoft,
-        shape: Radii.shape(Radii.md),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.warning_amber_rounded, size: 20, color: colors.warning),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              '本月支出已超预算 ${formatAmount(over)} 元（预算 ${formatAmount(budget)} 元）',
-              style: TextStyle(
-                fontSize: 12.5,
-                height: 1.4,
-                color: colors.warning,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BalanceCard extends StatelessWidget {
-  const _BalanceCard({
+class _BalanceSummaryCard extends StatelessWidget {
+  const _BalanceSummaryCard({
     required this.month,
     required this.summary,
+    required this.budget,
+    required this.entryCount,
     required this.todayCount,
     required this.todayIncome,
     required this.todayExpense,
-    required this.onChanged,
-    required this.onPick,
+    required this.onOpenBudget,
   });
 
   final String month;
   final LedgerMonthSummary summary;
+  final double budget;
+  final int entryCount;
   final int todayCount;
   final double todayIncome;
   final double todayExpense;
-  final ValueChanged<String> onChanged;
-  final VoidCallback onPick;
+  final VoidCallback onOpenBudget;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    final isCurrent = month == currentMonthKey();
+    final ratio = budget > 0 ? (summary.expense / budget).clamp(0.0, 1.0) : 0.0;
+    final overBudget = budget > 0 && summary.expense > budget;
+    final budgetColor = overBudget
+        ? colors.expense
+        : ratio >= 0.8
+        ? colors.warning
+        : colors.primary;
+
+    final statusText = isCurrent
+        ? (todayCount == 0
+              ? '今日暂无账目'
+              : '今日 $todayCount 笔'
+                    '${todayIncome > 0 ? ' · +${formatAmount(todayIncome, withSymbol: true)}' : ''}'
+                    '${todayExpense > 0 ? ' · -${formatAmount(todayExpense, withSymbol: true)}' : ''}')
+        : '共 $entryCount 笔账目';
+
     return GlassCard(
+      radius: Radii.hero,
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Pressable(
-                onTap: onPick,
-                shape: Radii.shape(Radii.sm),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 8,
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      AnimatedMonthLabel(
-                        label: formatMonthLabel(month),
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: colors.text2,
-                        ),
-                      ),
-                      const SizedBox(width: 2),
-                      Icon(
-                        Icons.expand_more_rounded,
-                        size: 17,
-                        color: colors.text3,
-                      ),
-                    ],
-                  ),
+              Text(
+                isCurrent ? '本月结余' : '当月结余',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: colors.text2,
                 ),
               ),
-              const Spacer(),
-              Semantics(
-                button: true,
-                label: '上个月',
-                onTap: () => onChanged(shiftMonth(month, -1)),
-                excludeSemantics: true,
-                child: Pressable(
-                  onTap: () => onChanged(shiftMonth(month, -1)),
-                  shape: Radii.shape(12),
-                  child: SizedBox(
-                    width: 44,
-                    height: 40,
-                    child: Icon(
-                      Icons.chevron_left_rounded,
-                      size: 20,
-                      color: colors.text3,
+              const SizedBox(width: 8),
+              Expanded(
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 9,
+                      vertical: 3.5,
                     ),
-                  ),
-                ),
-              ),
-              Semantics(
-                button: true,
-                label: '下个月',
-                onTap: () => onChanged(shiftMonth(month, 1)),
-                excludeSemantics: true,
-                child: Pressable(
-                  onTap: () => onChanged(shiftMonth(month, 1)),
-                  shape: Radii.shape(12),
-                  child: SizedBox(
-                    width: 44,
-                    height: 40,
-                    child: Icon(
-                      Icons.chevron_right_rounded,
-                      size: 20,
-                      color: colors.text3,
+                    decoration: ShapeDecoration(
+                      color: colors.block,
+                      shape: Radii.pillShape,
+                    ),
+                    child: Text(
+                      statusText,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: TypeScale.micro,
+                        fontWeight: FontWeight.w500,
+                        color: colors.text2,
+                        fontFeatures: tabularFigures,
+                      ),
                     ),
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: Gaps.sm),
-          Text(
-            month == currentMonthKey() ? '本月结余' : '当月结余',
-            style: TextStyle(
-              fontSize: TypeScale.caption,
-              fontWeight: FontWeight.w500,
-              color: colors.text3,
-            ),
-          ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           FittedBox(
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerLeft,
-            child: Text(
-              formatAmount(summary.balance),
+            child: AnimatedNumericText(
+              value: summary.balance,
+              formatter: (value) =>
+                  formatAmount(value.toDouble(), withSymbol: true),
               style: TextStyle(
                 fontSize: TypeScale.display,
-                height: 1.05,
+                height: 1.06,
                 fontWeight: FontWeight.w700,
-                letterSpacing: -0.03,
+                letterSpacing: -0.6,
                 color: summary.balance >= 0 ? colors.text : colors.expense,
-                fontFeatures: tabularFigures,
               ),
             ),
           ),
-          const SizedBox(height: Gaps.md),
-          // 收入 / 支出等宽双栏，中间一条 1px 细线做分隔：
-          // 原来两个指标左对齐挤在一起，金额位数一变就对不齐。
+          const SizedBox(height: 14),
           Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Expanded(
                 child: _SideMetric(
-                  label: '收入',
+                  label: '本月收入',
                   value: summary.income,
                   color: colors.income,
                 ),
               ),
-              Container(width: 1, height: 32, color: colors.cardBorder),
-              const SizedBox(width: Gaps.lg),
+              const SizedBox(width: Gaps.sm),
               Expanded(
                 child: _SideMetric(
-                  label: '支出',
+                  label: '本月支出',
                   value: summary.expense,
                   color: colors.expense,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          Text(
-            // 历史月份里「今天 N 笔」是另一套时间语境（记工页修过同一问题）：
-            // 标题写 2026年10月、副标题写今天，会让人以为本月账目丢了。
-            month != currentMonthKey()
-                ? '正在查看 ${formatMonthLabel(month)}'
-                : todayCount == 0
-                ? '今天还没有账目'
-                : '今天 $todayCount 笔'
-                      '${todayIncome > 0 ? ' · +${formatAmount(todayIncome)}' : ''}'
-                      '${todayExpense > 0 ? ' · -${formatAmount(todayExpense)}' : ''}',
-            style: TextStyle(fontSize: 12, color: colors.text2),
+          const SizedBox(height: 12),
+          Pressable(
+            onTap: onOpenBudget,
+            shape: Radii.shape(Radii.md),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+              decoration: ShapeDecoration(
+                color: colors.block.withValues(alpha: colors.isDark ? 0.65 : 0.72),
+                shape: Radii.shape(Radii.md),
+              ),
+              child: budget > 0
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              overBudget
+                                  ? '已超预算 ${formatAmount(summary.expense - budget, withSymbol: true)}'
+                                  : '支出预算已用 ${((summary.expense / budget) * 100).round()}%',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: overBudget
+                                    ? colors.expense
+                                    : colors.text2,
+                                fontFeatures: tabularFigures,
+                              ),
+                            ),
+                            const Spacer(),
+                            Text(
+                              '${formatAmount(summary.expense, withSymbol: true)} / ${formatAmount(budget, withSymbol: true)}',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                color: colors.text3,
+                                fontFeatures: tabularFigures,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        ProgressBar(
+                          ratio: ratio,
+                          color: budgetColor,
+                          height: 4.5,
+                        ),
+                      ],
+                    )
+                  : Row(
+                      children: [
+                        Icon(
+                          Icons.track_changes_rounded,
+                          size: 15,
+                          color: colors.primary,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '设置本月支出预算与收入目标',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w600,
+                            color: colors.primary,
+                          ),
+                        ),
+                        const Spacer(),
+                        Icon(
+                          Icons.chevron_right_rounded,
+                          size: 16,
+                          color: colors.primary,
+                        ),
+                      ],
+                    ),
+            ),
           ),
         ],
       ),
@@ -728,27 +824,234 @@ class _SideMetric extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: TypeScale.micro,
-            fontWeight: FontWeight.w500,
-            color: colors.text3,
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      decoration: ShapeDecoration(
+        color: colors.block.withValues(alpha: colors.isDark ? 0.65 : 0.72),
+        shape: Radii.shape(Radii.md),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 6,
+                height: 6,
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+              ),
+              const SizedBox(width: 5),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w500,
+                  color: colors.text2,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: AnimatedNumericText(
+              value: value,
+              formatter: (v) => formatAmount(v.toDouble(), withSymbol: true),
+              style: TextStyle(
+                fontSize: TypeScale.body,
+                height: 1.15,
+                fontWeight: FontWeight.w700,
+                color: color,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FilterChipPill extends StatelessWidget {
+  const _FilterChipPill({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.icon,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final IconData? icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: label,
+      onTap: onTap,
+      excludeSemantics: true,
+      child: Pressable(
+        onTap: onTap,
+        shape: Radii.pillShape,
+        pressedScale: 0.96,
+        child: AnimatedContainer(
+          duration: motionDuration(
+            Timings.micro,
+            disableAnimations: MediaQuery.maybeDisableAnimationsOf(context) ?? false,
+          ),
+          curve: Curves2.out,
+          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7.5),
+          decoration: ShapeDecoration(
+            color: selected ? colors.primary : colors.card,
+            shape: Radii.pillShape.copyWith(
+              side: selected
+                  ? BorderSide.none
+                  : BorderSide(
+                      color: colors.isDark
+                          ? Colors.white.withValues(alpha: 0.08)
+                          : Colors.black.withValues(alpha: 0.045),
+                      width: 0.8,
+                    ),
+            ),
+            shadows: selected ? null : context.shadows,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (icon != null) ...[
+                Icon(
+                  icon,
+                  size: 14,
+                  color: selected ? colors.onPrimary : colors.text2,
+                ),
+                const SizedBox(width: 5),
+              ],
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: TypeScale.label,
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                  color: selected ? colors.onPrimary : colors.text2,
+                ),
+              ),
+            ],
           ),
         ),
-        const SizedBox(height: 3),
-        Text(
-          formatAmount(value),
-          style: TextStyle(
-            fontSize: TypeScale.body,
-            height: 1.1,
-            fontWeight: FontWeight.w700,
-            letterSpacing: -0.02,
-            color: color,
-            fontFeatures: tabularFigures,
+      ),
+    );
+  }
+}
+
+class _DateGroupSection extends StatelessWidget {
+  const _DateGroupSection({
+    required this.date,
+    required this.today,
+    required this.yesterday,
+    required this.entries,
+    required this.buildRow,
+  });
+
+  final String date;
+  final String today;
+  final String yesterday;
+  final List<LedgerEntry> entries;
+  final Widget Function(LedgerEntry entry) buildRow;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final parsed = DateTime.tryParse(date);
+    final weekday = parsed == null ? '' : '周${weekdayName(parsed.weekday % 7)}';
+    final relativeTag = date == today
+        ? '今天'
+        : date == yesterday
+        ? '昨天'
+        : null;
+    var dayIncome = 0.0;
+    var dayExpense = 0.0;
+    for (final entry in entries) {
+      if (entry.type == LedgerType.income) {
+        dayIncome += entry.amount;
+      } else {
+        dayExpense += entry.amount;
+      }
+    }
+    final summaryParts = <String>[
+      if (dayIncome > 0) '收 ${formatAmount(dayIncome, withSymbol: true)}',
+      if (dayExpense > 0) '支 ${formatAmount(dayExpense, withSymbol: true)}',
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, right: 4, bottom: 7),
+          child: Row(
+            children: [
+              if (relativeTag != null) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 7,
+                    vertical: 2,
+                  ),
+                  decoration: ShapeDecoration(
+                    color: date == today
+                        ? colors.primaryContainer
+                        : colors.block,
+                    shape: Radii.pillShape,
+                  ),
+                  child: Text(
+                    relativeTag,
+                    style: TextStyle(
+                      fontSize: TypeScale.micro,
+                      fontWeight: FontWeight.w600,
+                      color: date == today
+                          ? colors.onPrimaryContainer
+                          : colors.text2,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+              ],
+              Text(
+                '${formatDateLabel(date)} $weekday',
+                style: TextStyle(
+                  fontSize: TypeScale.caption,
+                  fontWeight: FontWeight.w600,
+                  color: colors.text2,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                summaryParts.join(' · '),
+                style: TextStyle(
+                  fontSize: TypeScale.caption,
+                  color: colors.text3,
+                  fontFeatures: tabularFigures,
+                ),
+              ),
+            ],
+          ),
+        ),
+        GlassCard(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+          child: Column(
+            children: [
+              for (var i = 0; i < entries.length; i++) ...[
+                if (i > 0)
+                  Divider(
+                    height: 1,
+                    thickness: 1,
+                    indent: 50,
+                    color: colors.divider,
+                  ),
+                buildRow(entries[i]),
+              ],
+            ],
           ),
         ),
       ],
@@ -756,11 +1059,92 @@ class _SideMetric extends StatelessWidget {
   }
 }
 
+({IconData icon, Color color}) _categoryVisual(
+  String category,
+  bool isIncome,
+  AppColors colors,
+) {
+  final label = category.trim();
+  if (isIncome) {
+    if (label == '工资' || label.contains('薪') || label.contains('工资')) {
+      return (icon: Icons.account_balance_wallet_rounded, color: colors.income);
+    }
+    if (label == '奖金' || label.contains('奖') || label.contains('红包')) {
+      return (icon: Icons.emoji_events_rounded, color: colors.warning);
+    }
+    if (label == '兼职' || label.contains('兼职') || label.contains('外快')) {
+      return (icon: Icons.work_outline_rounded, color: colors.primary);
+    }
+    if (label == '报销' || label.contains('报销') || label.contains('退')) {
+      return (icon: Icons.receipt_long_rounded, color: const Color(0xFF5856D6));
+    }
+    return (icon: Icons.savings_outlined, color: colors.income);
+  }
+  if (label == '餐饮' ||
+      label.contains('饭') ||
+      label.contains('餐') ||
+      label.contains('吃') ||
+      label.contains('外卖') ||
+      label.contains('咖啡') ||
+      label.contains('奶茶')) {
+    return (icon: Icons.restaurant_rounded, color: const Color(0xFFFF9500));
+  }
+  if (label == '交通' ||
+      label.contains('车') ||
+      label.contains('地铁') ||
+      label.contains('公交') ||
+      label.contains('油') ||
+      label.contains('机票') ||
+      label.contains('出行')) {
+    return (icon: Icons.directions_transit_rounded, color: colors.primary);
+  }
+  if (label == '购物' ||
+      label.contains('买') ||
+      label.contains('购') ||
+      label.contains('衣') ||
+      label.contains('鞋') ||
+      label.contains('数码')) {
+    return (icon: Icons.shopping_bag_outlined, color: const Color(0xFFEC4899));
+  }
+  if (label == '居住' ||
+      label == '居家' ||
+      label.contains('房') ||
+      label.contains('水电') ||
+      label.contains('租') ||
+      label.contains('居')) {
+    return (icon: Icons.home_outlined, color: const Color(0xFF5856D6));
+  }
+  if (label == '医疗' ||
+      label.contains('医') ||
+      label.contains('药') ||
+      label.contains('健康')) {
+    return (
+      icon: Icons.medical_services_outlined,
+      color: colors.expense,
+    );
+  }
+  if (label == '学习' ||
+      label.contains('书') ||
+      label.contains('课') ||
+      label.contains('学')) {
+    return (icon: Icons.menu_book_rounded, color: const Color(0xFF0EA5E9));
+  }
+  if (label == '娱乐' ||
+      label.contains('影') ||
+      label.contains('游') ||
+      label.contains('玩') ||
+      label.contains('娱')) {
+    return (icon: Icons.sports_esports_rounded, color: const Color(0xFFAF52DE));
+  }
+  return (icon: Icons.local_offer_outlined, color: colors.text2);
+}
+
 class _EntryRow extends StatelessWidget {
   const _EntryRow({
     required this.entry,
     required this.linkedHours,
     required this.onTap,
+    required this.onLongPressStart,
     required this.onDelete,
     this.managed = false,
     this.deleteLabel = '删除',
@@ -769,9 +1153,8 @@ class _EntryRow extends StatelessWidget {
   final LedgerEntry entry;
   final double? linkedHours;
   final VoidCallback onTap;
+  final GestureLongPressStartCallback onLongPressStart;
   final VoidCallback onDelete;
-
-  /// 系统生成的工资账目（`wage-<date>`）：不可编辑，只能撤销对应结算。
   final bool managed;
   final String deleteLabel;
 
@@ -779,6 +1162,7 @@ class _EntryRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final isIncome = entry.type == LedgerType.income;
+    final visual = _categoryVisual(entry.category, isIncome, colors);
     return Dismissible(
       key: ValueKey(entry.id),
       direction: DismissDirection.endToStart,
@@ -788,7 +1172,7 @@ class _EntryRow extends StatelessWidget {
       },
       background: Container(
         alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: Gaps.lg),
+        padding: const EdgeInsets.only(right: Gaps.md),
         child: Icon(
           managed ? Icons.undo_rounded : Icons.delete_outline_rounded,
           color: managed ? colors.text2 : colors.expense,
@@ -805,73 +1189,210 @@ class _EntryRow extends StatelessWidget {
           CustomSemanticsAction(label: deleteLabel): onDelete,
         },
         excludeSemantics: true,
-        child: Pressable(
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            child: Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: ShapeDecoration(
-                    color: colors.block,
-                    shape: Radii.shape(14),
-                  ),
-                  child: Icon(
-                    isIncome
-                        ? Icons.arrow_downward_rounded
-                        : Icons.arrow_upward_rounded,
-                    size: 20,
-                    color: isIncome ? colors.income : colors.expense,
-                  ),
-                ),
-                const SizedBox(width: Gaps.md),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        entry.category,
-                        style: TextStyle(
-                          fontSize: TypeScale.title,
-                          fontWeight: FontWeight.w500,
-                          color: colors.text,
-                        ),
-                      ),
-                      Text(
-                        [
-                          formatDateLabel(entry.date),
-                          if (entry.remark.isNotEmpty) entry.remark,
-                          if (linkedHours != null)
-                            '${formatHoursValue(linkedHours!)}${context.unit.name}',
-                        ].join(' · '),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: TypeScale.caption,
-                          color: colors.text2,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 115),
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerRight,
-                    child: Text(
-                      '${isIncome ? '+' : '-'}${formatAmount(entry.amount)}',
-                      style: TextStyle(
-                        fontSize: TypeScale.title,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: -0.02,
-                        color: isIncome ? colors.income : colors.expense,
-                        fontFeatures: tabularFigures,
-                      ),
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onLongPressStart: onLongPressStart,
+          child: Pressable(
+            onTap: onTap,
+            shape: Radii.shape(Radii.md),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 11),
+              child: Row(
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: ShapeDecoration(
+                      color: colors.block,
+                      shape: Radii.shape(12),
+                    ),
+                    child: Icon(
+                      visual.icon,
+                      size: 19,
+                      color: visual.color,
                     ),
                   ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                entry.category,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: TypeScale.title,
+                                  fontWeight: FontWeight.w600,
+                                  color: colors.text,
+                                ),
+                              ),
+                            ),
+                            if (managed) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: ShapeDecoration(
+                                  color: colors.block,
+                                  shape: Radii.pillShape,
+                                ),
+                                child: Text(
+                                  '结算同步',
+                                  style: TextStyle(
+                                    fontSize: TypeScale.micro,
+                                    fontWeight: FontWeight.w600,
+                                    color: colors.text2,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        if (entry.remark.isNotEmpty || linkedHours != null) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            [
+                              if (entry.remark.isNotEmpty) entry.remark,
+                              if (linkedHours != null)
+                                '关联 ${formatHoursValue(linkedHours!)} ${context.unit.name}',
+                            ].join(' · '),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: TypeScale.caption,
+                              color: colors.text2,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    '${isIncome ? '+' : '-'}${formatAmount(entry.amount, withSymbol: true)}',
+                    style: TextStyle(
+                      fontSize: TypeScale.title,
+                      fontWeight: FontWeight.w700,
+                      color: isIncome ? colors.income : colors.expense,
+                      fontFeatures: tabularFigures,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AddLedgerFab extends StatelessWidget {
+  const _AddLedgerFab({required this.onTap, this.expanded = true});
+
+  final VoidCallback onTap;
+  final bool expanded;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    return Semantics(
+      button: true,
+      label: '记一笔',
+      onTap: onTap,
+      excludeSemantics: true,
+      child: Pressable(
+        onTap: onTap,
+        shape: Radii.pillShape,
+        pressedScale: 0.94,
+        child: Container(
+          height: 48,
+          padding: EdgeInsets.only(
+            left: expanded ? 14 : 13,
+            right: expanded ? 18 : 13,
+          ),
+          decoration: ShapeDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Color.lerp(
+                  colors.primary,
+                  Colors.white,
+                  colors.isDark ? 0.10 : 0.14,
+                )!,
+                colors.primary,
+              ],
+            ),
+            shape: Radii.pillShape.copyWith(
+              side: BorderSide(
+                color: Colors.white.withValues(
+                  alpha: colors.isDark ? 0.22 : 0.34,
+                ),
+                width: 1.0,
+              ),
+            ),
+            shadows: [
+              BoxShadow(
+                color: colors.primary.withValues(
+                  alpha: colors.isDark ? 0.42 : 0.34,
+                ),
+                blurRadius: 18,
+                offset: const Offset(0, 6),
+              ),
+              BoxShadow(
+                color: Colors.black.withValues(
+                  alpha: colors.isDark ? 0.26 : 0.08,
+                ),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: AnimatedSize(
+            duration: motionDuration(Timings.fast, disableAnimations: disable),
+            curve: Curves2.out,
+            alignment: Alignment.centerRight,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.add_rounded,
+                  size: 21,
+                  color: colors.onPrimary,
+                ),
+                AnimatedSwitcher(
+                  duration: motionDuration(
+                    Timings.fast,
+                    disableAnimations: disable,
+                  ),
+                  switchInCurve: Curves2.out,
+                  switchOutCurve: Curves2.out,
+                  transitionBuilder: (child, animation) => FadeTransition(
+                    opacity: animation,
+                    child: child,
+                  ),
+                  child: expanded
+                      ? Padding(
+                          key: const ValueKey('fab-label'),
+                          padding: const EdgeInsets.only(left: 6),
+                          child: Text(
+                            '记一笔',
+                            style: TextStyle(
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.w700,
+                              color: colors.onPrimary,
+                            ),
+                          ),
+                        )
+                      : const SizedBox.shrink(key: ValueKey('fab-compact')),
                 ),
               ],
             ),
@@ -888,6 +1409,8 @@ Future<void> showLedgerEditor(
   BuildContext context, {
   LedgerEntry? entry,
   String? presetDate,
+  LedgerType? presetType,
+  String? presetCategory,
 }) {
   final container = ProviderScope.containerOf(context, listen: false);
   if (container.read(archiveReadOnlyProvider)) {
@@ -897,15 +1420,28 @@ Future<void> showLedgerEditor(
   return showAppSheet<void>(
     context: context,
     dismissible: false,
-    builder: (_) => LedgerEditorSheet(entry: entry, presetDate: presetDate),
+    builder: (_) => LedgerEditorSheet(
+      entry: entry,
+      presetDate: presetDate,
+      presetType: presetType,
+      presetCategory: presetCategory,
+    ),
   );
 }
 
 class LedgerEditorSheet extends ConsumerStatefulWidget {
-  const LedgerEditorSheet({super.key, this.entry, this.presetDate});
+  const LedgerEditorSheet({
+    super.key,
+    this.entry,
+    this.presetDate,
+    this.presetType,
+    this.presetCategory,
+  });
 
   final LedgerEntry? entry;
   final String? presetDate;
+  final LedgerType? presetType;
+  final String? presetCategory;
 
   @override
   ConsumerState<LedgerEditorSheet> createState() => _LedgerEditorSheetState();
@@ -920,7 +1456,6 @@ class _LedgerEditorSheetState extends ConsumerState<LedgerEditorSheet> {
   String? _error;
   bool _submitted = false;
 
-  // 初始快照 + 值比较。用 controller listener 置 dirty 会被「光标移动」误触发。
   late final String _initialAmount;
   late final String _initialRemark;
   late final LedgerType _initialType;
@@ -938,9 +1473,12 @@ class _LedgerEditorSheetState extends ConsumerState<LedgerEditorSheet> {
   void initState() {
     super.initState();
     final entry = widget.entry;
-    _initialType = entry?.type ?? LedgerType.expense;
+    _initialType = entry?.type ?? widget.presetType ?? LedgerType.expense;
     _initialDate = entry?.date ?? widget.presetDate ?? todayISO();
-    _initialCategory = entry?.category ?? defaultExpenseCategories.first;
+    _initialCategory =
+        entry?.category ??
+        widget.presetCategory ??
+        defaultCategoriesOf(_initialType).first;
     _initialAmount = entry == null ? '' : formatAmountInput(entry.amount);
     _initialRemark = entry?.remark ?? '';
     _type = _initialType;
@@ -999,9 +1537,7 @@ class _LedgerEditorSheetState extends ConsumerState<LedgerEditorSheet> {
       maxDate: todayISO(),
     );
     if (picked != null) {
-      setState(() {
-        _date = picked;
-      });
+      setState(() => _date = picked);
     }
   }
 
@@ -1024,6 +1560,7 @@ class _LedgerEditorSheetState extends ConsumerState<LedgerEditorSheet> {
           Segmented<LedgerType>(
             values: const [LedgerType.expense, LedgerType.income],
             selected: _type,
+            accentActive: true,
             labelOf: (type) => type == LedgerType.expense ? '支出' : '收入',
             onChanged: (type) => setState(() {
               _type = type;
@@ -1059,11 +1596,11 @@ class _LedgerEditorSheetState extends ConsumerState<LedgerEditorSheet> {
               spacing: Gaps.sm,
               runSpacing: Gaps.sm,
               children: [
-                for (final category in categories)
+                for (final category in categories) ...[
                   Pressable(
-                    onTap: () => setState(() {
-                      _category = category;
-                    }),
+                    onTap: () => setState(() => _category = category),
+                    shape: Radii.pillShape,
+                    pressedScale: 0.96,
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 12,
@@ -1071,21 +1608,42 @@ class _LedgerEditorSheetState extends ConsumerState<LedgerEditorSheet> {
                       ),
                       decoration: ShapeDecoration(
                         color: _category == category
-                            ? colors.primaryContainer
+                            ? colors.primary
                             : colors.block,
                         shape: Radii.pillShape,
                       ),
-                      child: Text(
-                        category,
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          color: _category == category
-                              ? colors.onPrimaryContainer
-                              : colors.text2,
-                        ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _categoryVisual(
+                              category,
+                              _type == LedgerType.income,
+                              colors,
+                            ).icon,
+                            size: 14,
+                            color: _category == category
+                                ? colors.onPrimary
+                                : colors.text2,
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            category,
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: _category == category
+                                  ? FontWeight.w600
+                                  : FontWeight.w500,
+                              color: _category == category
+                                  ? colors.onPrimary
+                                  : colors.text2,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
+                ],
               ],
             ),
           ),

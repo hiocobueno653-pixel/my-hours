@@ -10,6 +10,12 @@ test-output.txt
 screenshots/
 .codex-attachments/
 
+# 已移除的 React/Capacitor 旧构建残留
+/dist/
+/node_modules/
+/android/keystore.properties
+/android/*.keystore
+
 # Dart / Flutter 侧忽略规则见 flutter_app/.gitignore；
 # 签名密钥（keystore.properties / *.keystore / *.jks）同样在那里声明，严禁提交。
 

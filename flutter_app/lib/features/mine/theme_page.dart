@@ -1,30 +1,23 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/motion.dart';
 import '../../core/settings.dart';
 import '../../core/theme_tokens.dart';
+import '../../ui/dialog.dart';
 import '../../ui/glass_menu.dart';
 import '../../ui/pinned_header.dart';
-import '../../ui/sheet.dart';
 import '../../ui/widgets.dart';
-import '../../core/motion.dart';
+import 'custom_color_sheet.dart';
 
 /// 主题与外观。版式参考系统主题页：顶部实时预览 + 分区设置卡片。
 class ThemePage extends ConsumerWidget {
   const ThemePage({super.key, required this.onBack});
 
   final VoidCallback onBack;
-
-  static const _presets = <Color>[
-    Color(0xFF2563EB),
-    Color(0xFF8B5CF6),
-    Color(0xFFEC4899),
-    Color(0xFFEF4444),
-    Color(0xFFF97316),
-    Color(0xFFFACC15),
-    Color(0xFF22C55E),
-    Color(0xFF64748B),
-  ];
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -33,14 +26,21 @@ class ThemePage extends ConsumerWidget {
       animation: settings,
       builder: (context, _) {
         final colors = context.colors;
-        return Stack(
-          children: [
-            Positioned.fill(
-              child: ListView(
-                padding: EdgeInsets.only(
-                  top: PinnedSubHeader.totalHeight(context) + 8,
-                  bottom: 48,
-                ),
+        final palette = settings.accentPalette;
+        final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+        return Scaffold(
+          backgroundColor: colors.page,
+          body: Stack(
+            children: [
+              Positioned.fill(
+                child: ListView(
+                  physics: const BouncingScrollPhysics(
+                    parent: AlwaysScrollableScrollPhysics(),
+                  ),
+                  padding: EdgeInsets.only(
+                    top: PinnedSubHeader.totalHeight(context) + 12,
+                    bottom: MediaQuery.paddingOf(context).bottom + 40,
+                  ),
                 children: [
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: Gaps.lg),
@@ -60,6 +60,7 @@ class ThemePage extends ConsumerWidget {
                               ThemeMode.dark,
                             ],
                             selected: settings.themeMode,
+                            accentActive: true,
                             labelOf: (mode) => switch (mode) {
                               ThemeMode.system => '自动',
                               ThemeMode.light => '浅色',
@@ -70,23 +71,68 @@ class ThemePage extends ConsumerWidget {
                         ),
                         const SizedBox(height: Gaps.md),
                         GlassCard(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: Gaps.lg,
-                            vertical: 2,
-                          ),
-                          child: Material(
-                            type: MaterialType.transparency,
-                            child: SwitchListTile(
-                              contentPadding: EdgeInsets.zero,
-                              value: settings.pureBlack,
-                              onChanged: settings.setPureBlack,
-                              title: const Text('纯黑模式'),
-                              subtitle: const Text('深色模式下使用纯黑页面与深色卡片'),
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: LiquidSwitchRow(
+                            title: '纯黑模式',
+                            subtitle: settings.themeMode == ThemeMode.light
+                                ? '仅深色模式生效'
+                                : '深色模式下使用纯黑页面与深色卡片',
+                            leading: AppIconBadge(
+                              icon: Icons.contrast_rounded,
+                              color: colors.isDark
+                                  ? colors.text
+                                  : const Color(0xFF18181C),
                             ),
+                            value: settings.pureBlack,
+                            onChanged: settings.themeMode == ThemeMode.light
+                                ? null
+                                : settings.setPureBlack,
                           ),
                         ),
                         const SizedBox(height: Gaps.xl),
-                        const _SectionLabel(label: '主题色彩'),
+                        Row(
+                          children: [
+                            const _SectionLabel(label: '主题色彩'),
+                            const Spacer(),
+                            AnimatedSwitcher(
+                              duration: motionDuration(
+                                Timings.fast,
+                                disableAnimations: disable,
+                              ),
+                              switchInCurve: Curves2.out,
+                              switchOutCurve: Curves2.out,
+                              child: settings.isDefaultThemeColor
+                                  ? const SizedBox.shrink(
+                                      key: ValueKey('reset-hidden'),
+                                    )
+                                  : Pressable(
+                                      key: const ValueKey('reset-shown'),
+                                      onTap: () =>
+                                          _confirmResetColors(context, settings),
+                                      shape: Radii.pillShape,
+                                      pressedScale: 0.94,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 4,
+                                        ),
+                                        decoration: ShapeDecoration(
+                                          color: colors.primaryContainer,
+                                          shape: Radii.pillShape,
+                                        ),
+                                        child: Text(
+                                          '恢复默认',
+                                          style: TextStyle(
+                                            fontSize: 11.5,
+                                            fontWeight: FontWeight.w600,
+                                            color: colors.onPrimaryContainer,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                            ),
+                          ],
+                        ),
                         const SizedBox(height: Gaps.sm),
                         GlassCard(
                           padding: const EdgeInsets.all(Gaps.lg),
@@ -97,7 +143,7 @@ class ThemePage extends ConsumerWidget {
                                 spacing: 14,
                                 runSpacing: 12,
                                 children: [
-                                  for (final color in _presets)
+                                  for (final color in palette)
                                     _ColorDot(
                                       color: color,
                                       selected:
@@ -105,12 +151,27 @@ class ThemePage extends ConsumerWidget {
                                           settings.accentColor.toARGB32(),
                                       onTap: () =>
                                           settings.setAccentColor(color),
+                                      onLongPress: (pos) => _showSwatchMenu(
+                                        context,
+                                        settings: settings,
+                                        color: color,
+                                        canDelete: palette.length > 1,
+                                        globalPosition: pos,
+                                      ),
                                     ),
                                   _AddColorDot(
                                     onTap: () =>
                                         _showCustomColor(context, settings),
                                   ),
                                 ],
+                              ),
+                              const SizedBox(height: 10),
+                              Text(
+                                '点「+」可按网格、光谱、滑块或 HEX 自由取色；长按色块可编辑或删除',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  color: colors.text3,
+                                ),
                               ),
                               const SizedBox(height: Gaps.lg),
                               Text(
@@ -152,51 +213,17 @@ class ThemePage extends ConsumerWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const _ControlLabel('底栏'),
-                              const SizedBox(height: Gaps.sm),
-                              Segmented<AppDockStyle>(
-                                values: AppDockStyle.values,
-                                selected: settings.dockStyle,
-                                labelOf: (style) =>
-                                    style == AppDockStyle.floating
-                                    ? '悬浮'
-                                    : '固定',
-                                onChanged: settings.setDockStyle,
-                              ),
-                              const SizedBox(height: Gaps.lg),
                               const _ControlLabel('选项卡动画'),
                               const SizedBox(height: Gaps.sm),
                               Segmented<AppTabTransition>(
                                 values: AppTabTransition.values,
                                 selected: settings.tabTransition,
+                                accentActive: true,
                                 labelOf: (style) =>
                                     style == AppTabTransition.slide
                                     ? '滑动'
                                     : '淡入',
                                 onChanged: settings.setTabTransition,
-                              ),
-                              const SizedBox(height: Gaps.lg),
-                              const _ControlLabel('液态玻璃'),
-                              const SizedBox(height: Gaps.sm),
-                              Segmented<AppGlassPreference>(
-                                values: AppGlassPreference.values,
-                                selected: settings.glassPreference,
-                                labelOf: (value) => switch (value) {
-                                  AppGlassPreference.none => '无',
-                                  AppGlassPreference.standard => '标准',
-                                  AppGlassPreference.extreme => '极致',
-                                },
-                                onChanged: settings.setGlassPreference,
-                              ),
-                              const SizedBox(height: 10),
-                              Text(
-                                '无：只保留磨砂；标准：仅底栏镜片折射，更省电；'
-                                '极致：全界面折射，设备不支持时自动降级',
-                                style: TextStyle(
-                                  fontSize: 11.5,
-                                  height: 1.45,
-                                  color: colors.text3,
-                                ),
                               ),
                             ],
                           ),
@@ -205,16 +232,13 @@ class ThemePage extends ConsumerWidget {
                         const _SectionLabel(label: '字体与阅读'),
                         const SizedBox(height: Gaps.sm),
                         GlassCard(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: Gaps.lg,
-                            vertical: 2,
-                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 4),
                           child: ListRow(
                             title: '字体',
                             subtitle: '系统默认字体 · 保持现有字形不变',
-                            leading: Icon(
-                              Icons.text_fields_rounded,
-                              color: colors.text2,
+                            leading: const AppIconBadge(
+                              icon: Icons.text_fields_rounded,
+                              color: Color(0xFF5856D6),
                             ),
                           ),
                         ),
@@ -238,6 +262,7 @@ class ThemePage extends ConsumerWidget {
                               Segmented<bool>(
                                 values: const [true, false],
                                 selected: settings.followSystemText,
+                                accentActive: true,
                                 labelOf: (follow) => follow ? '跟随系统' : '自定义',
                                 onChanged: (follow) {
                                   if (settings.largeText) {
@@ -302,20 +327,63 @@ class ThemePage extends ConsumerWidget {
                             ],
                           ),
                         ),
+                        const SizedBox(height: Gaps.xl),
+                        const _SectionLabel(label: '液态玻璃与底栏'),
+                        const SizedBox(height: Gaps.sm),
+                        GlassCard(
+                          padding: const EdgeInsets.fromLTRB(
+                            Gaps.lg,
+                            Gaps.lg,
+                            Gaps.lg,
+                            Gaps.md,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const _ControlLabel('玻璃材质档位'),
+                              const SizedBox(height: Gaps.sm),
+                              Segmented<AppGlassPreference>(
+                                values: AppGlassPreference.values,
+                                selected: settings.glassPreference,
+                                accentActive: true,
+                                labelOf: (pref) => switch (pref) {
+                                  AppGlassPreference.none => '纯色',
+                                  AppGlassPreference.standard => '标准',
+                                  AppGlassPreference.extreme => '极致折射',
+                                },
+                                onChanged: settings.setGlassPreference,
+                              ),
+                              const SizedBox(height: Gaps.lg),
+                              const _ControlLabel('底部导航样式'),
+                              const SizedBox(height: Gaps.sm),
+                              Segmented<AppDockStyle>(
+                                values: AppDockStyle.values,
+                                selected: settings.dockStyle,
+                                accentActive: true,
+                                labelOf: (style) =>
+                                    style == AppDockStyle.floating
+                                    ? '悬浮玻璃'
+                                    : '固定底栏',
+                                onChanged: settings.setDockStyle,
+                              ),
+                            ],
+                          ),
+                        ),
                         const SizedBox(height: Gaps.xxl),
                       ],
                     ),
                   ),
                 ],
               ),
-            ),
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: PinnedSubHeader(title: '主题', onBack: onBack),
-            ),
-          ],
+              ),
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: PinnedSubHeader(title: '主题', onBack: onBack),
+              ),
+            ],
+          ),
         );
       },
     );
@@ -325,57 +393,162 @@ class ThemePage extends ConsumerWidget {
     BuildContext context,
     AppSettings settings,
   ) async {
-    final choice = await showAppSheet<Color>(
-      context: context,
-      builder: (sheetContext) => SheetScaffold(
-        title: '自定义主题色',
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '选择一个颜色，主题会立即更新。',
-              style: TextStyle(fontSize: 13, color: sheetContext.colors.text2),
-            ),
-            const SizedBox(height: Gaps.lg),
-            Wrap(
-              spacing: 14,
-              runSpacing: 14,
-              children: [
-                for (final color in const [
-                  Color(0xFF0EA5E9),
-                  Color(0xFF14B8A6),
-                  Color(0xFF84CC16),
-                  Color(0xFFF43F5E),
-                  Color(0xFFA855F7),
-                  Color(0xFF475569),
-                ])
-                  _ColorDot(
-                    color: color,
-                    selected: false,
-                    onTap: () => Navigator.of(sheetContext).pop(color),
-                  ),
-              ],
-            ),
-          ],
-        ),
-      ),
+    await showCustomColorSheet(
+      context,
+      initialColor: settings.accentColor,
+      colorStyle: settings.colorStyle,
+      pureBlack: settings.pureBlack,
+      floatingDock: settings.dockStyle == AppDockStyle.floating,
+      onConfirmed: (color) => unawaited(settings.addAccentColor(color)),
     );
-    if (choice != null) await settings.setAccentColor(choice);
+  }
+
+  Future<void> _showEditColor(
+    BuildContext context,
+    AppSettings settings,
+    Color original,
+  ) async {
+    await showCustomColorSheet(
+      context,
+      title: '编辑主题色',
+      initialColor: original,
+      colorStyle: settings.colorStyle,
+      pureBlack: settings.pureBlack,
+      floatingDock: settings.dockStyle == AppDockStyle.floating,
+      onConfirmed: (edited) =>
+          unawaited(settings.editAccentColor(original, edited)),
+    );
+  }
+
+  Future<void> _confirmDeleteColor(
+    BuildContext context,
+    AppSettings settings,
+    Color color,
+  ) async {
+    final ok = await showConfirmDialog(
+      context,
+      title: '删除这个主题色？',
+      description: '从色板中移除后，如仍需要可重新添加。',
+      confirmLabel: '删除',
+      danger: true,
+    );
+    if (ok == true) {
+      await settings.removeAccentColor(color);
+    }
+  }
+
+  Future<void> _confirmResetColors(
+    BuildContext context,
+    AppSettings settings,
+  ) async {
+    final ok = await showConfirmDialog(
+      context,
+      title: '恢复默认主题色？',
+      description: '会还原默认色板、默认蓝色强调色与「鲜明」配色风格。',
+      confirmLabel: '恢复默认',
+      danger: true,
+    );
+    if (ok == true) {
+      await settings.resetThemeColors();
+    }
+  }
+
+  void _showSwatchMenu(
+    BuildContext context, {
+    required AppSettings settings,
+    required Color color,
+    required bool canDelete,
+    required Offset globalPosition,
+  }) {
+    HapticFeedback.mediumImpact();
+    unawaited(showDropletGlassMenu(
+      context,
+      anchorOffset: globalPosition,
+      preferRightAlign: false,
+      items: [
+        GlassMenuAction(
+          label: '编辑颜色',
+          icon: Icons.tune_rounded,
+          onSelected: () => unawaited(_showEditColor(context, settings, color)),
+        ),
+        if (canDelete)
+          GlassMenuAction(
+            label: '删除颜色',
+            icon: Icons.delete_outline_rounded,
+            danger: true,
+            onSelected: () =>
+                unawaited(_confirmDeleteColor(context, settings, color)),
+          ),
+      ],
+    ));
   }
 }
 
-class _ThemePreview extends StatelessWidget {
+class _ThemePreview extends StatefulWidget {
   const _ThemePreview({required this.settings});
 
   final AppSettings settings;
 
   @override
+  State<_ThemePreview> createState() => _ThemePreviewState();
+}
+
+class _ThemePreviewState extends State<_ThemePreview> {
+  int _tabIndex = 0;
+  int _direction = 1;
+  late AppTabTransition _lastTransition = widget.settings.tabTransition;
+
+  static const _icons = [
+    Icons.schedule_rounded,
+    Icons.account_balance_wallet_rounded,
+    Icons.insights_rounded,
+    Icons.person_rounded,
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    widget.settings.addListener(_onSettingsChanged);
+  }
+
+  void _onSettingsChanged() {
+    final next = widget.settings.tabTransition;
+    if (next != _lastTransition) {
+      _lastTransition = next;
+      if (mounted) {
+        setState(() {
+          _direction = 1;
+          _tabIndex = (_tabIndex + 1) % _icons.length;
+        });
+      }
+    }
+  }
+
+  void _selectPreviewTab(int index) {
+    if (index == _tabIndex) return;
+    HapticFeedback.selectionClick();
+    setState(() {
+      _direction = index > _tabIndex ? 1 : -1;
+      _tabIndex = index;
+    });
+  }
+
+  @override
+  void dispose() {
+    widget.settings.removeListener(_onSettingsChanged);
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    final settings = widget.settings;
+    final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    final isSlide = settings.tabTransition == AppTabTransition.slide;
     return GlassCard(
       padding: const EdgeInsets.all(Gaps.md),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 260),
+        duration: motionDuration(Timings.base, disableAnimations: disable),
         curve: Curves2.out,
         height: 226,
         decoration: ShapeDecoration(
@@ -412,7 +585,7 @@ class _ThemePreview extends StatelessWidget {
                     Row(
                       children: [
                         Text(
-                          '计时',
+                          '时页',
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w700,
@@ -448,146 +621,124 @@ class _ThemePreview extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 12),
-                    Container(
-                      height: 72,
-                      padding: const EdgeInsets.fromLTRB(12, 9, 12, 8),
-                      decoration: ShapeDecoration(
-                        color: colors.card,
-                        shape: Radii.shape(Radii.md),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                width: 6,
-                                height: 6,
-                                decoration: BoxDecoration(
-                                  color: colors.primary,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              const SizedBox(width: 5),
-                              Container(
-                                width: 52,
-                                height: 6,
-                                decoration: BoxDecoration(
-                                  color: colors.inset,
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                              ),
-                              const Spacer(),
-                              Container(
-                                width: 30,
-                                height: 6,
-                                decoration: BoxDecoration(
-                                  color: colors.primary.withValues(alpha: 0.5),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                              ),
-                            ],
+                    Expanded(
+                      child: ClipRect(
+                        child: AnimatedSwitcher(
+                          duration: motionDuration(
+                            isSlide ? Timings.slow : Timings.fast,
+                            disableAnimations: disable,
                           ),
-                          const Spacer(),
-                          SizedBox(
-                            height: 29,
-                            width: double.infinity,
-                            child: CustomPaint(
-                              painter: _PreviewChartPainter(
-                                color: colors.primary,
-                                grid: colors.divider,
+                          switchInCurve: isSlide ? Curves2.out : Curves2.inOut,
+                          switchOutCurve: isSlide ? Curves2.out : Curves2.inOut,
+                          transitionBuilder: (child, animation) {
+                            if (!isSlide) {
+                              return FadeTransition(
+                                opacity: animation,
+                                child: child,
+                              );
+                            }
+                            final incoming =
+                                child.key == ValueKey('preview-tab-$_tabIndex');
+                            final offset = Tween<Offset>(
+                              begin: Offset(
+                                (incoming ? _direction : -_direction) * 0.36,
+                                0,
                               ),
+                              end: Offset.zero,
+                            ).animate(animation);
+                            return FadeTransition(
+                              opacity: animation,
+                              child: SlideTransition(
+                                position: offset,
+                                child: child,
+                              ),
+                            );
+                          },
+                          child: _buildTabBody(colors),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    if (settings.dockStyle == AppDockStyle.floating)
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _MiniPill(
+                            color: settings.glassPreference ==
+                                    AppGlassPreference.none
+                                ? colors.card
+                                : colors.inset,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                for (var i = 0; i < _icons.length; i++)
+                                  GestureDetector(
+                                    behavior: HitTestBehavior.opaque,
+                                    onTap: () => _selectPreviewTab(i),
+                                    child: AnimatedContainer(
+                                      duration: motionDuration(
+                                        Timings.fast,
+                                        disableAnimations: disable,
+                                      ),
+                                      curve: Curves2.out,
+                                      width: i == _tabIndex ? 24 : 18,
+                                      height: 20,
+                                      margin: EdgeInsets.only(
+                                        left: i == 0 ? 0 : 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: i == _tabIndex
+                                            ? colors.primary
+                                            : Colors.transparent,
+                                        borderRadius: BorderRadius.circular(999),
+                                      ),
+                                      child: Icon(
+                                        _icons[i],
+                                        size: 11,
+                                        color: i == _tabIndex
+                                            ? colors.onPrimary
+                                            : colors.text3,
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
-                          const SizedBox(height: 5),
-                          Row(
-                            children: [
-                              Container(
-                                width: 36,
-                                height: 5,
-                                decoration: BoxDecoration(
-                                  color: colors.inset,
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                              ),
-                              const SizedBox(width: 5),
-                              Container(
-                                width: 24,
-                                height: 5,
-                                decoration: BoxDecoration(
-                                  color: colors.inset,
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                              ),
-                            ],
-                          ),
                         ],
+                      )
+                    else
+                      Container(
+                        height: 26,
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        decoration: BoxDecoration(
+                          color: colors.card,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: colors.divider, width: 0.8),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            for (var i = 0; i < _icons.length; i++)
+                              GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: () => _selectPreviewTab(i),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 4,
+                                  ),
+                                  child: Icon(
+                                    _icons[i],
+                                    size: 13,
+                                    color: i == _tabIndex
+                                        ? colors.primary
+                                        : colors.text3,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 7),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _MiniBlock(
-                            color: colors.primaryContainer,
-                            accent: colors.primary,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: _MiniBlock(
-                            color: colors.incomeSoft,
-                            accent: colors.income,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const Spacer(),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _MiniPill(
-                          color: colors.inset,
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                width: 20,
-                                height: 20,
-                                decoration: BoxDecoration(
-                                  color: colors.primary,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(
-                                  Icons.calendar_today_rounded,
-                                  size: 11,
-                                  color: colors.onPrimary,
-                                ),
-                              ),
-                              Container(
-                                width: 18,
-                                height: 14,
-                                margin: const EdgeInsets.symmetric(
-                                  horizontal: 3,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: colors.text3.withValues(alpha: 0.35),
-                                  borderRadius: BorderRadius.circular(5),
-                                ),
-                              ),
-                              Container(
-                                width: 18,
-                                height: 14,
-                                decoration: BoxDecoration(
-                                  color: colors.text3.withValues(alpha: 0.35),
-                                  borderRadius: BorderRadius.circular(5),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
                   ],
                 ),
               ),
@@ -595,6 +746,118 @@ class _ThemePreview extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildTabBody(AppColors colors) {
+    final accent = switch (_tabIndex) {
+      1 => colors.income,
+      2 => colors.warning,
+      3 => colors.primary,
+      _ => colors.primary,
+    };
+    return Column(
+      key: ValueKey('preview-tab-$_tabIndex'),
+      children: [
+        Container(
+          height: 70,
+          padding: const EdgeInsets.fromLTRB(12, 9, 12, 8),
+          decoration: ShapeDecoration(
+            color: colors.card,
+            shape: Radii.shape(Radii.md),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: accent,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                  Container(
+                    width: 52,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: colors.inset,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                  const Spacer(),
+                  Container(
+                    width: 30,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: accent.withValues(alpha: 0.5),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ],
+              ),
+              const Spacer(),
+              SizedBox(
+                height: 28,
+                width: double.infinity,
+                child: CustomPaint(
+                  painter: _PreviewChartPainter(
+                    color: accent,
+                    grid: colors.divider,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: colors.inset,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                  Container(
+                    width: 24,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: colors.inset,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 7),
+        Row(
+          children: [
+            Expanded(
+              child: _MiniBlock(
+                color: _tabIndex == 1
+                    ? colors.incomeSoft
+                    : colors.primaryContainer,
+                accent: _tabIndex == 1 ? colors.income : colors.primary,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: _MiniBlock(
+                color: _tabIndex == 2
+                    ? colors.warningSoft
+                    : colors.incomeSoft,
+                accent: _tabIndex == 2 ? colors.warning : colors.income,
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
@@ -723,44 +986,67 @@ class _ColorDot extends StatelessWidget {
     required this.color,
     required this.selected,
     required this.onTap,
+    this.onLongPress,
   });
 
   final Color color;
   final bool selected;
   final VoidCallback onTap;
+  final void Function(Offset globalPosition)? onLongPress;
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
+    final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    final checkColor =
+        color.computeLuminance() >= 0.42 ? const Color(0xFF18181C) : Colors.white;
     return Semantics(
       button: true,
       selected: selected,
       label: '主题色',
       onTap: onTap,
       excludeSemantics: true,
-      child: Pressable(
-        onTap: onTap,
-        shape: const CircleBorder(),
-        pressedScale: .88,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          width: 38,
-          height: 38,
-          padding: const EdgeInsets.all(3),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: selected ? colors.text : Colors.transparent,
-              width: 2,
-            ),
-          ),
-          child: DecoratedBox(
+      child: GestureDetector(
+        onLongPressStart: onLongPress == null
+            ? null
+            : (details) => onLongPress!(details.globalPosition),
+        child: Pressable(
+          onTap: onTap,
+          shape: const CircleBorder(),
+          pressedScale: .88,
+          child: AnimatedContainer(
+            duration: motionDuration(Timings.micro, disableAnimations: disable),
+            curve: Curves2.out,
+            width: 38,
+            height: 38,
+            padding: const EdgeInsets.all(3),
             decoration: BoxDecoration(
-              color: color,
               shape: BoxShape.circle,
               border: Border.all(
-                color: Colors.white.withValues(alpha: .8),
-                width: 1.5,
+                color: selected ? color : Colors.transparent,
+                width: 2,
+              ),
+            ),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: color,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: selected ? .9 : .55),
+                  width: 1.5,
+                ),
+              ),
+              child: AnimatedScale(
+                duration: motionDuration(
+                  Timings.micro,
+                  disableAnimations: disable,
+                ),
+                curve: Curves2.out,
+                scale: selected ? 1.0 : 0.0,
+                child: Icon(
+                  Icons.check_rounded,
+                  size: 16,
+                  color: checkColor,
+                ),
               ),
             ),
           ),

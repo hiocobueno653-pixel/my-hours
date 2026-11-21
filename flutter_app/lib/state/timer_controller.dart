@@ -114,8 +114,8 @@ class TimerController extends Notifier<ActiveTimer?> {
 
   /// 和 Android 前台服务同步「是否在计时」。
   ///
-  /// 只传三个时刻的快照，不传秒数：通知里的秒由 SystemUI 的
-  /// Chronometer 自己走，不需要我们每秒唤醒进程。
+  /// 开始时传累计时长；原生服务每秒重发通知，保证 Chronometer 与
+  /// 流体云/焦点通知读取的短文本都持续走时。
   static const _channel = MethodChannel('com.myhours.app/timer');
 
   Future<void> _syncNotification(ActiveTimer? timer) async {
@@ -136,6 +136,9 @@ class TimerController extends Notifier<ActiveTimer?> {
     }
   }
 
+  /// App 重启或系统回收服务后重新挂上通知；没有计时则清掉残留服务。
+  Future<void> syncNotification() => _syncNotification(state);
+
   void _persist(ActiveTimer? timer) {
     try {
       unawaited(
@@ -148,22 +151,24 @@ class TimerController extends Notifier<ActiveTimer?> {
     unawaited(_syncNotification(timer));
   }
 
-  /// 开始或继续。
+  /// 开始新计时。已有计时时不会静默覆盖，而是继续原计时。
   void start({required String date, String? workId}) {
     final current = state;
-    if (current == null || current.date != date) {
-      _persist(
-        ActiveTimer(date: date, workId: workId, startedAt: DateTime.now()),
-      );
+    if (current != null) {
+      resume();
       return;
     }
-    if (current.running) return;
     _persist(
-      current.copyWith(
-        startedAt: DateTime.now(),
-        workId: workId ?? current.workId,
-      ),
+      ActiveTimer(date: date, workId: workId, startedAt: DateTime.now()),
     );
+  }
+
+  /// 继续暂停中的计时；保留开始时的归属日期。
+  void resume() {
+    final current = state;
+    if (current == null) return;
+    if (current.running) return;
+    _persist(current.copyWith(startedAt: DateTime.now()));
   }
 
   /// 暂停：把当前这轮时长并入累计。

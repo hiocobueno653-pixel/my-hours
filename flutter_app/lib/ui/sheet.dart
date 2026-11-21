@@ -215,7 +215,7 @@ class _SheetScaffoldState extends State<SheetScaffold> {
     final colors = context.colors;
     final media = MediaQuery.of(context);
     final resetDuration = motionDuration(
-      const Duration(milliseconds: 180),
+      Timings.micro,
       disableAnimations: MediaQuery.maybeDisableAnimationsOf(context) ?? false,
     );
     return PopScope(
@@ -245,6 +245,12 @@ class _SheetScaffoldState extends State<SheetScaffold> {
                 borderRadius: BorderRadius.vertical(
                   top: Radius.circular(Radii.alert),
                 ),
+                side: BorderSide(
+                  color: colors.isDark
+                      ? Colors.white.withValues(alpha: 0.12)
+                      : Colors.white.withValues(alpha: 0.9),
+                  width: 1,
+                ),
               ),
               shadows: context.floatingShadows,
             ),
@@ -263,10 +269,10 @@ class _SheetScaffoldState extends State<SheetScaffold> {
                       const SizedBox(height: Gaps.sm),
                       Container(
                         width: 36,
-                        height: 5,
+                        height: 4,
                         decoration: BoxDecoration(
-                          color: colors.divider,
-                          borderRadius: BorderRadius.circular(3),
+                          color: colors.outline.withValues(alpha: 0.4),
+                          borderRadius: BorderRadius.circular(2),
                         ),
                       ),
                       Padding(
@@ -296,10 +302,9 @@ class _SheetScaffoldState extends State<SheetScaffold> {
                               icon: Icons.close_rounded,
                               onTap: _requestClose,
                               tooltip: '关闭',
-                              iconSize: 19,
-                              size: 44,
-                              radius: 22,
-                              bright: true,
+                              iconSize: 18,
+                              size: 40,
+                              radius: Radii.pill,
                             ),
                           ],
                         ),
