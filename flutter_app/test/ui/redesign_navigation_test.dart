@@ -19,9 +19,7 @@ import 'package:my_hours/state/app_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
-  testWidgets('四标签导航可切换工时、账本、统计、我的；纯工时模式隐藏账本', (
-    tester,
-  ) async {
+  testWidgets('四标签导航可切换工时、账本、统计、我的；纯工时模式隐藏账本', (tester) async {
     tester.view.physicalSize = const Size(1170, 2532);
     tester.view.devicePixelRatio = 3.0;
     addTearDown(tester.view.reset);
@@ -103,16 +101,17 @@ void main() {
     await tester.pumpAndSettle();
 
     final hoursDock = find.byKey(const ValueKey('app-dock'));
-    expect(find.descendant(of: hoursDock, matching: find.text('账本')), findsNothing);
+    expect(
+      find.descendant(of: hoursDock, matching: find.text('账本')),
+      findsNothing,
+    );
     expect(
       find.descendant(of: hoursDock, matching: find.text('统计')),
       findsAtLeastNWidgets(1),
     );
   });
 
-  testWidgets('点选日历日期先更新行内摘要卡片，今天工作区展示生效时薪', (
-    tester,
-  ) async {
+  testWidgets('点选日历日期先更新行内摘要卡片，今天工作区展示生效时薪', (tester) async {
     tester.view.physicalSize = const Size(1170, 2532);
     tester.view.devicePixelRatio = 3.0;
     addTearDown(tester.view.reset);
@@ -150,7 +149,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('兼职家教 · ¥90/时'), findsOneWidget);
+    expect(
+      find.text('兼职家教 · ¥90/时'),
+      kHoursOnly ? findsNothing : findsOneWidget,
+    );
 
     await tester.tap(find.bySemanticsLabel('$targetDay日'));
     await tester.pumpAndSettle();
@@ -160,13 +162,14 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('数学辅导'), findsOneWidget);
-    expect(find.text('6 小时 · ¥540 · 兼职家教'), findsOneWidget);
+    expect(
+      find.text(kHoursOnly ? '6 小时 · 兼职家教' : '6 小时 · ¥540 · 兼职家教'),
+      findsOneWidget,
+    );
     container.read(appControllerProvider.notifier).flushPendingPersist();
   });
 
-  testWidgets('我的页推入二级子页具备 Scaffold 背景与 Material 祖先，无黑底黄线', (
-    tester,
-  ) async {
+  testWidgets('我的页推入二级子页具备 Scaffold 背景与 Material 祖先，无黑底黄线', (tester) async {
     tester.view.physicalSize = const Size(1170, 2532);
     tester.view.devicePixelRatio = 3.0;
     addTearDown(tester.view.reset);

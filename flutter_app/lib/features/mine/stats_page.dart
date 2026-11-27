@@ -10,8 +10,6 @@ import '../../core/theme_tokens.dart';
 import '../../data/constants.dart';
 import '../../data/dates.dart';
 import '../../data/models.dart';
-import '../../data/profiles.dart';
-import '../../data/records.dart';
 import '../../data/stats.dart';
 import '../../state/app_controller.dart';
 import '../../ui/pinned_header.dart';
@@ -47,60 +45,20 @@ class _StatsPageState extends ConsumerState<StatsPage> {
     setState(() => _year = (_year + delta).clamp(_minYear, _maxYear).toInt());
   }
 
-  List<WorkBreakdownRow> _yearWorkBreakdown(
-    List<WorkDayRecord> records,
-    List<WorkProfile> profiles,
-    int year,
-  ) {
-    final prefix = '$year-';
-    final map = <String, WorkBreakdownRow>{};
-    for (final record in records) {
-      if (!record.date.startsWith(prefix)) continue;
-      final pay = recordPay(record, profiles);
-      if (record.hours <= 0 && pay <= 0) continue;
-      final id = record.workId ?? defaultWorkId;
-      final name = workNameOf(record, profiles);
-      final existing = map[id];
-      map[id] = WorkBreakdownRow(
-        workId: id,
-        name: name,
-        hours: roundMoney((existing?.hours ?? 0) + record.hours),
-        pay: roundMoney((existing?.pay ?? 0) + pay),
-      );
-    }
-    final list = map.values.toList()..sort((a, b) => b.hours.compareTo(a.hours));
-    return list;
-  }
-
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final state = ref.watch(appControllerProvider);
-    final hoursTrend = getYearHoursTrend(
-      state.records,
-      _year,
-      state.workProfiles,
-    );
-    final ledgerTrend = getYearLedgerTrend(state.entries, _year);
-    final summary = getYearSummary(
-      state.records,
-      state.entries,
-      _year,
-      state.workProfiles,
-    );
-    final workBreakdown = _yearWorkBreakdown(
-      state.records,
-      state.workProfiles,
-      _year,
-    );
-    final totalWorkDays = hoursTrend.fold<int>(
-      0,
-      (sum, point) => sum + point.workDays,
-    );
+    final yearStats = ref.watch(yearStatsProvider(_year));
+    final entries = ref.watch(entriesProvider);
+    final hoursTrend = yearStats.hoursTrend;
+    final ledgerTrend = yearStats.ledgerTrend;
+    final summary = yearStats.summary;
+    final workBreakdown = yearStats.workBreakdown;
+    final totalWorkDays = yearStats.totalWorkDays;
     final selectedMonth = ref.watch(selectedMonthProvider);
     final categoryMonth =
         '$_year-${(parseMonthKey(selectedMonth)?.month ?? DateTime.now().month).toString().padLeft(2, '0')}';
-    final allCategories = getMonthCategoryTotals(state.entries, categoryMonth);
+    final allCategories = getMonthCategoryTotals(entries, categoryMonth);
     final categories = allCategories
         .where((row) => row.type == _categoryType)
         .toList();
@@ -149,181 +107,163 @@ class _StatsPageState extends ConsumerState<StatsPage> {
                         clipper: ShapeBorderClipper(
                           shape: Radii.shape(Radii.hero),
                         ),
-                        child: Stack(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            Positioned(
-                              top: -48,
-                              right: -28,
-                              width: 190,
-                              height: 190,
-                              child: IgnorePointer(
-                                child: DecoratedBox(
-                                  decoration: BoxDecoration(
-                                    gradient: RadialGradient(
-                                      colors: [
-                                        colors.primary.withValues(alpha: 0.30),
-                                        colors.primary.withValues(alpha: 0.0),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
                             Padding(
                               padding: const EdgeInsets.fromLTRB(
                                 18,
                                 16,
                                 18,
-                                16,
+                                14,
                               ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Expanded(
-                                        child: Column(
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          '全年${context.unit.quantity}',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w500,
+                                            color: colors.text2,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Row(
                                           crossAxisAlignment:
-                                              CrossAxisAlignment.start,
+                                              CrossAxisAlignment.baseline,
+                                          textBaseline: TextBaseline.alphabetic,
                                           children: [
-                                            Text(
-                                              '全年${context.unit.quantity}',
-                                              style: const TextStyle(
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.w500,
-                                                color: Color(0xFFA8B5CE),
+                                            Flexible(
+                                              child: FittedBox(
+                                                fit: BoxFit.scaleDown,
+                                                alignment: Alignment.centerLeft,
+                                                child: AnimatedNumericText(
+                                                  value: summary.totalHours,
+                                                  formatter: (v) =>
+                                                      formatHoursValue(
+                                                        v.toDouble(),
+                                                      ),
+                                                  style: TextStyle(
+                                                    fontSize: 42,
+                                                    height: 0.98,
+                                                    fontWeight: FontWeight.w600,
+                                                    letterSpacing: -1.5,
+                                                    color: colors.text,
+                                                  ),
+                                                ),
                                               ),
                                             ),
-                                            const SizedBox(height: 4),
-                                            Row(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.baseline,
-                                              textBaseline:
-                                                  TextBaseline.alphabetic,
-                                              children: [
-                                                Flexible(
-                                                  child: FittedBox(
-                                                    fit: BoxFit.scaleDown,
-                                                    alignment:
-                                                        Alignment.centerLeft,
-                                                    child: AnimatedNumericText(
-                                                      value: summary.totalHours,
-                                                      formatter: (v) =>
-                                                          formatHoursValue(
-                                                            v.toDouble(),
-                                                          ),
-                                                      style: const TextStyle(
-                                                        fontSize: 44,
-                                                        height: 0.98,
-                                                        fontWeight:
-                                                            FontWeight.w700,
-                                                        letterSpacing: -1.6,
-                                                        color: Color(
-                                                          0xFFF8FAFC,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
-                                                const SizedBox(width: 5),
-                                                Text(
-                                                  context.unit.short,
-                                                  style: const TextStyle(
-                                                    fontSize: 13.5,
-                                                    fontWeight: FontWeight.w500,
-                                                    color: Color(0xFFA8B5CE),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                            const SizedBox(height: 6),
+                                            const SizedBox(width: 5),
                                             Text(
-                                              '出勤 $totalWorkDays 天'
-                                              '${!kHoursOnly && summary.totalPay > 0 ? ' · 工资 ${formatAmount(summary.totalPay, withSymbol: true)}' : ''}',
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: const TextStyle(
-                                                fontSize: 12,
+                                              context.unit.short,
+                                              style: TextStyle(
+                                                fontSize: 13.5,
                                                 fontWeight: FontWeight.w500,
-                                                color: Color(0xFF94A3B8),
-                                                fontFeatures: tabularFigures,
+                                                color: colors.text3,
                                               ),
                                             ),
                                           ],
                                         ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      _YearActivityMatrix(
-                                        values: [
-                                          for (final point in hoursTrend)
-                                            point.hours,
-                                        ],
-                                        year: _year,
-                                      ),
-                                    ],
-                                  ),
-                                  if (!kHoursOnly) ...[
-                                    const SizedBox(height: 14),
-                                    Divider(
-                                      height: 1,
-                                      thickness: 0.7,
-                                      color: Colors.white.withValues(
-                                        alpha: 0.11,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 12),
-                                    Row(
-                                      children: [
-                                        _YearMetric(
-                                          label: '全年收入',
-                                          numericValue: summary.totalIncome,
-                                          formatter: (v) => formatAmount(
-                                            v.toDouble(),
-                                            withSymbol: true,
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          '出勤 $totalWorkDays 天'
+                                          '${!kHoursOnly && summary.totalPay > 0 ? ' · 工资 ${formatAmount(summary.totalPay, withSymbol: true)}' : ''}',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w500,
+                                            color: colors.text2,
+                                            fontFeatures: tabularFigures,
                                           ),
-                                          unit: '',
-                                          color: const Color(0xFF34D399),
-                                          labelColor: const Color(0xFF94A3B8),
-                                          compact: true,
-                                        ),
-                                        _YearMetric(
-                                          label: '全年支出',
-                                          numericValue: summary.totalExpense,
-                                          formatter: (v) => formatAmount(
-                                            v.toDouble(),
-                                            withSymbol: true,
-                                          ),
-                                          unit: '',
-                                          color: const Color(0xFFF87171),
-                                          labelColor: const Color(0xFF94A3B8),
-                                          compact: true,
-                                        ),
-                                        _YearMetric(
-                                          label: '年度净结余',
-                                          numericValue:
-                                              summary.totalIncome -
-                                              summary.totalExpense,
-                                          formatter: (v) => formatAmount(
-                                            v.toDouble(),
-                                            withSymbol: true,
-                                          ),
-                                          unit: '',
-                                          color:
-                                              summary.totalIncome >=
-                                                  summary.totalExpense
-                                              ? const Color(0xFFF8FAFC)
-                                              : const Color(0xFFF87171),
-                                          labelColor: const Color(0xFF94A3B8),
-                                          compact: true,
                                         ),
                                       ],
                                     ),
-                                  ],
+                                  ),
+                                  const SizedBox(width: 12),
+                                  _YearActivityMatrix(
+                                    values: [
+                                      for (final point in hoursTrend)
+                                        point.hours,
+                                    ],
+                                    year: _year,
+                                  ),
                                 ],
                               ),
                             ),
+                            if (!kHoursOnly) ...[
+                              Divider(
+                                height: 1,
+                                thickness: 0.7,
+                                color: colors.divider,
+                              ),
+                              ColoredBox(
+                                color: colors.heroWell,
+                                child: Padding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    18,
+                                    12,
+                                    18,
+                                    13,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      _YearMetric(
+                                        label: '全年收入',
+                                        dotColor: colors.income,
+                                        numericValue: summary.totalIncome,
+                                        formatter: (v) => formatAmount(
+                                          v.toDouble(),
+                                          withSymbol: true,
+                                        ),
+                                        unit: '',
+                                        color: colors.text,
+                                        labelColor: colors.text3,
+                                        compact: true,
+                                      ),
+                                      _YearMetric(
+                                        label: '全年支出',
+                                        dotColor: colors.expense,
+                                        numericValue: summary.totalExpense,
+                                        formatter: (v) => formatAmount(
+                                          v.toDouble(),
+                                          withSymbol: true,
+                                        ),
+                                        unit: '',
+                                        color: colors.text,
+                                        labelColor: colors.text3,
+                                        compact: true,
+                                      ),
+                                      _YearMetric(
+                                        label: '年度净结余',
+                                        dotColor: colors.primary,
+                                        numericValue:
+                                            summary.totalIncome -
+                                            summary.totalExpense,
+                                        formatter: (v) => formatAmount(
+                                          v.toDouble(),
+                                          withSymbol: true,
+                                        ),
+                                        unit: '',
+                                        color:
+                                            summary.totalIncome >=
+                                                summary.totalExpense
+                                            ? colors.text
+                                            : colors.expense,
+                                        labelColor: colors.text3,
+                                        compact: true,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),
@@ -375,12 +315,12 @@ class _StatsPageState extends ConsumerState<StatsPage> {
                           children: [
                             Row(
                               children: [
-                              Icon(
-                                Icons.pie_chart_outline_rounded,
-                                color: colors.chart[1],
-                                size: 16,
+                                Icon(
+                                  Icons.pie_chart_outline_rounded,
+                                  color: colors.chart[1],
+                                  size: 16,
                                 ),
-                              const SizedBox(width: 6),
+                                const SizedBox(width: 6),
                                 Text(
                                   '按工作构成（$_year 年）',
                                   style: TextStyle(
@@ -392,8 +332,28 @@ class _StatsPageState extends ConsumerState<StatsPage> {
                               ],
                             ),
                             const SizedBox(height: Gaps.md),
+                            _StackedShareBar(
+                              values: [
+                                for (final row in workBreakdown) row.hours,
+                              ],
+                              colors: [
+                                for (var i = 0; i < workBreakdown.length; i++)
+                                  colors.chart[i % colors.chart.length],
+                              ],
+                            ),
+                            const SizedBox(height: 12),
                             for (var i = 0; i < workBreakdown.length; i++) ...[
-                              if (i > 0) const SizedBox(height: 10),
+                              if (i > 0)
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 8,
+                                  ),
+                                  child: Divider(
+                                    height: 1,
+                                    thickness: 0.6,
+                                    color: colors.divider,
+                                  ),
+                                ),
                               _WorkBreakdownBar(
                                 row: workBreakdown[i],
                                 totalHours: summary.totalHours,
@@ -413,12 +373,12 @@ class _StatsPageState extends ConsumerState<StatsPage> {
                           children: [
                             Row(
                               children: [
-                              Icon(
-                                Icons.bar_chart_rounded,
+                                Icon(
+                                  Icons.bar_chart_rounded,
                                   color: colors.income,
-                                size: 16,
+                                  size: 16,
                                 ),
-                              const SizedBox(width: 6),
+                                const SizedBox(width: 6),
                                 Text(
                                   '每月收支对比',
                                   style: TextStyle(
@@ -469,14 +429,14 @@ class _StatsPageState extends ConsumerState<StatsPage> {
                           children: [
                             Row(
                               children: [
-                              Icon(
-                                Icons.donut_large_rounded,
+                                Icon(
+                                  Icons.donut_large_rounded,
                                   color: _categoryType == LedgerType.expense
                                       ? colors.expense
                                       : colors.income,
-                                size: 16,
+                                  size: 16,
                                 ),
-                              const SizedBox(width: 6),
+                                const SizedBox(width: 6),
                                 Expanded(
                                   child: Text(
                                     '${formatMonthLabel(categoryMonth)} '
@@ -564,8 +524,8 @@ class _StatsPageState extends ConsumerState<StatsPage> {
                                                       width: 8,
                                                       height: 8,
                                                       decoration: BoxDecoration(
-                                                        color: colors
-                                                            .chart[i %
+                                                        color:
+                                                            colors.chart[i %
                                                                 colors
                                                                     .chart
                                                                     .length],
@@ -627,9 +587,7 @@ class _StatsPageState extends ConsumerState<StatsPage> {
               ? PinnedSubHeader(title: '年度统计', onBack: widget.onBack!)
               : PinnedHeader(
                   title: '统计',
-                  actions: [
-                    _YearSwitchPill(year: _year, onShift: _shiftYear),
-                  ],
+                  actions: [_YearSwitchPill(year: _year, onShift: _shiftYear)],
                 ),
         ),
       ],
@@ -657,47 +615,100 @@ class _WorkBreakdownBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final ratio =
-        totalHours <= 0 ? 0.0 : (row.hours / totalHours).clamp(0.0, 1.0);
+    final ratio = totalHours <= 0
+        ? 0.0
+        : (row.hours / totalHours).clamp(0.0, 1.0);
     final percent = (ratio * 100).round();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Row(
       children: [
-        Row(
-          children: [
-            Container(
-              width: 7,
-              height: 7,
-              margin: const EdgeInsets.only(right: 7),
-              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        Container(
+          width: 8,
+          height: 8,
+          margin: const EdgeInsets.only(right: 8),
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        Expanded(
+          child: Text(
+            row.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w600,
+              color: colors.text,
             ),
-            Expanded(
-              child: Text(
-                row.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: colors.text,
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6.5, vertical: 2),
+          decoration: ShapeDecoration(
+            color: colors.block,
+            shape: Radii.shape(6),
+          ),
+          child: Text(
+            '$percent%',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: colors.text2,
+              fontFeatures: tabularFigures,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          '${formatHoursValue(row.hours)}$unitName'
+          '${!kHoursOnly && row.pay > 0 ? ' · ${formatAmount(row.pay, withSymbol: true)}' : ''}',
+          style: TextStyle(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w600,
+            color: colors.text,
+            fontFeatures: tabularFigures,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 整段工作构成比例条：直观呈现年度各工作的工时占比。
+class _StackedShareBar extends StatelessWidget {
+  const _StackedShareBar({required this.values, required this.colors});
+
+  final List<double> values;
+  final List<Color> colors;
+
+  @override
+  Widget build(BuildContext context) {
+    final total = values.fold<double>(0, (sum, value) => sum + value);
+    if (total <= 0) {
+      return Container(
+        height: 7,
+        decoration: BoxDecoration(
+          color: context.colors.block,
+          borderRadius: BorderRadius.circular(999),
+        ),
+      );
+    }
+    return SizedBox(
+      height: 7,
+      child: Row(
+        children: [
+          for (var i = 0; i < values.length; i++) ...[
+            if (i > 0) const SizedBox(width: 3),
+            if (values[i] > 0)
+              Expanded(
+                flex: math.max(1, (values[i] / total * 1000).round()),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: colors[i % colors.length],
+                    borderRadius: BorderRadius.circular(999),
+                  ),
                 ),
               ),
-            ),
-            Text(
-              '$percent% · ${formatHoursValue(row.hours)}$unitName'
-              '${!kHoursOnly && row.pay > 0 ? ' · ${formatAmount(row.pay, withSymbol: true)}' : ''}',
-              style: TextStyle(
-                fontSize: 12.5,
-                fontWeight: FontWeight.w600,
-                color: colors.text2,
-                fontFeatures: tabularFigures,
-              ),
-            ),
           ],
-        ),
-        const SizedBox(height: 5),
-        ProgressBar(ratio: ratio, color: color, height: 4.5),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -720,7 +731,8 @@ class _CategoryTypeToggle extends StatelessWidget {
         child: AnimatedContainer(
           duration: motionDuration(
             Timings.fast,
-            disableAnimations: MediaQuery.maybeDisableAnimationsOf(context) ?? false,
+            disableAnimations:
+                MediaQuery.maybeDisableAnimationsOf(context) ?? false,
           ),
           curve: Curves2.out,
           padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
@@ -742,10 +754,7 @@ class _CategoryTypeToggle extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.all(3),
-      decoration: ShapeDecoration(
-        color: colors.block,
-        shape: Radii.pillShape,
-      ),
+      decoration: ShapeDecoration(color: colors.block, shape: Radii.pillShape),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -829,6 +838,7 @@ class _YearMetric extends StatelessWidget {
     required this.formatter,
     required this.unit,
     required this.color,
+    this.dotColor,
     this.labelColor,
     this.compact = false,
   });
@@ -838,6 +848,7 @@ class _YearMetric extends StatelessWidget {
   final String Function(num value) formatter;
   final String unit;
   final Color color;
+  final Color? dotColor;
   final Color? labelColor;
   final bool compact;
 
@@ -848,12 +859,28 @@ class _YearMetric extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11.5,
-              color: labelColor ?? colors.text3,
-            ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (dotColor != null) ...[
+                Container(
+                  width: 5,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: dotColor,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 5),
+              ],
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11.5,
+                  color: labelColor ?? colors.text3,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 3),
           Row(
@@ -902,7 +929,6 @@ class _YearActivityMatrix extends StatelessWidget {
     for (final v in values) {
       if (v > maxVal) maxVal = v;
     }
-    final barAccent = Color.lerp(colors.primary, Colors.white, 0.36)!;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
@@ -912,7 +938,7 @@ class _YearActivityMatrix extends StatelessWidget {
             fontSize: 10,
             fontWeight: FontWeight.w600,
             letterSpacing: 1.0,
-            color: const Color(0xFF94A3B8),
+            color: colors.text3,
             fontFeatures: tabularFigures,
           ),
         ),
@@ -936,21 +962,13 @@ class _YearActivityMatrix extends StatelessWidget {
                     height: h,
                     decoration: BoxDecoration(
                       color: value <= 0
-                          ? Colors.white.withValues(alpha: 0.14)
+                          ? colors.block
                           : Color.lerp(
-                              barAccent.withValues(alpha: 0.55),
-                              barAccent,
+                              colors.primary.withValues(alpha: 0.38),
+                              colors.primary,
                               ratio,
                             ),
                       borderRadius: BorderRadius.circular(999),
-                      boxShadow: value > 0 && ratio > 0.7
-                          ? [
-                              BoxShadow(
-                                color: barAccent.withValues(alpha: 0.45),
-                                blurRadius: 6,
-                              ),
-                            ]
-                          : null,
                     ),
                   );
                 }(),
@@ -962,7 +980,6 @@ class _YearActivityMatrix extends StatelessWidget {
     );
   }
 }
-
 
 class _Legend extends StatelessWidget {
   const _Legend({required this.color, required this.label});

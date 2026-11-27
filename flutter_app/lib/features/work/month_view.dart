@@ -123,8 +123,12 @@ class _MonthViewState extends ConsumerState<MonthView> {
       final listenable = settings;
       return ListenableBuilder(
         listenable: listenable,
-        builder: (context, _) =>
-            _buildContent(context, colors, listenable, listenable.dashboardCards),
+        builder: (context, _) => _buildContent(
+          context,
+          colors,
+          listenable,
+          listenable.dashboardCards,
+        ),
       );
     }
     return _buildContent(context, colors, null, DashboardCardIds.defaults);
@@ -137,11 +141,12 @@ class _MonthViewState extends ConsumerState<MonthView> {
     List<String> dashboardCards,
   ) {
     final records = ref.watch(recordsProvider);
+    final allRecordsByDate = ref.watch(recordsByDateProvider);
     final entries = ref.watch(entriesProvider);
     final profiles = ref.watch(workProfilesProvider);
     final month = ref.watch(selectedMonthProvider);
     final today = todayISO();
-    final todayRecord = getRecordByDate(records, today);
+    final todayRecord = allRecordsByDate[today];
     final summary = ref.watch(currentMonthWorkSummaryProvider);
     final monthWork = ref.watch(currentMonthWorkViewDataProvider);
     final monthLedger = ref.watch(currentMonthLedgerViewDataProvider);
@@ -175,12 +180,7 @@ class _MonthViewState extends ConsumerState<MonthView> {
     final underpaidDays = monthWork.underpaidDays;
     final recordsByDate = monthWork.recordsByDate;
     final entriesByDate = monthLedger.entriesByDate;
-    final activeDate = _resolveSelectedDate(
-      month,
-      today,
-      dates,
-      recordsByDate,
-    );
+    final activeDate = _resolveSelectedDate(month, today, dates, recordsByDate);
     final activeRecord = recordsByDate[activeDate];
     final activeEntries = entriesByDate[activeDate] ?? const <LedgerEntry>[];
 
@@ -221,33 +221,38 @@ class _MonthViewState extends ConsumerState<MonthView> {
                     else
                       RepaintBoundary(
                         child: WorkBentoHeader(
-                      showToday: month == currentMonthKey(),
-                      date: today,
-                      record: todayRecord,
-                      profiles: profiles,
-                      income: todayIncome,
-                      expense: todayExpense,
-                      entryCount: todayEntries.length,
-                      summary: summary,
-                      ledgerSummary: ledgerSummary,
-                      cards: dashboardCards,
-                      todayEntries: todayEntries,
-                      monthPay: monthPay,
-                      settlement: settlement,
-                      workdays: workdays,
-                      onOpenLedger: kHoursOnly
-                          ? null
-                          : () => showLedgerEditor(context, presetDate: today),
-                      onOpenToday: () => _openDay(today),
-                      onQuickAmount: _quickSaveToday,
-                      onOpenMonthDetail: () => showMonthDetail(context, month),
-                      onOpenWage: () => showWagePanel(context, month),
-                      onOpenWorkManager: () => showWorkManager(context),
-                      deltaText: deltaText,
-                      deltaColor: monthDelta != null && monthDelta.delta >= 0
-                          ? colors.income
-                          : colors.expense,
-                    ),
+                          showToday: month == currentMonthKey(),
+                          date: today,
+                          record: todayRecord,
+                          profiles: profiles,
+                          income: todayIncome,
+                          expense: todayExpense,
+                          entryCount: todayEntries.length,
+                          summary: summary,
+                          ledgerSummary: ledgerSummary,
+                          cards: dashboardCards,
+                          todayEntries: todayEntries,
+                          monthPay: monthPay,
+                          settlement: settlement,
+                          workdays: workdays,
+                          onOpenLedger: kHoursOnly
+                              ? null
+                              : () => showLedgerEditor(
+                                  context,
+                                  presetDate: today,
+                                ),
+                          onOpenToday: () => _openDay(today),
+                          onQuickAmount: _quickSaveToday,
+                          onOpenMonthDetail: () =>
+                              showMonthDetail(context, month),
+                          onOpenWage: () => showWagePanel(context, month),
+                          onOpenWorkManager: () => showWorkManager(context),
+                          deltaText: deltaText,
+                          deltaColor:
+                              monthDelta != null && monthDelta.delta >= 0
+                              ? colors.income
+                              : colors.expense,
+                        ),
                       ),
                     if (!kHoursOnly && underpaidDays > 0) ...[
                       const SizedBox(height: Gaps.cardGap),
@@ -343,94 +348,94 @@ class _MonthViewState extends ConsumerState<MonthView> {
                   ),
                 )
               else ...[
-              MonthSwitchPill(
-                month: month,
-                onChanged: _changeMonth,
-                onPick: () async {
-                  final picked = await showMonthPicker(
-                    context,
-                    initialMonth: month,
-                  );
-                  if (picked != null && context.mounted) {
-                    _changeMonth(picked);
-                  }
-                },
-              ),
-              GlassMenuButton(
-                tooltip: '更多操作',
-                items: [
-                  GlassMenuAction(
-                    label: '导出本月数据',
-                    icon: Icons.download_rounded,
-                    onSelected: () => showExportSheet(
+                MonthSwitchPill(
+                  month: month,
+                  onChanged: _changeMonth,
+                  onPick: () async {
+                    final picked = await showMonthPicker(
                       context,
-                      month: month,
-                      records: records,
-                      entries: entries,
-                      includeLedger: !kHoursOnly,
-                    ),
-                  ),
-                  if (!kHoursOnly)
+                      initialMonth: month,
+                    );
+                    if (picked != null && context.mounted) {
+                      _changeMonth(picked);
+                    }
+                  },
+                ),
+                GlassMenuButton(
+                  tooltip: '更多操作',
+                  items: [
                     GlassMenuAction(
-                      label: '快速记一笔账',
-                      icon: Icons.add_card_rounded,
-                      onSelected: () =>
-                          showLedgerEditor(context, presetDate: activeDate),
+                      label: '导出本月数据',
+                      icon: Icons.download_rounded,
+                      onSelected: () => showExportSheet(
+                        context,
+                        month: month,
+                        records: records,
+                        entries: entries,
+                        includeLedger: !kHoursOnly,
+                      ),
                     ),
-                  GlassMenuAction(
-                    label: '工作与${context.unit.rateName}',
-                    icon: Icons.work_outline_rounded,
-                    dividerBefore: true,
-                    sectionTitle: '快捷管理',
-                    onSelected: () => showWorkManager(context),
-                  ),
-                  if (!kHoursOnly) ...[
+                    if (!kHoursOnly)
+                      GlassMenuAction(
+                        label: '快速记一笔账',
+                        icon: Icons.add_card_rounded,
+                        onSelected: () =>
+                            showLedgerEditor(context, presetDate: activeDate),
+                      ),
                     GlassMenuAction(
-                      label: '工资结算明细',
-                      icon: Icons.payments_outlined,
-                      onSelected: () => showWagePanel(context, month),
-                    ),
-                    GlassMenuAction(
-                      label: '预算与月目标',
-                      icon: Icons.track_changes_rounded,
-                      onSelected: () => showBudgetPanel(context),
-                    ),
-                  ],
-                  if (settings != null)
-                    GlassMenuAction(
-                      label: '首页指标卡',
-                      subtitle: '已启用 ${dashboardCards.length} 项',
-                      icon: Icons.dashboard_customize_outlined,
+                      label: '工作与${context.unit.rateName}',
+                      icon: Icons.work_outline_rounded,
                       dividerBefore: true,
-                      children: [
-                        GlassMenuAction(
-                          label: '编辑顺序与卡片',
-                          icon: Icons.drag_indicator_rounded,
-                          onSelected: () =>
-                              setState(() => _editingLayout = true),
-                        ),
-                        for (final cardId in DashboardCardIds.all)
-                          if (!kHoursOnly ||
-                              (cardId != DashboardCardIds.ledgerBalance &&
-                                  cardId != DashboardCardIds.todayLedger))
-                            GlassMenuAction(
-                              label: _dashboardCardLabel(context, cardId),
-                              selected: dashboardCards.contains(cardId),
-                              onSelected: () {
-                                final next = List<String>.of(dashboardCards);
-                                if (next.contains(cardId)) {
-                                  if (next.length > 1) next.remove(cardId);
-                                } else {
-                                  next.add(cardId);
-                                }
-                                unawaited(settings.setDashboardCards(next));
-                                if (mounted) setState(() {});
-                              },
-                            ),
-                      ],
+                      sectionTitle: '快捷管理',
+                      onSelected: () => showWorkManager(context),
                     ),
-                ],
-              ),
+                    if (!kHoursOnly) ...[
+                      GlassMenuAction(
+                        label: '工资结算明细',
+                        icon: Icons.payments_outlined,
+                        onSelected: () => showWagePanel(context, month),
+                      ),
+                      GlassMenuAction(
+                        label: '预算与月目标',
+                        icon: Icons.track_changes_rounded,
+                        onSelected: () => showBudgetPanel(context),
+                      ),
+                    ],
+                    if (settings != null)
+                      GlassMenuAction(
+                        label: '首页指标卡',
+                        subtitle: '已启用 ${dashboardCards.length} 项',
+                        icon: Icons.dashboard_customize_outlined,
+                        dividerBefore: true,
+                        children: [
+                          GlassMenuAction(
+                            label: '编辑顺序与卡片',
+                            icon: Icons.drag_indicator_rounded,
+                            onSelected: () =>
+                                setState(() => _editingLayout = true),
+                          ),
+                          for (final cardId in DashboardCardIds.all)
+                            if (!kHoursOnly ||
+                                (cardId != DashboardCardIds.ledgerBalance &&
+                                    cardId != DashboardCardIds.todayLedger))
+                              GlassMenuAction(
+                                label: _dashboardCardLabel(context, cardId),
+                                selected: dashboardCards.contains(cardId),
+                                onSelected: () {
+                                  final next = List<String>.of(dashboardCards);
+                                  if (next.contains(cardId)) {
+                                    if (next.length > 1) next.remove(cardId);
+                                  } else {
+                                    next.add(cardId);
+                                  }
+                                  unawaited(settings.setDashboardCards(next));
+                                  if (mounted) setState(() {});
+                                },
+                              ),
+                        ],
+                      ),
+                  ],
+                ),
               ],
             ],
           ),
@@ -445,23 +450,25 @@ class _MonthViewState extends ConsumerState<MonthView> {
     Offset globalPosition,
   ) {
     final current = settings.measureUnit;
-    unawaited(showDropletGlassMenu(
-      context,
-      anchorOffset: globalPosition,
-      preferRightAlign: false,
-      items: [
-        for (var i = 0; i < MeasureUnit.presets.length; i++)
-          GlassMenuAction(
-            label:
-                '${MeasureUnit.presets[i].quantity}（${MeasureUnit.presets[i].name}）',
-            sectionTitle: i == 0 ? '切换计量单位' : null,
-            selected: MeasureUnit.presets[i].id == current.id,
-            onSelected: () {
-              unawaited(settings.setMeasureUnit(MeasureUnit.presets[i]));
-            },
-          ),
-      ],
-    ));
+    unawaited(
+      showDropletGlassMenu(
+        context,
+        anchorOffset: globalPosition,
+        preferRightAlign: false,
+        items: [
+          for (var i = 0; i < MeasureUnit.presets.length; i++)
+            GlassMenuAction(
+              label:
+                  '${MeasureUnit.presets[i].quantity}（${MeasureUnit.presets[i].name}）',
+              sectionTitle: i == 0 ? '切换计量单位' : null,
+              selected: MeasureUnit.presets[i].id == current.id,
+              onSelected: () {
+                unawaited(settings.setMeasureUnit(MeasureUnit.presets[i]));
+              },
+            ),
+        ],
+      ),
+    );
   }
 
   String _dashboardCardLabel(BuildContext context, String cardId) {
@@ -692,7 +699,9 @@ class _SelectedDayCard extends StatelessWidget {
 
     var netLedger = 0.0;
     for (final entry in entries) {
-      netLedger += entry.type == LedgerType.income ? entry.amount : -entry.amount;
+      netLedger += entry.type == LedgerType.income
+          ? entry.amount
+          : -entry.amount;
     }
 
     return GlassCard(
@@ -714,7 +723,10 @@ class _SelectedDayCard extends StatelessWidget {
               if (isToday) ...[
                 const SizedBox(width: 6),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
                   decoration: ShapeDecoration(
                     color: colors.primaryContainer,
                     shape: Radii.shape(6),
@@ -732,7 +744,10 @@ class _SelectedDayCard extends StatelessWidget {
               if (settled) ...[
                 const SizedBox(width: 6),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
                   decoration: ShapeDecoration(
                     color: colors.incomeSoft,
                     shape: Radii.shape(6),
@@ -885,8 +900,7 @@ class _InlineAction extends StatelessWidget {
   }
 }
 
-const int _calendarTotalMonths =
-    (maxSupportedYear - minSupportedYear + 1) * 12;
+const int _calendarTotalMonths = (maxSupportedYear - minSupportedYear + 1) * 12;
 
 int _monthKeyToIndex(String monthKey) {
   final parsed = parseMonthKey(monthKey);
@@ -913,10 +927,10 @@ class _CalendarPageScrollPhysics extends PageScrollPhysics {
 
   @override
   SpringDescription get spring => SpringDescription.withDampingRatio(
-        mass: 0.72,
-        stiffness: 270,
-        ratio: 1.04,
-      );
+    mass: 0.72,
+    stiffness: 270,
+    ratio: 1.04,
+  );
 
   @override
   double get minFlingVelocity => 140;
@@ -955,6 +969,9 @@ class _SwipeableCalendarState extends State<_SwipeableCalendar> {
   late final PageController _pageController = PageController(
     initialPage: _currentIndex,
   );
+  late final ValueNotifier<double> _rowCountNotifier = ValueNotifier<double>(
+    _weekRowCount(_currentIndex).toDouble(),
+  );
   int? _programmaticTarget;
   int _syncToken = 0;
 
@@ -967,6 +984,7 @@ class _SwipeableCalendarState extends State<_SwipeableCalendar> {
     super.initState();
     _rebuildRecordIndex();
     _rebuildEntryIndex();
+    _pageController.addListener(_syncRowCount);
   }
 
   @override
@@ -991,8 +1009,29 @@ class _SwipeableCalendarState extends State<_SwipeableCalendar> {
 
   @override
   void dispose() {
+    _pageController.removeListener(_syncRowCount);
+    _rowCountNotifier.dispose();
     _pageController.dispose();
     super.dispose();
+  }
+
+  void _syncRowCount() {
+    if (!_pageController.hasClients ||
+        !_pageController.position.hasContentDimensions) {
+      return;
+    }
+    final page = _pageController.page ?? _currentIndex.toDouble();
+    final left = page.floor().clamp(0, _calendarTotalMonths - 1);
+    final right = page.ceil().clamp(0, _calendarTotalMonths - 1);
+    final fraction = (page - left).clamp(0.0, 1.0);
+    final nextRows = lerpDouble(
+      _weekRowCount(left).toDouble(),
+      _weekRowCount(right).toDouble(),
+      fraction,
+    )!;
+    if ((nextRows - _rowCountNotifier.value).abs() > 0.001) {
+      _rowCountNotifier.value = nextRows;
+    }
   }
 
   void _rebuildRecordIndex() {
@@ -1027,11 +1066,6 @@ class _SwipeableCalendarState extends State<_SwipeableCalendar> {
     return ((leadingBlanks + dates.length) / 7).ceil().clamp(4, 6);
   }
 
-  double _gridHeightForIndex(int index, double cellExtent, double rowGap) {
-    final rows = _weekRowCount(index);
-    return rows * cellExtent + (rows - 1) * rowGap;
-  }
-
   void _syncExternalPage(int target) {
     _currentIndex = target;
     if (!_pageController.hasClients) return;
@@ -1046,11 +1080,7 @@ class _SwipeableCalendarState extends State<_SwipeableCalendar> {
     _programmaticTarget = target;
     unawaited(
       _pageController
-          .animateToPage(
-            target,
-            duration: const Duration(milliseconds: 280),
-            curve: Curves2.out,
-          )
+          .animateToPage(target, duration: Timings.slow, curve: Curves2.out)
           .whenComplete(() {
             if (mounted && token == _syncToken) {
               _programmaticTarget = null;
@@ -1078,8 +1108,11 @@ class _SwipeableCalendarState extends State<_SwipeableCalendar> {
     final textScale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.3);
     final cellExtent = 44.0 * textScale;
     const rowGap = 4.0;
+    final viewportHeight = 6 * cellExtent + 5 * rowGap;
     final currentRecords = _recordsByMonth[widget.month] ?? const {};
-    final recordedCount = currentRecords.values.where((r) => r.hours > 0).length;
+    final recordedCount = currentRecords.values
+        .where((r) => r.hours > 0)
+        .length;
 
     return GlassCard(
       radius: Radii.hero,
@@ -1111,7 +1144,10 @@ class _SwipeableCalendarState extends State<_SwipeableCalendar> {
                 onTap: widget.onOpenDetail,
                 shape: Radii.shape(8),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 5,
+                    vertical: 3,
+                  ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -1157,29 +1193,21 @@ class _SwipeableCalendarState extends State<_SwipeableCalendar> {
           const SizedBox(height: 6),
           Divider(height: 1, thickness: 0.6, color: colors.divider),
           const SizedBox(height: 7),
-          ListenableBuilder(
-            listenable: _pageController,
-            builder: (context, child) {
-              double height;
-              if (_pageController.hasClients &&
-                  _pageController.position.hasContentDimensions) {
-                final page = _pageController.page ?? _currentIndex.toDouble();
-                final left = page.floor().clamp(0, _calendarTotalMonths - 1);
-                final right = page.ceil().clamp(0, _calendarTotalMonths - 1);
-                final fraction = (page - left).clamp(0.0, 1.0);
-                height = lerpDouble(
-                  _gridHeightForIndex(left, cellExtent, rowGap),
-                  _gridHeightForIndex(right, cellExtent, rowGap),
-                  fraction,
-                )!;
-              } else {
-                height = _gridHeightForIndex(
-                  _currentIndex,
-                  cellExtent,
-                  rowGap,
-                );
-              }
-              return SizedBox(height: height, child: child);
+          ValueListenableBuilder<double>(
+            valueListenable: _rowCountNotifier,
+            builder: (context, rows, child) {
+              final height = rows * cellExtent + (rows - 1) * rowGap;
+              return SizedBox(
+                height: height,
+                child: ClipRect(
+                  child: OverflowBox(
+                    alignment: Alignment.topCenter,
+                    minHeight: viewportHeight,
+                    maxHeight: viewportHeight,
+                    child: child,
+                  ),
+                ),
+              );
             },
             child: PageView.builder(
               controller: _pageController,
@@ -1193,39 +1221,41 @@ class _SwipeableCalendarState extends State<_SwipeableCalendar> {
                 final dates = _datesFor(monthKey);
                 final records = _recordsByMonth[monthKey] ?? const {};
                 final entries = _entriesByMonth[monthKey] ?? const {};
-                final leadingBlanks =
-                    dates.isEmpty ? 0 : (dates.first.weekday + 6) % 7;
-                return GridView.builder(
-                  key: ValueKey('calendar-grid-$monthKey'),
-                  shrinkWrap: true,
-                  primary: false,
-                  padding: EdgeInsets.zero,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: leadingBlanks + dates.length,
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 7,
-                    mainAxisSpacing: rowGap,
-                    crossAxisSpacing: 3,
-                    mainAxisExtent: cellExtent,
+                final leadingBlanks = dates.isEmpty
+                    ? 0
+                    : (dates.first.weekday + 6) % 7;
+                return RepaintBoundary(
+                  child: GridView.builder(
+                    key: ValueKey('calendar-grid-$monthKey'),
+                    primary: false,
+                    padding: EdgeInsets.zero,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: leadingBlanks + dates.length,
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 7,
+                      mainAxisSpacing: rowGap,
+                      crossAxisSpacing: 3,
+                      mainAxisExtent: cellExtent,
+                    ),
+                    itemBuilder: (context, cellIndex) {
+                      if (cellIndex < leadingBlanks) {
+                        return const SizedBox.shrink();
+                      }
+                      final day = dates[cellIndex - leadingBlanks];
+                      return _CalendarCell(
+                        day: day,
+                        record: records[day.date],
+                        entries: entries[day.date] ?? const [],
+                        isToday: day.date == widget.today,
+                        isSelected: day.date == widget.selectedDate,
+                        isFuture: day.date.compareTo(widget.today) > 0,
+                        isWeekend: day.weekday == 0 || day.weekday == 6,
+                        onTap: () => widget.onTapDate(day.date),
+                        onLongPress: (pos) =>
+                            widget.onLongPressDate(day.date, pos),
+                      );
+                    },
                   ),
-                  itemBuilder: (context, cellIndex) {
-                    if (cellIndex < leadingBlanks) {
-                      return const SizedBox.shrink();
-                    }
-                    final day = dates[cellIndex - leadingBlanks];
-                    return _CalendarCell(
-                      day: day,
-                      record: records[day.date],
-                      entries: entries[day.date] ?? const [],
-                      isToday: day.date == widget.today,
-                      isSelected: day.date == widget.selectedDate,
-                      isFuture: day.date.compareTo(widget.today) > 0,
-                      isWeekend: day.weekday == 0 || day.weekday == 6,
-                      onTap: () => widget.onTapDate(day.date),
-                      onLongPress: (pos) =>
-                          widget.onLongPressDate(day.date, pos),
-                    );
-                  },
                 );
               },
             ),
@@ -1284,21 +1314,23 @@ class _CalendarLegendDot extends StatelessWidget {
       children: [
         if (pill)
           Container(
-            width: 12,
-            height: 3,
-            decoration: BoxDecoration(
-              color: color,
-              borderRadius: BorderRadius.circular(999),
+            width: 9,
+            height: 9,
+            decoration: ShapeDecoration(
+              color: color.withValues(alpha: colors.isDark ? 0.26 : 0.18),
+              shape: Radii.shape(3).copyWith(
+                side: BorderSide(
+                  color: color.withValues(alpha: 0.55),
+                  width: 0.75,
+                ),
+              ),
             ),
           )
         else
           Container(
             width: 5,
             height: 5,
-            decoration: BoxDecoration(
-              color: color,
-              shape: BoxShape.circle,
-            ),
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
           ),
         const SizedBox(width: 4),
         Text(label, style: TextStyle(fontSize: 11, color: colors.text3)),
@@ -1352,23 +1384,24 @@ class _CalendarCell extends StatelessWidget {
     final Color? heatTint = !hasRecord || isRest
         ? null
         : isSettled
-        ? colors.income.withValues(alpha: colors.isDark ? 0.15 : 0.085)
+        ? colors.income.withValues(alpha: colors.isDark ? 0.14 : 0.085)
         : isOvertime
-        ? colors.warning.withValues(alpha: colors.isDark ? 0.16 : 0.10)
-        : colors.primary.withValues(
+        ? colors.warning.withValues(alpha: colors.isDark ? 0.15 : 0.095)
+        : colors.block.withValues(
             alpha: hours >= 8
-                ? (colors.isDark ? 0.14 : 0.075)
-                : (colors.isDark ? 0.09 : 0.045),
+                ? (colors.isDark ? 0.72 : 0.76)
+                : (colors.isDark ? 0.45 : 0.48),
           );
-    final cellBg =
-        isSelected ? colors.heroHighlight : (heatTint ?? Colors.transparent);
+    final cellBg = isSelected
+        ? colors.primary
+        : (heatTint ?? Colors.transparent);
 
     final borderSide = isToday && !isSelected
         ? BorderSide(color: colors.primary, width: 1.4)
         : BorderSide.none;
 
     final dayColor = isSelected
-        ? Colors.white
+        ? colors.onPrimary
         : isToday
         ? colors.primary
         : isFuture
@@ -1378,7 +1411,7 @@ class _CalendarCell extends StatelessWidget {
         : colors.text;
 
     final hoursColor = isSelected
-        ? Colors.white.withValues(alpha: 0.84)
+        ? colors.onPrimary.withValues(alpha: 0.86)
         : isRest
         ? colors.text3
         : isSettled
@@ -1386,16 +1419,6 @@ class _CalendarCell extends StatelessWidget {
         : isOvertime
         ? colors.warning
         : colors.text2;
-
-    final indicatorColor = isSelected
-        ? Colors.white.withValues(alpha: 0.65)
-        : isRest
-        ? colors.outline.withValues(alpha: 0.45)
-        : isSettled
-        ? colors.income
-        : isOvertime
-        ? colors.warning
-        : colors.primary.withValues(alpha: 0.65);
 
     return Semantics(
       button: true,
@@ -1412,13 +1435,7 @@ class _CalendarCell extends StatelessWidget {
           haptic: false,
           shape: Radii.shape(11),
           pressedScale: 0.92,
-          child: AnimatedContainer(
-            duration: motionDuration(
-              Timings.micro,
-              disableAnimations:
-                  MediaQuery.maybeDisableAnimationsOf(context) ?? false,
-            ),
-            curve: Curves2.out,
+          child: _LazyDecoratedBox(
             decoration: ShapeDecoration(
               color: cellBg,
               shape: Radii.shape(11).copyWith(side: borderSide),
@@ -1438,7 +1455,7 @@ class _CalendarCell extends StatelessWidget {
               children: [
                 Center(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 2),
+                    padding: const EdgeInsets.fromLTRB(2, 0, 2, 4),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -1465,22 +1482,13 @@ class _CalendarCell extends StatelessWidget {
                                     ? '休'
                                     : '${formatHoursValue(hours)}${context.unit.short}',
                                 style: TextStyle(
-                                  fontSize: 9.5,
+                                  fontSize: 10,
                                   height: 1.0,
                                   fontWeight: FontWeight.w600,
                                   color: hoursColor,
                                   fontFeatures: tabularFigures,
                                 ),
                               ),
-                            ),
-                          ),
-                          const SizedBox(height: 2.5),
-                          Container(
-                            width: 14,
-                            height: 2.2,
-                            decoration: BoxDecoration(
-                              color: indicatorColor,
-                              borderRadius: BorderRadius.circular(999),
                             ),
                           ),
                         ],
@@ -1490,9 +1498,11 @@ class _CalendarCell extends StatelessWidget {
                 ),
                 if (income > 0 || expense > 0)
                   Positioned(
-                    top: 4,
-                    right: 4,
+                    left: 0,
+                    right: 0,
+                    bottom: 3.5,
                     child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         if (income > 0)
@@ -1811,10 +1821,68 @@ class _CellDot extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 4,
-      height: 4,
-      margin: const EdgeInsets.symmetric(horizontal: 1),
+      width: 3.5,
+      height: 3.5,
+      margin: const EdgeInsets.symmetric(horizontal: 1.2),
       decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+    );
+  }
+}
+
+/// 懒加载装饰过渡容器：静态日历格零 AnimationController / Ticker 开销，
+/// 仅在背景色、描边或阴影真正变化时才按 `Timings.micro` 平滑过渡。
+class _LazyDecoratedBox extends StatefulWidget {
+  const _LazyDecoratedBox({required this.decoration, required this.child});
+
+  final Decoration decoration;
+  final Widget child;
+
+  @override
+  State<_LazyDecoratedBox> createState() => _LazyDecoratedBoxState();
+}
+
+class _LazyDecoratedBoxState extends State<_LazyDecoratedBox>
+    with SingleTickerProviderStateMixin {
+  AnimationController? _controller;
+  CurvedAnimation? _curved;
+  Animation<Decoration>? _animation;
+
+  @override
+  void didUpdateWidget(covariant _LazyDecoratedBox oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.decoration == widget.decoration) return;
+    final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    if (disable) {
+      _controller?.stop();
+      _animation = null;
+      return;
+    }
+    final from = _animation?.value ?? oldWidget.decoration;
+    final controller = _controller ??= AnimationController(
+      vsync: this,
+      duration: Timings.micro,
+    );
+    _curved ??= CurvedAnimation(parent: controller, curve: Curves2.out);
+    _animation = DecorationTween(
+      begin: from,
+      end: widget.decoration,
+    ).animate(_curved!);
+    controller.forward(from: 0.0);
+  }
+
+  @override
+  void dispose() {
+    _curved?.dispose();
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBoxTransition(
+      decoration:
+          _animation ?? AlwaysStoppedAnimation<Decoration>(widget.decoration),
+      child: widget.child,
     );
   }
 }
@@ -2175,7 +2243,10 @@ class _DayEditorSheetState extends ConsumerState<DayEditorSheet> {
                           padding: const EdgeInsets.only(top: 2),
                           child: Text(
                             '当天工资为 0，无需结算',
-                            style: TextStyle(fontSize: 11.5, color: colors.text3),
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              color: colors.text3,
+                            ),
                           ),
                         ),
                     ],
@@ -2339,9 +2410,9 @@ class DayDetailSheet extends ConsumerWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: ShapeDecoration(
               color: colors.page,
-              shape: Radii.shape(Radii.lg).copyWith(
-                side: BorderSide(color: colors.divider, width: 0.7),
-              ),
+              shape: Radii.shape(
+                Radii.lg,
+              ).copyWith(side: BorderSide(color: colors.divider, width: 0.7)),
             ),
             child: IntrinsicHeight(
               child: Row(
@@ -2431,9 +2502,9 @@ class DayDetailSheet extends ConsumerWidget {
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
               decoration: ShapeDecoration(
                 color: colors.page,
-                shape: Radii.shape(Radii.lg).copyWith(
-                  side: BorderSide(color: colors.divider, width: 0.7),
-                ),
+                shape: Radii.shape(
+                  Radii.lg,
+                ).copyWith(side: BorderSide(color: colors.divider, width: 0.7)),
               ),
               child: Column(
                 children: [
@@ -2475,7 +2546,9 @@ class DayDetailSheet extends ConsumerWidget {
               if (!kHoursOnly) ...[
                 Expanded(
                   child: PrimaryButton(
-                    label: record.settled ? '取消结算' : (pay > 0 ? '标记结算' : '无需结算'),
+                    label: record.settled
+                        ? '取消结算'
+                        : (pay > 0 ? '标记结算' : '无需结算'),
                     icon: record.settled
                         ? Icons.undo_rounded
                         : (pay > 0

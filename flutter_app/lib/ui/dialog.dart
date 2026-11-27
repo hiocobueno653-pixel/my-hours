@@ -35,9 +35,7 @@ Future<bool?> showConfirmDialog(
       final highContrast =
           MediaQuery.maybeOf(dialogContext)?.highContrast ?? false;
       final dialogOrigin = MotionOrigin.consumeRecent();
-      final confirmBackground = danger
-          ? colors.expense
-          : colors.primary;
+      final confirmBackground = danger ? colors.expense : colors.primary;
       final confirmForeground = danger ? Colors.white : colors.onPrimary;
       final dialogShape = Radii.shape(Radii.alert);
       final outerStroke = isDark
@@ -46,12 +44,15 @@ Future<bool?> showConfirmDialog(
       final surfaceColor = isDark
           ? colors.card.withValues(alpha: highContrast ? 1.0 : 0.94)
           : colors.card.withValues(alpha: highContrast ? 1.0 : 0.96);
-      final blurSigma = highContrast ? 0.0 : (disable ? 8.0 : 16.0);
+      final enableBlur = !highContrast && !disable;
       final scrimOpacity = animation.drive(
-        CurveTween(
-          curve: const Interval(0, 0.45, curve: Curves2.out),
-        ),
+        CurveTween(curve: const Interval(0, 0.45, curve: Curves2.out)),
       );
+      final dialogOpacity = disable
+          ? const AlwaysStoppedAnimation<double>(1.0)
+          : animation.drive(CurveTween(curve: FlClashSprings.alertCurve));
+      final screen = MediaQuery.sizeOf(dialogContext);
+      final screenCenter = Offset(screen.width / 2, screen.height / 2);
       return Stack(
         children: [
           Positioned.fill(
@@ -66,142 +67,125 @@ Future<bool?> showConfirmDialog(
             ),
           ),
           Center(
-            child: AnimatedBuilder(
-              animation: animation,
-              builder: (context, child) {
-                final entering =
-                    animation.status != AnimationStatus.reverse;
-                final springProgress = FlClashSprings.alertCurve.transform(
-                  animation.value,
-                );
-                final progress = springProgress.clamp(0.0, 1.0);
-                final focusBlur = disable
-                    ? 0.0
-                    : (1.0 - (progress / 0.78).clamp(0.0, 1.0)) * 5.5;
-                final contentChild = focusBlur > 0.25
-                    ? ImageFiltered(
-                        imageFilter: ImageFilter.blur(
-                          sigmaX: focusBlur,
-                          sigmaY: focusBlur,
-                        ),
-                        child: child,
-                      )
-                    : child;
-                if (dialogOrigin == null) {
-                  final scale = entering
-                      ? FlClashSprings.alertEntryScale -
-                            (FlClashSprings.alertEntryScale - 1.0) *
-                                springProgress
-                      : 1.0;
-                  return Opacity(
-                    opacity: progress,
-                    child: Transform.scale(scale: scale, child: contentChild),
+            child: FadeTransition(
+              opacity: dialogOpacity,
+              child: AnimatedBuilder(
+                animation: animation,
+                builder: (context, child) {
+                  if (disable) return child!;
+                  final entering = animation.status != AnimationStatus.reverse;
+                  final springProgress = FlClashSprings.alertCurve.transform(
+                    animation.value,
                   );
-                }
-                final screen = MediaQuery.sizeOf(dialogContext);
-                final screenCenter = Offset(
-                  screen.width / 2,
-                  screen.height / 2,
-                );
-                final travel =
-                    (dialogOrigin - screenCenter) * (1 - progress) * 0.78;
-                return Opacity(
-                  opacity: progress,
-                  child: Transform.translate(
+                  final progress = springProgress.clamp(0.0, 1.0);
+                  if (dialogOrigin == null) {
+                    final scale = entering
+                        ? FlClashSprings.alertEntryScale -
+                              (FlClashSprings.alertEntryScale - 1.0) *
+                                  springProgress
+                        : 1.0;
+                    return Transform.scale(scale: scale, child: child);
+                  }
+                  final travel =
+                      (dialogOrigin - screenCenter) * (1 - progress) * 0.78;
+                  return Transform.translate(
                     offset: travel,
                     child: Transform.scale(
                       scale: 0.86 + 0.14 * progress,
-                      child: contentChild,
+                      child: child,
                     ),
-                  ),
-                );
-              },
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 34),
-                child: Material(
-                  type: MaterialType.transparency,
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxWidth: 282,
-                      maxHeight: MediaQuery.sizeOf(dialogContext).height * 0.72,
-                    ),
-                    child: DecoratedBox(
-                      decoration: ShapeDecoration(
-                        shape: dialogShape.copyWith(
-                          side: BorderSide(color: outerStroke, width: 0.75),
+                  );
+                },
+                child: RepaintBoundary(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 34),
+                    child: Material(
+                      type: MaterialType.transparency,
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth: 282,
+                          maxHeight: screen.height * 0.72,
                         ),
-                        shadows: context.floatingShadows,
-                      ),
-                      child: ClipPath(
-                        clipper: ShapeBorderClipper(shape: dialogShape),
-                        child: _maybeBlur(
-                          sigma: blurSigma,
-                          child: DecoratedBox(
-                            decoration: ShapeDecoration(
-                              color: surfaceColor,
-                              shape: dialogShape,
+                        child: DecoratedBox(
+                          decoration: ShapeDecoration(
+                            shape: dialogShape.copyWith(
+                              side: BorderSide(color: outerStroke, width: 0.75),
                             ),
-                            child: SingleChildScrollView(
-                              padding: const EdgeInsets.fromLTRB(
-                                20,
-                                19,
-                                20,
-                                15,
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    title,
-                                    textAlign: TextAlign.left,
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      height: 1.32,
-                                      fontWeight: FontWeight.w600,
-                                      letterSpacing: -0.2,
-                                      color: colors.text,
-                                    ),
+                            shadows: context.floatingShadows,
+                          ),
+                          child: ClipPath(
+                            clipper: ShapeBorderClipper(shape: dialogShape),
+                            child: _maybeBlur(
+                              enabled: enableBlur,
+                              child: DecoratedBox(
+                                decoration: ShapeDecoration(
+                                  color: surfaceColor,
+                                  shape: dialogShape,
+                                ),
+                                child: SingleChildScrollView(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    20,
+                                    19,
+                                    20,
+                                    15,
                                   ),
-                                  if (description != null) ...[
-                                    const SizedBox(height: 6),
-                                    Text(
-                                      description,
-                                      textAlign: TextAlign.left,
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        height: 1.48,
-                                        color: colors.text2,
-                                      ),
-                                    ),
-                                  ],
-                                  const SizedBox(height: 16),
-                                  Row(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
-                                      Expanded(
-                                        child: _DialogButton(
-                                          label: cancelLabel,
-                                          background: colors.block,
-                                          foreground: colors.text,
-                                          onTap: () =>
-                                              Navigator.of(dialogContext)
-                                                  .pop(false),
+                                      Text(
+                                        title,
+                                        textAlign: TextAlign.left,
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          height: 1.32,
+                                          fontWeight: FontWeight.w600,
+                                          letterSpacing: -0.2,
+                                          color: colors.text,
                                         ),
                                       ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: _DialogButton(
-                                          label: confirmLabel,
-                                          background: confirmBackground,
-                                          foreground: confirmForeground,
-                                          bold: true,
-                                          onTap: () =>
-                                              Navigator.of(dialogContext)
-                                                  .pop(true),
+                                      if (description != null) ...[
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          description,
+                                          textAlign: TextAlign.left,
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            height: 1.48,
+                                            color: colors.text2,
+                                          ),
                                         ),
+                                      ],
+                                      const SizedBox(height: 16),
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: _DialogButton(
+                                              label: cancelLabel,
+                                              background: colors.block,
+                                              foreground: colors.text,
+                                              onTap: () =>
+                                                  Navigator.of(dialogContext)
+                                                      .pop(false),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: _DialogButton(
+                                              label: confirmLabel,
+                                              background: confirmBackground,
+                                              foreground: confirmForeground,
+                                              bold: true,
+                                              onTap: () =>
+                                                  Navigator.of(dialogContext)
+                                                      .pop(true),
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ],
                                   ),
-                                ],
+                                ),
                               ),
                             ),
                           ),
@@ -252,10 +236,7 @@ class _DialogButton extends StatelessWidget {
         child: Container(
           width: double.infinity,
           height: 40,
-          decoration: ShapeDecoration(
-            color: background,
-            shape: shape,
-          ),
+          decoration: ShapeDecoration(color: background, shape: shape),
           child: Center(
             child: Text(
               label,
@@ -272,10 +253,9 @@ class _DialogButton extends StatelessWidget {
   }
 }
 
-Widget _maybeBlur({required double sigma, required Widget child}) {
-  if (sigma <= 0.1) return child;
-  return BackdropFilter(
-    filter: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
-    child: child,
-  );
+final ImageFilter _dialogBlurFilter = ImageFilter.blur(sigmaX: 12, sigmaY: 12);
+
+Widget _maybeBlur({required bool enabled, required Widget child}) {
+  if (!enabled) return child;
+  return BackdropFilter(filter: _dialogBlurFilter, child: child);
 }

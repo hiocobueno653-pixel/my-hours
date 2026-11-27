@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:my_hours/features/onboarding/welcome_screen.dart';
+import 'package:my_hours/state/app_controller.dart';
 
 void main() {
   testWidgets('欢迎页展示三段功能并可开始使用', (tester) async {
@@ -21,7 +22,10 @@ void main() {
     await tester.pump(const Duration(milliseconds: 1100));
 
     expect(find.text('记录时间，记下生活。'), findsOneWidget);
-    expect(find.text('把工时、工资与每一笔收支，留在属于你的时间页。'), findsOneWidget);
+    expect(
+      find.text(kHoursOnly ? '把每一天的工时，留在属于你的时间页。' : '把工时、工资与每一笔收支，留在属于你的时间页。'),
+      findsOneWidget,
+    );
     expect(find.text('本周预览'), findsOneWidget);
     expect(find.text('本地离线'), findsOneWidget);
     expect(find.text('日工时预设'), findsOneWidget);

@@ -88,7 +88,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
                               children: [
                                 ListRow(
                                   title: '计量单位',
-                                  subtitle: '决定「${context.unit.quantity}」与短单位显示方式',
+                                  subtitle:
+                                      '决定「${context.unit.quantity}」与短单位显示方式',
                                   leading: AppIconBadge(
                                     icon: Icons.straighten_rounded,
                                     color: colors.primary,
@@ -225,7 +226,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
                           const SizedBox(height: Gaps.xl),
                           Center(
                             child: Text(
-                              '时页 TIMEPAGE · 1.7.8 · 数据全部保存在本机',
+                              '时页 TIMEPAGE · 1.7.9 · 数据全部保存在本机',
                               style: TextStyle(
                                 fontSize: 11.5,
                                 color: colors.text3,

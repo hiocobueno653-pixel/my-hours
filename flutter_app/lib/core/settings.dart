@@ -47,15 +47,15 @@ class AppSettings extends ChangeNotifier {
   static const _kTimer = 'my-hours.timer';
   static const _kDashboardCards = 'my-hours.dashboardCards';
 
-  static const Color defaultAccentColor = Color(0xFF1E5BFF);
+  static const Color defaultAccentColor = Color(0xFF2A57C4);
 
   static const List<Color> defaultAccentPalette = [
-    Color(0xFF1E5BFF),
-    Color(0xFFE5484D),
-    Color(0xFF0E9F6E),
-    Color(0xFF6E56CF),
-    Color(0xFFD97706),
-    Color(0xFF334155),
+    Color(0xFF2A57C4),
+    Color(0xFFC4454B),
+    Color(0xFF1B7A58),
+    Color(0xFF6250B8),
+    Color(0xFFBE6F1D),
+    Color(0xFF262932),
   ];
 
   static Future<AppSettings> load() async {
@@ -190,10 +190,9 @@ class AppSettings extends ChangeNotifier {
     if (!next.any((item) => item.toARGB32() == rgb)) {
       next.add(normalized);
     }
-    await _prefs.setStringList(
-      _kAccentPalette,
-      [for (final item in next) _encodeHex(item)],
-    );
+    await _prefs.setStringList(_kAccentPalette, [
+      for (final item in next) _encodeHex(item),
+    ]);
     await _prefs.setString(_kAccent, _encodeHex(normalized));
     notifyListeners();
   }
@@ -214,10 +213,9 @@ class AppSettings extends ChangeNotifier {
     } else {
       next[index] = normalized;
     }
-    await _prefs.setStringList(
-      _kAccentPalette,
-      [for (final item in next) _encodeHex(item)],
-    );
+    await _prefs.setStringList(_kAccentPalette, [
+      for (final item in next) _encodeHex(item),
+    ]);
     if (accentColor.toARGB32() == oldRgb) {
       await _prefs.setString(_kAccent, _encodeHex(normalized));
     }
@@ -229,14 +227,12 @@ class AppSettings extends ChangeNotifier {
     final next = List<Color>.of(accentPalette)
       ..removeWhere((item) => item.toARGB32() == rgb);
     if (next.isEmpty) return;
-    await _prefs.setStringList(
-      _kAccentPalette,
-      [for (final item in next) _encodeHex(item)],
-    );
+    await _prefs.setStringList(_kAccentPalette, [
+      for (final item in next) _encodeHex(item),
+    ]);
     if (accentColor.toARGB32() == rgb) {
-      final fallback = next.any(
-        (item) => item.toARGB32() == defaultAccentColor.toARGB32(),
-      )
+      final fallback =
+          next.any((item) => item.toARGB32() == defaultAccentColor.toARGB32())
           ? defaultAccentColor
           : next.first;
       await _prefs.setString(_kAccent, _encodeHex(fallback));

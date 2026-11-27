@@ -69,21 +69,17 @@ class AppColors {
 
   /// 轻盈描边：暗色纯黑与玻璃浮层上提供微弱轮廓，亮色卡片靠面差呼吸。
   Color get cardBorder =>
-      isDark ? const Color(0xFF253046) : const Color(0xFFE2E8F2);
+      isDark ? const Color(0xFF272A33) : const Color(0xFFE5E3DB);
 
-  /// 英雄卡片深空基底色：随当前主题强调色微妙偏移，始终与品牌光感统一。
-  Color get heroBase => Color.lerp(
-    isDark ? const Color(0xFF121A2B) : const Color(0xFF0C1324),
-    primary,
-    isDark ? 0.16 : 0.14,
-  )!;
+  /// 英雄卡片基底色：与当前明暗界面同色系，仅融入极轻的主题色光感。
+  Color get heroBase => Color.lerp(card, primary, isDark ? 0.036 : 0.012)!;
 
   /// 英雄卡片高光端色。
-  Color get heroHighlight => Color.lerp(
-    isDark ? const Color(0xFF182540) : const Color(0xFF152342),
-    primary,
-    isDark ? 0.28 : 0.26,
-  )!;
+  Color get heroHighlight =>
+      Color.lerp(card, isDark ? Colors.white : primary, isDark ? 0.035 : 0.0)!;
+
+  /// 英雄卡片下沉底座色：用于今日主卡操作盘、预算条与统计底栏，建立「上读数 / 下操作」两段式仪器质感。
+  Color get heroWell => Color.lerp(card, block, isDark ? 0.68 : 0.56)!;
 
   AppColors copyWith({
     Color? page,
@@ -171,8 +167,7 @@ class AppColors {
     const darkInk = Color(0xFF071222);
     final darkInkContrast = _contrastRatio(adjusted, darkInk);
     final whiteContrast = _contrastRatio(adjusted, Colors.white);
-    final onPrimary =
-        (whiteContrast >= 4.0 || whiteContrast >= darkInkContrast)
+    final onPrimary = (whiteContrast >= 4.0 || whiteContrast >= darkInkContrast)
         ? Colors.white
         : darkInk;
     var page = base.page;
@@ -190,11 +185,7 @@ class AppColors {
           inset = Color.lerp(base.inset, adjusted, isDark ? 0.11 : 0.07)!;
           break;
         case AppColorStyle.soft:
-          page = Color.lerp(
-            base.page,
-            Colors.white,
-            isDark ? 0.03 : 0.16,
-          )!;
+          page = Color.lerp(base.page, Colors.white, isDark ? 0.03 : 0.16)!;
           card = Color.lerp(base.card, Colors.white, isDark ? 0.05 : 0.0)!;
           block = Color.lerp(base.block, Colors.white, isDark ? 0.07 : 0.12)!;
           inset = Color.lerp(base.inset, Colors.white, isDark ? 0.09 : 0.08)!;
@@ -225,94 +216,94 @@ class AppColors {
   }
 
   static const AppColors light = AppColors(
-    page: Color(0xFFF3F5FA),
+    page: Color(0xFFF4F3EF),
     card: Color(0xFFFFFFFF),
-    block: Color(0xFFEAEFF7),
-    inset: Color(0xFFDDE4F0),
-    text: Color(0xFF0F172A),
-    text2: Color(0xFF526077),
-    text3: Color(0xFF8A96AB),
-    divider: Color(0xFFE6ECF4),
-    outline: Color(0xFF9EABC0),
-    primary: Color(0xFF1E5BFF),
+    block: Color(0xFFECEBE5),
+    inset: Color(0xFFE2E0D8),
+    text: Color(0xFF141519),
+    text2: Color(0xFF5B5E68),
+    text3: Color(0xFF8E929E),
+    divider: Color(0xFFEAE9E3),
+    outline: Color(0xFFB6B8C0),
+    primary: Color(0xFF2A57C4),
     onPrimary: Color(0xFFFFFFFF),
-    primaryContainer: Color(0xFFE8F0FF),
-    onPrimaryContainer: Color(0xFF123DB3),
-    income: Color(0xFF0E8A5F),
-    incomeSoft: Color(0xFFE5F6EF),
-    expense: Color(0xFFDC3F35),
-    expenseSoft: Color(0xFFFDECEB),
-    warning: Color(0xFFD97706),
-    warningSoft: Color(0xFFFEF3E2),
+    primaryContainer: Color(0xFFEEF2FB),
+    onPrimaryContainer: Color(0xFF1E419B),
+    income: Color(0xFF1B7A58),
+    incomeSoft: Color(0xFFEAF4F0),
+    expense: Color(0xFFC04244),
+    expenseSoft: Color(0xFFF9EFEF),
+    warning: Color(0xFFBC6E18),
+    warningSoft: Color(0xFFFAF2E6),
     chart: [
-      Color(0xFF1E5BFF),
-      Color(0xFF0E9F6E),
-      Color(0xFF6E56CF),
-      Color(0xFFD97706),
-      Color(0xFFE5484D),
-      Color(0xFF64748B),
+      Color(0xFF2A57C4),
+      Color(0xFF1B7A58),
+      Color(0xFF6250B8),
+      Color(0xFFBE6F1D),
+      Color(0xFFC4454B),
+      Color(0xFF6F7480),
     ],
     isDark: false,
   );
 
   static const AppColors dark = AppColors(
-    page: Color(0xFF0A0E17),
-    card: Color(0xFF131926),
-    block: Color(0xFF1C2436),
-    inset: Color(0xFF263147),
-    text: Color(0xFFF1F5FB),
-    text2: Color(0xFF9BA8BF),
-    text3: Color(0xFF66758F),
-    divider: Color(0xFF20293B),
-    outline: Color(0xFF5D6C86),
-    primary: Color(0xFF5C93FF),
-    onPrimary: Color(0xFF061326),
-    primaryContainer: Color(0xFF182F58),
+    page: Color(0xFF0C0D10),
+    card: Color(0xFF15161B),
+    block: Color(0xFF1E2027),
+    inset: Color(0xFF292C35),
+    text: Color(0xFFF3F3F5),
+    text2: Color(0xFF9EA3B0),
+    text3: Color(0xFF6B707E),
+    divider: Color(0xFF23252E),
+    outline: Color(0xFF5B6170),
+    primary: Color(0xFF6D97F5),
+    onPrimary: Color(0xFF081226),
+    primaryContainer: Color(0xFF1B2740),
     onPrimaryContainer: Color(0xFFD6E8FF),
-    income: Color(0xFF34D399),
-    incomeSoft: Color(0xFF0F352A),
-    expense: Color(0xFFF87171),
-    expenseSoft: Color(0xFF3F1D23),
-    warning: Color(0xFFFBBF24),
-    warningSoft: Color(0xFF3B2C13),
+    income: Color(0xFF3CC48E),
+    incomeSoft: Color(0xFF132B22),
+    expense: Color(0xFFEA7272),
+    expenseSoft: Color(0xFF321B1D),
+    warning: Color(0xFFE8AD4E),
+    warningSoft: Color(0xFF302313),
     chart: [
-      Color(0xFF5C93FF),
-      Color(0xFF34D399),
-      Color(0xFFA78BFA),
-      Color(0xFFFBBF24),
-      Color(0xFFF87171),
-      Color(0xFF94A3B8),
+      Color(0xFF6D97F5),
+      Color(0xFF3CC48E),
+      Color(0xFFA08BF4),
+      Color(0xFFE8AD4E),
+      Color(0xFFEA7272),
+      Color(0xFF9CA3AF),
     ],
     isDark: true,
   );
 
   static const AppColors darkPureBlack = AppColors(
     page: Color(0xFF000000),
-    card: Color(0xFF10141E),
-    block: Color(0xFF1A202E),
-    inset: Color(0xFF262E40),
-    text: Color(0xFFF4F7FC),
-    text2: Color(0xFFA9B6CC),
-    text3: Color(0xFF74849E),
-    divider: Color(0xFF1D2433),
-    outline: Color(0xFF677690),
-    primary: Color(0xFF5C93FF),
-    onPrimary: Color(0xFF061326),
-    primaryContainer: Color(0xFF182F58),
+    card: Color(0xFF111216),
+    block: Color(0xFF1B1D22),
+    inset: Color(0xFF272A32),
+    text: Color(0xFFF4F4F6),
+    text2: Color(0xFFA5AAB7),
+    text3: Color(0xFF727785),
+    divider: Color(0xFF1F222A),
+    outline: Color(0xFF636A7A),
+    primary: Color(0xFF6D97F5),
+    onPrimary: Color(0xFF081226),
+    primaryContainer: Color(0xFF1B2740),
     onPrimaryContainer: Color(0xFFD6E8FF),
-    income: Color(0xFF34D399),
-    incomeSoft: Color(0xFF0F352A),
-    expense: Color(0xFFF87171),
-    expenseSoft: Color(0xFF3F1D23),
-    warning: Color(0xFFFBBF24),
-    warningSoft: Color(0xFF3B2C13),
+    income: Color(0xFF3CC48E),
+    incomeSoft: Color(0xFF132B22),
+    expense: Color(0xFFEA7272),
+    expenseSoft: Color(0xFF321B1D),
+    warning: Color(0xFFE8AD4E),
+    warningSoft: Color(0xFF302313),
     chart: [
-      Color(0xFF5C93FF),
-      Color(0xFF34D399),
-      Color(0xFFA78BFA),
-      Color(0xFFFBBF24),
-      Color(0xFFF87171),
-      Color(0xFF94A3B8),
+      Color(0xFF6D97F5),
+      Color(0xFF3CC48E),
+      Color(0xFFA08BF4),
+      Color(0xFFE8AD4E),
+      Color(0xFFEA7272),
+      Color(0xFF9CA3AF),
     ],
     isDark: true,
   );
@@ -321,22 +312,17 @@ class AppColors {
 /// 内置几何数字与英文品牌字族（拉丁与数字走 Outfit，中文自动回退系统字体）。
 const String kDisplayFont = 'Outfit';
 
-/// 深空琉璃英雄卡统一装饰：深邃蓝曜渐变 + 顶部微光描边 + 柔和景深阴影。
+/// 润玉瓷面 / 曜石主卡统一装饰：与当前明暗界面同属一个明度家族，
+/// 靠细腻瓷釉细边与克制中性漫射阴影建立视觉主次，杜绝突兀大色块。
 ShapeDecoration studioHeroDecoration(
   AppColors colors, {
   double radius = Radii.hero,
 }) {
-  final shape = Radii.shape(radius).copyWith(
-    side: BorderSide(
-      color: Colors.white.withValues(alpha: colors.isDark ? 0.12 : 0.16),
-      width: 0.9,
-    ),
-  );
-  final shadowTint = Color.lerp(
-    const Color(0xFF0B1222),
-    colors.primary,
-    0.32,
-  )!;
+  final borderColor = colors.isDark
+      ? Colors.white.withValues(alpha: 0.085)
+      : colors.cardBorder.withValues(alpha: 0.80);
+  final shape = Radii.shape(radius)
+      .copyWith(side: BorderSide(color: borderColor, width: 0.75));
   return ShapeDecoration(
     shape: shape,
     gradient: LinearGradient(
@@ -344,18 +330,26 @@ ShapeDecoration studioHeroDecoration(
       end: Alignment.bottomRight,
       colors: [colors.heroHighlight, colors.heroBase],
     ),
-    shadows: [
-      BoxShadow(
-        color: shadowTint.withValues(alpha: colors.isDark ? 0.45 : 0.22),
-        blurRadius: 24,
-        offset: const Offset(0, 10),
-      ),
-      BoxShadow(
-        color: shadowTint.withValues(alpha: colors.isDark ? 0.24 : 0.08),
-        blurRadius: 4,
-        offset: const Offset(0, 2),
-      ),
-    ],
+    shadows: colors.isDark
+        ? [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.36),
+              blurRadius: 20,
+              offset: const Offset(0, 7),
+            ),
+          ]
+        : [
+            BoxShadow(
+              color: const Color(0xFF141519).withValues(alpha: 0.05),
+              blurRadius: 22,
+              offset: const Offset(0, 7),
+            ),
+            BoxShadow(
+              color: const Color(0xFF141519).withValues(alpha: 0.022),
+              blurRadius: 3,
+              offset: const Offset(0, 1),
+            ),
+          ],
   );
 }
 
@@ -387,11 +381,28 @@ abstract final class Radii {
     top: Radius.circular(alert),
   );
 
-  static RoundedSuperellipseBorder shape(double radius) =>
-      RoundedSuperellipseBorder(borderRadius: BorderRadius.circular(radius));
+  static const RoundedSuperellipseBorder cardShape = RoundedSuperellipseBorder(
+    borderRadius: cardRadius,
+  );
+  static const RoundedSuperellipseBorder pillShape = RoundedSuperellipseBorder(
+    borderRadius: BorderRadius.all(Radius.circular(pill)),
+  );
 
-  static RoundedSuperellipseBorder get cardShape => shape(card);
-  static RoundedSuperellipseBorder get pillShape => shape(pill);
+  static final Map<double, RoundedSuperellipseBorder> _shapeCache = {
+    card: cardShape,
+    pill: pillShape,
+  };
+
+  static RoundedSuperellipseBorder shape(double radius) {
+    if (radius == card) return cardShape;
+    if (radius == pill) return pillShape;
+    return _shapeCache.putIfAbsent(
+      radius,
+      () => RoundedSuperellipseBorder(
+        borderRadius: BorderRadius.all(Radius.circular(radius)),
+      ),
+    );
+  }
 }
 
 /// 微排版刻度。
@@ -460,16 +471,8 @@ class AppTokens extends ThemeExtension<AppTokens> {
   static const AppTokens lightTokens = AppTokens(
     colors: AppColors.light,
     shadows: [
-      BoxShadow(
-        color: Color(0x0A0F172A),
-        blurRadius: 16,
-        offset: Offset(0, 4),
-      ),
-      BoxShadow(
-        color: Color(0x050F172A),
-        blurRadius: 2,
-        offset: Offset(0, 1),
-      ),
+      BoxShadow(color: Color(0x0A0F172A), blurRadius: 16, offset: Offset(0, 4)),
+      BoxShadow(color: Color(0x050F172A), blurRadius: 2, offset: Offset(0, 1)),
     ],
     floatingShadows: [
       BoxShadow(
@@ -487,11 +490,7 @@ class AppTokens extends ThemeExtension<AppTokens> {
       BoxShadow(color: Color(0x22000000), blurRadius: 8, offset: Offset(0, 2)),
     ],
     floatingShadows: [
-      BoxShadow(
-        color: Color(0x48000000),
-        blurRadius: 22,
-        offset: Offset(0, 8),
-      ),
+      BoxShadow(color: Color(0x48000000), blurRadius: 22, offset: Offset(0, 8)),
       BoxShadow(color: Color(0x22000000), blurRadius: 4, offset: Offset(0, 1)),
     ],
   );
@@ -551,7 +550,9 @@ ThemeData buildAppTheme(
   String? fontFamily,
 }) {
   final fallbackFonts = <String>[
-    if (fontFamily != null && fontFamily.isNotEmpty && fontFamily != kDisplayFont)
+    if (fontFamily != null &&
+        fontFamily.isNotEmpty &&
+        fontFamily != kDisplayFont)
       fontFamily,
   ];
   final base = ThemeData(
@@ -722,16 +723,14 @@ ThemeData buildAppTheme(
             ? colors.onPrimary
             : (colors.isDark ? colors.text2 : Colors.white),
       ),
-      trackColor: WidgetStateProperty.resolveWith(
-        (states) {
-          if (states.contains(WidgetState.disabled)) {
-            return colors.block;
-          }
-          return states.contains(WidgetState.selected)
-              ? colors.primary
-              : colors.inset;
-        },
-      ),
+      trackColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.disabled)) {
+          return colors.block;
+        }
+        return states.contains(WidgetState.selected)
+            ? colors.primary
+            : colors.inset;
+      }),
       trackOutlineColor: WidgetStateProperty.resolveWith(
         (states) => states.contains(WidgetState.selected)
             ? Colors.transparent

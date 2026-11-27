@@ -32,6 +32,14 @@ class _ThemeCrossFadeState extends State<ThemeCrossFade>
     vsync: this,
     duration: widget.duration,
   )..addStatusListener(_handleStatus);
+  late final CurvedAnimation _curved = CurvedAnimation(
+    parent: _controller,
+    curve: Curves2.out,
+  );
+  late final Animation<double> _fadeOut = Tween<double>(
+    begin: 1.0,
+    end: 0.0,
+  ).animate(_curved);
 
   ui.Image? _snapshot;
   Size? _snapshotSize;
@@ -68,7 +76,10 @@ class _ThemeCrossFadeState extends State<ThemeCrossFade>
       return;
     }
     try {
-      final dpr = MediaQuery.maybeDevicePixelRatioOf(context) ?? 1.0;
+      final dpr = (MediaQuery.maybeDevicePixelRatioOf(context) ?? 1.0).clamp(
+        1.0,
+        2.0,
+      );
       final next = renderObject.toImageSync(pixelRatio: dpr);
       _snapshot?.dispose();
       _snapshot = next;
@@ -91,6 +102,7 @@ class _ThemeCrossFadeState extends State<ThemeCrossFade>
 
   @override
   void dispose() {
+    _curved.dispose();
     _controller.dispose();
     _snapshot?.dispose();
     _snapshot = null;
@@ -108,23 +120,13 @@ class _ThemeCrossFadeState extends State<ThemeCrossFade>
         if (snapshot != null && size != null)
           Positioned.fill(
             child: IgnorePointer(
-              child: AnimatedBuilder(
-                animation: _controller,
-                builder: (context, _) {
-                  final opacity = (1.0 - Curves2.out.transform(_controller.value))
-                      .clamp(0.0, 1.0);
-                  if (opacity <= 0.001) return const SizedBox.shrink();
-                  return Opacity(
-                    opacity: opacity,
-                    child: RawImage(
-                      image: snapshot,
-                      width: size.width,
-                      height: size.height,
-                      fit: BoxFit.fill,
-                      filterQuality: FilterQuality.low,
-                    ),
-                  );
-                },
+              child: RawImage(
+                image: snapshot,
+                opacity: _fadeOut,
+                width: size.width,
+                height: size.height,
+                fit: BoxFit.fill,
+                filterQuality: FilterQuality.low,
               ),
             ),
           ),

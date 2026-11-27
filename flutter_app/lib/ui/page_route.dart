@@ -83,6 +83,21 @@ class _AppCardTransition extends StatefulWidget {
 
 class _AppCardTransitionState extends State<_AppCardTransition> {
   final SnapshotController _snapshot = SnapshotController();
+  static final Animatable<Offset> _primarySlideTween = Tween<Offset>(
+    begin: const Offset(1.0, 0.0),
+    end: Offset.zero,
+  );
+  static final Animatable<Offset> _secondarySlideTween = Tween<Offset>(
+    begin: Offset.zero,
+    end: const Offset(-FlClashSprings.coveredSlideFraction, 0.0),
+  );
+  static const Color _coveredDimColor = Color.fromRGBO(
+    0,
+    0,
+    0,
+    FlClashSprings.coveredDimAlpha,
+  );
+
   late final CurvedAnimation _primaryCurved = CurvedAnimation(
     parent: widget.primaryAnimation,
     curve: FlClashSprings.pushCurve,
@@ -93,22 +108,51 @@ class _AppCardTransitionState extends State<_AppCardTransition> {
     curve: FlClashSprings.pushCurve,
     reverseCurve: FlClashSprings.pushCurve.flipped,
   );
+  late final Animation<Offset> _curvedPrimarySlide = _primarySlideTween.animate(
+    _primaryCurved,
+  );
+  late final Animation<Offset> _linearPrimarySlide = _primarySlideTween.animate(
+    widget.primaryAnimation,
+  );
+  late final Animation<Offset> _curvedSecondarySlide = _secondarySlideTween
+      .animate(_secondaryCurved);
+  late final Animation<Offset> _linearSecondarySlide = _secondarySlideTween
+      .animate(widget.secondaryAnimation);
+  bool _primaryMoving = false;
+  bool _secondaryVisible = false;
 
   @override
   void initState() {
     super.initState();
+    widget.primaryAnimation.addStatusListener(_syncPrimaryStatus);
     widget.secondaryAnimation.addStatusListener(_syncSnapshot);
-    _syncSnapshot(widget.secondaryAnimation.status);
+    _syncPrimaryStatus(widget.primaryAnimation.status, allowSetState: false);
+    _syncSnapshot(widget.secondaryAnimation.status, allowSetState: false);
   }
 
-  void _syncSnapshot(AnimationStatus status) {
+  void _syncPrimaryStatus(AnimationStatus status, {bool allowSetState = true}) {
+    final moving =
+        status == AnimationStatus.forward || status == AnimationStatus.reverse;
+    if (_primaryMoving != moving) {
+      _primaryMoving = moving;
+      if (allowSetState && mounted) setState(() {});
+    }
+  }
+
+  void _syncSnapshot(AnimationStatus status, {bool allowSetState = true}) {
     final coveredMoving =
         status == AnimationStatus.forward || status == AnimationStatus.reverse;
     _snapshot.allowSnapshotting = coveredMoving;
+    final visible = status != AnimationStatus.dismissed;
+    if (_secondaryVisible != visible) {
+      _secondaryVisible = visible;
+      if (allowSetState && mounted) setState(() {});
+    }
   }
 
   @override
   void dispose() {
+    widget.primaryAnimation.removeStatusListener(_syncPrimaryStatus);
     widget.secondaryAnimation.removeStatusListener(_syncSnapshot);
     _primaryCurved.dispose();
     _secondaryCurved.dispose();
@@ -128,76 +172,61 @@ class _AppCardTransitionState extends State<_AppCardTransition> {
 
   @override
   Widget build(BuildContext context) {
-    final effectivePrimary = widget.linearTransition
-        ? widget.primaryAnimation
-        : _primaryCurved;
     final effectiveSecondary = widget.linearTransition
         ? widget.secondaryAnimation
         : _secondaryCurved;
-    final primarySlide = Tween<Offset>(
-      begin: const Offset(1.0, 0.0),
-      end: Offset.zero,
-    ).animate(effectivePrimary);
-    final secondarySlide = Tween<Offset>(
-      begin: Offset.zero,
-      end: const Offset(-FlClashSprings.coveredSlideFraction, 0.0),
-    ).animate(effectiveSecondary);
+    final primarySlide = widget.linearTransition
+        ? _linearPrimarySlide
+        : _curvedPrimarySlide;
+    final secondarySlide = widget.linearTransition
+        ? _linearSecondarySlide
+        : _curvedSecondarySlide;
+    final showShadow =
+        widget.showLeadingEdgeShadow &&
+        (_primaryMoving || widget.linearTransition);
 
     return SlideTransition(
       position: secondarySlide,
       child: SlideTransition(
         position: primarySlide,
-        child: AnimatedBuilder(
-          animation: Listenable.merge([
-            widget.primaryAnimation,
-            widget.secondaryAnimation,
-          ]),
-          builder: (context, child) {
-            final primaryVal = widget.primaryAnimation.value;
-            final movingIn = primaryVal > 0.001 && primaryVal < 0.999;
-            final dimAlpha =
-                FlClashSprings.coveredDimAlpha *
-                effectiveSecondary.value.clamp(0.0, 1.0);
-            return Stack(
-              clipBehavior: Clip.none,
-              fit: StackFit.passthrough,
-              children: [
-                if (widget.showLeadingEdgeShadow && movingIn)
-                  const Positioned(
-                    top: 0,
-                    bottom: 0,
-                    left: -36,
-                    width: 36,
-                    child: IgnorePointer(
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.centerLeft,
-                            end: Alignment.centerRight,
-                            colors: _shadowColors,
-                            stops: _shadowStops,
-                          ),
-                        ),
+        child: Stack(
+          clipBehavior: Clip.none,
+          fit: StackFit.passthrough,
+          children: [
+            if (showShadow)
+              const Positioned(
+                top: 0,
+                bottom: 0,
+                left: -36,
+                width: 36,
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                        colors: _shadowColors,
+                        stops: _shadowStops,
                       ),
                     ),
                   ),
-                child!,
-                if (dimAlpha > 0.001)
-                  Positioned.fill(
-                    child: IgnorePointer(
-                      child: ColoredBox(
-                        color: Colors.black.withValues(alpha: dimAlpha),
-                      ),
-                    ),
+                ),
+              ),
+            SnapshotWidget(
+              controller: _snapshot,
+              mode: SnapshotMode.permissive,
+              child: widget.child,
+            ),
+            if (_secondaryVisible || widget.linearTransition)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: FadeTransition(
+                    opacity: effectiveSecondary,
+                    child: const ColoredBox(color: _coveredDimColor),
                   ),
-              ],
-            );
-          },
-          child: SnapshotWidget(
-            controller: _snapshot,
-            mode: SnapshotMode.permissive,
-            child: widget.child,
-          ),
+                ),
+              ),
+          ],
         ),
       ),
     );

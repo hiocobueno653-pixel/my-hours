@@ -20,6 +20,7 @@ import '../data/models.dart';
 import '../data/persistence.dart';
 import '../data/profiles.dart';
 import '../data/records.dart';
+import '../data/stats.dart';
 import '../data/wage_entries.dart';
 
 /// 「只记工时」变体开关（`--dart-define=HOURS_ONLY=true`）。
@@ -746,6 +747,11 @@ final recordsProvider = Provider<List<WorkDayRecord>>(
   (ref) => ref.watch(appControllerProvider.select((s) => s.records)),
 );
 
+final recordsByDateProvider = Provider<Map<String, WorkDayRecord>>((ref) {
+  final records = ref.watch(recordsProvider);
+  return {for (final record in records) record.date: record};
+});
+
 final entriesProvider = Provider<List<LedgerEntry>>(
   (ref) => ref.watch(appControllerProvider.select((s) => s.entries)),
 );
@@ -826,7 +832,9 @@ final currentMonthWorkViewDataProvider = Provider<MonthWorkViewData>((ref) {
   final profiles = ref.watch(workProfilesProvider);
   final dates = getMonthDates(month);
   final parsed = parseMonthKey(month);
-  final workdays = parsed == null ? 0 : workdaysInMonth(parsed.year, parsed.month);
+  final workdays = parsed == null
+      ? 0
+      : workdaysInMonth(parsed.year, parsed.month);
   final prefix = '$month-';
   final recordsByDate = <String, WorkDayRecord>{};
   var underpaidDays = 0;
@@ -870,3 +878,63 @@ String _currentMonth() {
   final now = DateTime.now();
   return '${now.year}-${now.month.toString().padLeft(2, '0')}';
 }
+
+@immutable
+class YearStatsData {
+  const YearStatsData({
+    required this.year,
+    required this.hoursTrend,
+    required this.ledgerTrend,
+    required this.summary,
+    required this.workBreakdown,
+    required this.totalWorkDays,
+  });
+
+  final int year;
+  final List<MonthHoursPoint> hoursTrend;
+  final List<MonthLedgerPoint> ledgerTrend;
+  final YearSummary summary;
+  final List<WorkBreakdownRow> workBreakdown;
+  final int totalWorkDays;
+}
+
+/// 某年度统计页的派生汇总：只在记录、账目或工种变化时重算，
+/// 切换分类收支标签等局部 UI 状态不再重复扫描全量记录。
+final yearStatsProvider = Provider.family<YearStatsData, int>((ref, year) {
+  final records = ref.watch(recordsProvider);
+  final entries = ref.watch(entriesProvider);
+  final profiles = ref.watch(workProfilesProvider);
+  final hoursTrend = getYearHoursTrend(records, year, profiles);
+  final ledgerTrend = getYearLedgerTrend(entries, year);
+  final summary = getYearSummary(records, entries, year, profiles);
+  final prefix = '$year-';
+  final map = <String, WorkBreakdownRow>{};
+  for (final record in records) {
+    if (!record.date.startsWith(prefix)) continue;
+    final pay = recordPay(record, profiles);
+    if (record.hours <= 0 && pay <= 0) continue;
+    final id = record.workId ?? defaultWorkId;
+    final name = workNameOf(record, profiles);
+    final existing = map[id];
+    map[id] = WorkBreakdownRow(
+      workId: id,
+      name: name,
+      hours: roundMoney((existing?.hours ?? 0) + record.hours),
+      pay: roundMoney((existing?.pay ?? 0) + pay),
+    );
+  }
+  final workBreakdown = map.values.toList()
+    ..sort((a, b) => b.hours.compareTo(a.hours));
+  final totalWorkDays = hoursTrend.fold<int>(
+    0,
+    (sum, point) => sum + point.workDays,
+  );
+  return YearStatsData(
+    year: year,
+    hoursTrend: hoursTrend,
+    ledgerTrend: ledgerTrend,
+    summary: summary,
+    workBreakdown: workBreakdown,
+    totalWorkDays: totalWorkDays,
+  );
+});

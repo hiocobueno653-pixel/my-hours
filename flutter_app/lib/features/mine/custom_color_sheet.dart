@@ -65,7 +65,9 @@ class _CustomColorSheetState extends State<_CustomColorSheet> {
   late final ValueNotifier<Color> _color = ValueNotifier<Color>(
     Color(widget.initialColor.toARGB32() | 0xFF000000),
   );
-  late HSVColor _hsv = HSVColor.fromColor(_color.value);
+  late final ValueNotifier<HSVColor> _hsv = ValueNotifier<HSVColor>(
+    HSVColor.fromColor(_color.value),
+  );
   bool _updatingFromHsv = false;
   _PaletteMode _mode = _PaletteMode.grid;
 
@@ -77,8 +79,8 @@ class _CustomColorSheetState extends State<_CustomColorSheet> {
 
   void _syncHsv() {
     if (_updatingFromHsv) return;
-    if (_hsv.toColor().toARGB32() != _color.value.toARGB32()) {
-      setState(() => _hsv = HSVColor.fromColor(_color.value));
+    if (_hsv.value.toColor().toARGB32() != _color.value.toARGB32()) {
+      _hsv.value = HSVColor.fromColor(_color.value);
     }
   }
 
@@ -91,7 +93,7 @@ class _CustomColorSheetState extends State<_CustomColorSheet> {
   void _pickHsv(HSVColor hsv) {
     _updatingFromHsv = true;
     try {
-      setState(() => _hsv = hsv);
+      _hsv.value = hsv;
       _color.value = Color(hsv.toColor().toARGB32() | 0xFF000000);
     } finally {
       _updatingFromHsv = false;
@@ -115,6 +117,7 @@ class _CustomColorSheetState extends State<_CustomColorSheet> {
   void dispose() {
     _color.removeListener(_syncHsv);
     _color.dispose();
+    _hsv.dispose();
     super.dispose();
   }
 
@@ -124,9 +127,7 @@ class _CustomColorSheetState extends State<_CustomColorSheet> {
     return SheetScaffold(
       title: widget.title,
       maxHeightFactor: 0.90,
-      actions: [
-        TextActionButton(label: '确定', onPressed: _confirm),
-      ],
+      actions: [TextActionButton(label: '确定', onPressed: _confirm)],
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -157,23 +158,23 @@ class _CustomColorSheetState extends State<_CustomColorSheet> {
             duration: motionDuration(Timings.base, disableAnimations: disable),
             curve: Curves2.out,
             alignment: Alignment.topCenter,
-            child: ValueListenableBuilder<Color>(
-              valueListenable: _color,
-              builder: (_, color, _) => switch (_mode) {
-                _PaletteMode.grid => _ColorGridPad(
-                  color: color,
-                  onPicked: _pickColor,
-                ),
-                _PaletteMode.spectrum => _SpectrumPad(
-                  color: color,
-                  onPicked: _pickColor,
-                ),
-                _PaletteMode.sliders => _HsvSlidersPanel(
-                  hsv: _hsv,
-                  onChanged: _pickHsv,
-                ),
-              },
-            ),
+            child: switch (_mode) {
+              _PaletteMode.grid => ValueListenableBuilder<Color>(
+                valueListenable: _color,
+                builder: (_, color, _) =>
+                    _ColorGridPad(color: color, onPicked: _pickColor),
+              ),
+              _PaletteMode.spectrum => ValueListenableBuilder<Color>(
+                valueListenable: _color,
+                builder: (_, color, _) =>
+                    _SpectrumPad(color: color, onPicked: _pickColor),
+              ),
+              _PaletteMode.sliders => ValueListenableBuilder<HSVColor>(
+                valueListenable: _hsv,
+                builder: (_, hsv, _) =>
+                    _HsvSlidersPanel(hsv: hsv, onChanged: _pickHsv),
+              ),
+            },
           ),
           const SizedBox(height: Gaps.md),
         ],
@@ -233,10 +234,7 @@ class _DualBrightnessPreview extends StatelessWidget {
 }
 
 class _MiniPhonePreview extends StatelessWidget {
-  const _MiniPhonePreview({
-    required this.palette,
-    required this.floatingDock,
-  });
+  const _MiniPhonePreview({required this.palette, required this.floatingDock});
 
   final AppColors palette;
   final bool floatingDock;
@@ -476,9 +474,8 @@ class _HexColorInputState extends State<_HexColorInput> {
           padding: const EdgeInsets.symmetric(horizontal: 10),
           decoration: ShapeDecoration(
             color: colors.card,
-            shape: Radii.shape(Radii.sm).copyWith(
-              side: BorderSide(color: colors.divider, width: 0.8),
-            ),
+            shape: Radii.shape(Radii.sm)
+                .copyWith(side: BorderSide(color: colors.divider, width: 0.8)),
           ),
           child: Row(
             children: [
@@ -591,9 +588,10 @@ class _ColorGridPad extends StatelessWidget {
       aspectRatio: columns / rows,
       child: _ImmediatePickArea(
         onPicked: (pos, size) {
-          final col = (pos.dx / size.width * columns)
-              .floor()
-              .clamp(0, columns - 1);
+          final col = (pos.dx / size.width * columns).floor().clamp(
+            0,
+            columns - 1,
+          );
           final row = (pos.dy / size.height * rows).floor().clamp(0, rows - 1);
           onPicked(_rows[row][col]);
         },
@@ -641,7 +639,10 @@ class _ColorGridPainter extends CustomPainter {
     if (selectedRect != null) {
       final isDark = selected.computeLuminance() < 0.45;
       canvas.drawRRect(
-        RRect.fromRectAndRadius(selectedRect.deflate(1.5), const Radius.circular(5)),
+        RRect.fromRectAndRadius(
+          selectedRect.deflate(1.5),
+          const Radius.circular(5),
+        ),
         Paint()
           ..style = PaintingStyle.stroke
           ..strokeWidth = 2.6
@@ -747,8 +748,16 @@ class _SpectrumPainter extends CustomPainter {
         ).createShader(rect),
     );
     final center = Offset(
-      clampDouble(position.dx * size.width, _thumbRadius, size.width - _thumbRadius),
-      clampDouble(position.dy * size.height, _thumbRadius, size.height - _thumbRadius),
+      clampDouble(
+        position.dx * size.width,
+        _thumbRadius,
+        size.width - _thumbRadius,
+      ),
+      clampDouble(
+        position.dy * size.height,
+        _thumbRadius,
+        size.height - _thumbRadius,
+      ),
     );
     _paintThumb(canvas, center, _thumbRadius, color);
   }
@@ -803,7 +812,8 @@ class _HsvSlidersPanel extends StatelessWidget {
             fraction: hsv.hue / 360.0,
             gradientColors: _hueStops,
             thumbColor: pureHue,
-            onChanged: (f) => onChanged(hsv.withHue((f * 360.0).clamp(0, 359.99))),
+            onChanged: (f) =>
+                onChanged(hsv.withHue((f * 360.0).clamp(0, 359.99))),
           ),
           const SizedBox(height: 16),
           _GradientSliderRow(

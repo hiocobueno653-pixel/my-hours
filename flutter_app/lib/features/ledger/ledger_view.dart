@@ -15,7 +15,6 @@ import '../../data/constants.dart';
 import '../../data/dates.dart';
 import '../../data/ledger.dart';
 import '../../data/models.dart';
-import '../../data/records.dart';
 import '../../data/wage_entries.dart';
 import '../../state/app_controller.dart';
 import '../../ui/date_wheel.dart';
@@ -40,17 +39,18 @@ class LedgerView extends ConsumerStatefulWidget {
 
 class _LedgerViewState extends ConsumerState<LedgerView> {
   final TextEditingController _search = TextEditingController();
+  final ValueNotifier<bool> _fabExpanded = ValueNotifier<bool>(true);
   LedgerEntry? _undoEntry;
   Timer? _undoTimer;
   Timer? _searchTimer;
   bool _searching = false;
-  bool _fabExpanded = true;
   String _searchQuery = '';
   String _categoryFilter = '';
 
   @override
   void dispose() {
     _search.dispose();
+    _fabExpanded.dispose();
     _undoTimer?.cancel();
     _searchTimer?.cancel();
     super.dispose();
@@ -191,7 +191,10 @@ class _LedgerViewState extends ConsumerState<LedgerView> {
     );
   }
 
-  Widget _entryRow(LedgerEntry entry, List<WorkDayRecord> records) {
+  Widget _entryRow(
+    LedgerEntry entry,
+    Map<String, WorkDayRecord> recordsByDate,
+  ) {
     final managed = _isManagedEntry(entry);
     return _EntryRow(
       entry: entry,
@@ -199,7 +202,7 @@ class _LedgerViewState extends ConsumerState<LedgerView> {
       deleteLabel: managed ? '撤销该日结算' : '删除',
       linkedHours: entry.workDate == null
           ? null
-          : getRecordByDate(records, entry.workDate!)?.hours,
+          : recordsByDate[entry.workDate!]?.hours,
       onTap: managed
           ? _hintManagedEntry
           : () => showLedgerEditor(context, entry: entry),
@@ -221,17 +224,19 @@ class _LedgerViewState extends ConsumerState<LedgerView> {
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(appControllerProvider);
     final month = ref.watch(selectedMonthProvider);
+    final allEntries = ref.watch(entriesProvider);
+    final recordsByDate = ref.watch(recordsByDateProvider);
+    final monthLedger = ref.watch(currentMonthLedgerViewDataProvider);
     ref.listen<String>(selectedMonthProvider, (previous, next) {
       if (previous != next && _categoryFilter.isNotEmpty) {
         setState(() => _categoryFilter = '');
       }
     });
-    final summary = getLedgerMonthSummary(state.entries, month);
+    final summary = monthLedger.summary;
     final budget = ref.watch(budgetTargetsProvider).monthlyExpenseBudget;
     final keyword = _searchQuery;
-    final baseEntries = getLedgerMonthEntries(state.entries, month);
+    final baseEntries = getLedgerMonthEntries(allEntries, month);
     final filteredByCategory = baseEntries.where((entry) {
       if (_categoryFilter.isEmpty) return true;
       if (_categoryFilter.startsWith('type:')) {
@@ -259,16 +264,11 @@ class _LedgerViewState extends ConsumerState<LedgerView> {
     }).toList();
 
     final seenCategories = <String>{};
-    final categoryChips =
-        <({String key, String label, LedgerType? type})>[];
+    final categoryChips = <({String key, String label, LedgerType? type})>[];
     for (final entry in baseEntries) {
       final key = 'cat:${ledgerTypeValue(entry.type)}:${entry.category}';
       if (seenCategories.add(key)) {
-        categoryChips.add((
-          key: key,
-          label: entry.category,
-          type: entry.type,
-        ));
+        categoryChips.add((key: key, label: entry.category, type: entry.type));
       }
     }
     final filterChips = <({String key, String label, LedgerType? type})>[
@@ -280,10 +280,12 @@ class _LedgerViewState extends ConsumerState<LedgerView> {
 
     final today = todayISO();
     final yesterday = shiftDate(today, -1);
-    final todayEntries = [
-      for (final entry in state.entries)
-        if (entry.date == today) entry,
-    ];
+    final todayEntries = month == currentMonthKey()
+        ? (monthLedger.entriesByDate[today] ?? const <LedgerEntry>[])
+        : [
+            for (final entry in allEntries)
+              if (entry.date == today) entry,
+          ];
     var todayIncome = 0.0;
     var todayExpense = 0.0;
     for (final entry in todayEntries) {
@@ -319,11 +321,11 @@ class _LedgerViewState extends ConsumerState<LedgerView> {
             onNotification: (notification) {
               if (notification.metrics.axis != Axis.vertical) return false;
               if (notification.direction == ScrollDirection.reverse &&
-                  _fabExpanded) {
-                setState(() => _fabExpanded = false);
+                  _fabExpanded.value) {
+                _fabExpanded.value = false;
               } else if (notification.direction == ScrollDirection.forward &&
-                  !_fabExpanded) {
-                setState(() => _fabExpanded = true);
+                  !_fabExpanded.value) {
+                _fabExpanded.value = true;
               }
               return false;
             },
@@ -335,31 +337,39 @@ class _LedgerViewState extends ConsumerState<LedgerView> {
               slivers: [
                 SliverPadding(
                   padding: EdgeInsets.fromLTRB(
-                    Gaps.lg,
+                    0,
                     MorphingSearchHeader.totalHeight(context) + 12,
-                    Gaps.lg,
+                    0,
                     Gaps.md,
                   ),
                   sliver: SliverToBoxAdapter(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        RepaintBoundary(
-                          child: _BalanceSummaryCard(
-                            month: month,
-                            summary: summary,
-                            budget: budget,
-                            entryCount: baseEntries.length,
-                            todayCount: todayEntries.length,
-                            todayIncome: todayIncome,
-                            todayExpense: todayExpense,
-                            onOpenBudget: () => showBudgetPanel(context),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: Gaps.lg,
+                          ),
+                          child: RepaintBoundary(
+                            child: _BalanceSummaryCard(
+                              month: month,
+                              summary: summary,
+                              budget: budget,
+                              entryCount: baseEntries.length,
+                              todayCount: todayEntries.length,
+                              todayIncome: todayIncome,
+                              todayExpense: todayExpense,
+                              onOpenBudget: () => showBudgetPanel(context),
+                            ),
                           ),
                         ),
                         const SizedBox(height: Gaps.cardGap),
                         SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
                           physics: const BouncingScrollPhysics(),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: Gaps.lg,
+                          ),
                           child: Row(
                             children: [
                               for (
@@ -375,7 +385,11 @@ class _LedgerViewState extends ConsumerState<LedgerView> {
                                     color: context.colors.divider,
                                   ),
                                 Padding(
-                                  padding: const EdgeInsets.only(right: 6),
+                                  padding: EdgeInsets.only(
+                                    right: index == filterChips.length - 1
+                                        ? 0
+                                        : 6,
+                                  ),
                                   child: _FilterChipPill(
                                     label: filterChips[index].label,
                                     icon: filterChips[index].type == null
@@ -387,7 +401,8 @@ class _LedgerViewState extends ConsumerState<LedgerView> {
                                             context.colors,
                                           ).icon,
                                     selected:
-                                        _categoryFilter == filterChips[index].key,
+                                        _categoryFilter ==
+                                        filterChips[index].key,
                                     onTap: () => setState(
                                       () => _categoryFilter =
                                           filterChips[index].key,
@@ -460,7 +475,7 @@ class _LedgerViewState extends ConsumerState<LedgerView> {
                           entries: entriesByDate[date]!,
                           isFirst: index == 0,
                           isLast: index == groupedDates.length - 1,
-                          buildRow: (entry) => _entryRow(entry, state.records),
+                          buildRow: (entry) => _entryRow(entry, recordsByDate),
                         );
                       },
                     ),
@@ -516,9 +531,12 @@ class _LedgerViewState extends ConsumerState<LedgerView> {
         Positioned(
           right: 16,
           bottom: fabBottom,
-          child: _AddLedgerFab(
-            expanded: _fabExpanded,
-            onTap: () => showLedgerEditor(context),
+          child: ValueListenableBuilder<bool>(
+            valueListenable: _fabExpanded,
+            builder: (context, expanded, _) => _AddLedgerFab(
+              expanded: expanded,
+              onTap: () => showLedgerEditor(context),
+            ),
           ),
         ),
         Positioned(
@@ -560,8 +578,8 @@ class _LedgerViewState extends ConsumerState<LedgerView> {
                   onSelected: () => showExportSheet(
                     context,
                     month: month,
-                    records: state.records,
-                    entries: state.entries,
+                    records: ref.read(recordsProvider),
+                    entries: ref.read(entriesProvider),
                   ),
                 ),
                 GlassMenuAction(
@@ -646,179 +664,194 @@ class _BalanceSummaryCard extends StatelessWidget {
                     '${todayExpense > 0 ? ' · -${formatAmount(todayExpense, withSymbol: true)}' : ''}')
         : '共 $entryCount 笔账目';
 
-    return GlassCard(
-      radius: Radii.hero,
-      padding: const EdgeInsets.fromLTRB(18, 16, 18, 15),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text(
-                isCurrent ? '本月结余' : '当月结余',
-                style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w500,
-                  color: colors.text2,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  statusText,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.right,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w400,
-                    color: colors.text3,
-                    fontFeatures: tabularFigures,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.baseline,
-              textBaseline: TextBaseline.alphabetic,
-              children: [
-                Text(
-                  summary.balance < 0 ? '-¥' : '¥',
-                  style: TextStyle(
-                    fontSize: 22,
-                    height: 1.0,
-                    fontWeight: FontWeight.w600,
-                    color: summary.balance < 0 ? colors.expense : colors.text2,
-                  ),
-                ),
-                const SizedBox(width: 2),
-                AnimatedNumericText(
-                  value: summary.balance.abs(),
-                  formatter: (value) =>
-                      formatAmount(value.toDouble(), withSymbol: false),
-                  style: TextStyle(
-                    fontSize: 42,
-                    height: 1.0,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -1.6,
-                    color: summary.balance >= 0 ? colors.text : colors.expense,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          _CashflowRatioBar(
-            income: summary.income,
-            expense: summary.expense,
-          ),
-          const SizedBox(height: 12),
-          IntrinsicHeight(
-            child: Row(
-              children: [
-                Expanded(
-                  child: _SideMetric(
-                    label: '本月收入',
-                    value: summary.income,
-                    color: colors.income,
-                  ),
-                ),
-                Container(
-                  width: 0.7,
-                  margin: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 2,
-                  ),
-                  color: colors.divider,
-                ),
-                Expanded(
-                  child: _SideMetric(
-                    label: '本月支出',
-                    value: summary.expense,
-                    color: colors.expense,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          Divider(height: 1, thickness: 0.7, color: colors.divider),
-          const SizedBox(height: 10),
-          Pressable(
-            onTap: onOpenBudget,
-            shape: Radii.shape(Radii.sm),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 2),
-              child: budget > 0
-                  ? Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Text(
-                              overBudget
-                                  ? '已超预算 ${formatAmount(summary.expense - budget, withSymbol: true)}'
-                                  : '支出预算已用 ${((summary.expense / budget) * 100).round()}%',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                                color: overBudget
-                                    ? colors.expense
-                                    : colors.text2,
-                                fontFeatures: tabularFigures,
-                              ),
-                            ),
-                            const Spacer(),
-                            Text(
-                              '${formatAmount(summary.expense, withSymbol: true)} / ${formatAmount(budget, withSymbol: true)}',
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                color: colors.text3,
-                                fontFeatures: tabularFigures,
-                              ),
-                            ),
-                          ],
+    return Container(
+      decoration: studioHeroDecoration(colors, radius: Radii.hero),
+      child: ClipPath(
+        clipper: ShapeBorderClipper(shape: Radii.shape(Radii.hero)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        isCurrent ? '本月结余' : '当月结余',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w500,
+                          color: colors.text2,
                         ),
-                        const SizedBox(height: 6),
-                        ProgressBar(
-                          ratio: ratio,
-                          color: budgetColor,
-                          height: 3.5,
-                        ),
-                      ],
-                    )
-                  : Row(
-                      children: [
-                        Icon(
-                          Icons.track_changes_rounded,
-                          size: 15,
-                          color: colors.primary,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          '设置本月支出预算与收入目标',
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          statusText,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.right,
                           style: TextStyle(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w500,
-                            color: colors.primary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w400,
+                            color: colors.text3,
+                            fontFeatures: tabularFigures,
                           ),
                         ),
-                        const Spacer(),
-                        Icon(
-                          Icons.chevron_right_rounded,
-                          size: 16,
-                          color: colors.primary,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
+                      children: [
+                        Text(
+                          summary.balance < 0 ? '-¥' : '¥',
+                          style: TextStyle(
+                            fontSize: 22,
+                            height: 1.0,
+                            fontWeight: FontWeight.w600,
+                            color: summary.balance < 0
+                                ? colors.expense
+                                : colors.text2,
+                          ),
+                        ),
+                        const SizedBox(width: 2),
+                        AnimatedNumericText(
+                          value: summary.balance.abs(),
+                          formatter: (value) =>
+                              formatAmount(value.toDouble(), withSymbol: false),
+                          style: TextStyle(
+                            fontSize: 42,
+                            height: 1.0,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -1.6,
+                            color: summary.balance >= 0
+                                ? colors.text
+                                : colors.expense,
+                          ),
                         ),
                       ],
                     ),
+                  ),
+                  const SizedBox(height: 12),
+                  _CashflowRatioBar(
+                    income: summary.income,
+                    expense: summary.expense,
+                  ),
+                  const SizedBox(height: 12),
+                  IntrinsicHeight(
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _SideMetric(
+                            label: '本月收入',
+                            value: summary.income,
+                            color: colors.income,
+                          ),
+                        ),
+                        Container(
+                          width: 0.7,
+                          margin: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 2,
+                          ),
+                          color: colors.divider,
+                        ),
+                        Expanded(
+                          child: _SideMetric(
+                            label: '本月支出',
+                            value: summary.expense,
+                            color: colors.expense,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+            Divider(height: 1, thickness: 0.7, color: colors.divider),
+            ColoredBox(
+              color: colors.heroWell,
+              child: Pressable(
+                onTap: onOpenBudget,
+                shape: const RoundedRectangleBorder(),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 11, 18, 12),
+                  child: budget > 0
+                      ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text(
+                                  overBudget
+                                      ? '已超预算 ${formatAmount(summary.expense - budget, withSymbol: true)}'
+                                      : '支出预算已用 ${((summary.expense / budget) * 100).round()}%',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                    color: overBudget
+                                        ? colors.expense
+                                        : colors.text2,
+                                    fontFeatures: tabularFigures,
+                                  ),
+                                ),
+                                const Spacer(),
+                                Text(
+                                  '${formatAmount(summary.expense, withSymbol: true)} / ${formatAmount(budget, withSymbol: true)}',
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    color: colors.text3,
+                                    fontFeatures: tabularFigures,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            ProgressBar(
+                              ratio: ratio,
+                              color: budgetColor,
+                              height: 3.5,
+                            ),
+                          ],
+                        )
+                      : Row(
+                          children: [
+                            Icon(
+                              Icons.track_changes_rounded,
+                              size: 15,
+                              color: colors.primary,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              '设置本月支出预算与收入目标',
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w500,
+                                color: colors.primary,
+                              ),
+                            ),
+                            const Spacer(),
+                            Icon(
+                              Icons.chevron_right_rounded,
+                              size: 16,
+                              color: colors.primary,
+                            ),
+                          ],
+                        ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -847,7 +880,7 @@ class _CashflowRatioBar extends StatelessWidget {
     final incomeFlex = (income / total * 1000).round().clamp(0, 1000);
     final expenseFlex = (expense / total * 1000).round().clamp(0, 1000);
     return SizedBox(
-      height: 7,
+      height: 5.5,
       child: Row(
         children: [
           if (incomeFlex > 0)
@@ -860,7 +893,7 @@ class _CashflowRatioBar extends StatelessWidget {
                 ),
               ),
             ),
-          if (incomeFlex > 0 && expenseFlex > 0) const SizedBox(width: 4),
+          if (incomeFlex > 0 && expenseFlex > 0) const SizedBox(width: 3.5),
           if (expenseFlex > 0)
             Expanded(
               flex: expenseFlex,
@@ -891,18 +924,18 @@ class _SideMetric extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final valueColor = value == 0 ? colors.text3 : color;
+    final valueColor = value == 0 ? colors.text3 : colors.text;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
             Container(
-              width: 5,
-              height: 5,
+              width: 5.5,
+              height: 5.5,
               decoration: BoxDecoration(color: color, shape: BoxShape.circle),
             ),
-            const SizedBox(width: 5),
+            const SizedBox(width: 6),
             Text(
               label,
               style: TextStyle(
@@ -921,10 +954,10 @@ class _SideMetric extends StatelessWidget {
             value: value,
             formatter: (v) => formatAmount(v.toDouble(), withSymbol: true),
             style: TextStyle(
-              fontSize: 17,
+              fontSize: 17.5,
               height: 1.15,
               fontWeight: FontWeight.w600,
-              letterSpacing: -0.3,
+              letterSpacing: -0.35,
               color: valueColor,
             ),
           ),
@@ -963,19 +996,20 @@ class _FilterChipPill extends StatelessWidget {
         child: AnimatedContainer(
           duration: motionDuration(
             Timings.micro,
-            disableAnimations: MediaQuery.maybeDisableAnimationsOf(context) ?? false,
+            disableAnimations:
+                MediaQuery.maybeDisableAnimationsOf(context) ?? false,
           ),
           curve: Curves2.out,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6.5),
           decoration: ShapeDecoration(
-            color: selected ? colors.heroHighlight : colors.card,
+            color: selected ? colors.text : colors.card,
             shape: Radii.pillShape.copyWith(
               side: selected
                   ? BorderSide.none
                   : BorderSide(
                       color: colors.isDark
                           ? Colors.white.withValues(alpha: 0.08)
-                          : const Color(0xFF0F172A).withValues(alpha: 0.065),
+                          : colors.cardBorder,
                       width: 0.75,
                     ),
             ),
@@ -987,7 +1021,7 @@ class _FilterChipPill extends StatelessWidget {
                 Icon(
                   icon,
                   size: 14,
-                  color: selected ? Colors.white : colors.text2,
+                  color: selected ? colors.card : colors.text2,
                 ),
                 const SizedBox(width: 5),
               ],
@@ -996,7 +1030,7 @@ class _FilterChipPill extends StatelessWidget {
                 style: TextStyle(
                   fontSize: TypeScale.label,
                   fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-                  color: selected ? Colors.white : colors.text2,
+                  color: selected ? colors.card : colors.text2,
                 ),
               ),
             ],
@@ -1185,10 +1219,7 @@ class _DateGroupSection extends StatelessWidget {
       label.contains('医') ||
       label.contains('药') ||
       label.contains('健康')) {
-    return (
-      icon: Icons.medical_services_outlined,
-      color: colors.expense,
-    );
+    return (icon: Icons.medical_services_outlined, color: colors.expense);
   }
   if (label == '学习' ||
       label.contains('书') ||
@@ -1275,11 +1306,7 @@ class _EntryRow extends StatelessWidget {
                       ),
                       shape: Radii.shape(10),
                     ),
-                    child: Icon(
-                      visual.icon,
-                      size: 18,
-                      color: visual.color,
-                    ),
+                    child: Icon(visual.icon, size: 18, color: visual.color),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -1351,8 +1378,9 @@ class _EntryRow extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
-                            color: (isIncome ? colors.income : colors.expense)
-                                .withValues(alpha: 0.80),
+                            color: isIncome
+                                ? colors.income.withValues(alpha: 0.85)
+                                : colors.text2,
                           ),
                         ),
                         TextSpan(
@@ -1360,7 +1388,7 @@ class _EntryRow extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 15.5,
                             fontWeight: FontWeight.w700,
-                            color: isIncome ? colors.income : colors.expense,
+                            color: isIncome ? colors.income : colors.text,
                             fontFeatures: tabularFigures,
                           ),
                         ),
@@ -1408,15 +1436,14 @@ class _AddLedgerFab extends StatelessWidget {
             shadows: [
               BoxShadow(
                 color: colors.primary.withValues(
-                  alpha: colors.isDark ? 0.42 : 0.32,
+                  alpha: colors.isDark ? 0.32 : 0.22,
                 ),
-                blurRadius: 16,
-                offset: const Offset(0, 6),
+                blurRadius: 14,
+                offset: const Offset(0, 5),
               ),
               BoxShadow(
-                color: const Color(0xFF0F172A).withValues(
-                  alpha: colors.isDark ? 0.24 : 0.08,
-                ),
+                color: const Color(0xFF141519)
+                    .withValues(alpha: colors.isDark ? 0.24 : 0.07),
                 blurRadius: 3,
                 offset: const Offset(0, 1),
               ),
@@ -1429,11 +1456,7 @@ class _AddLedgerFab extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  Icons.add_rounded,
-                  size: 19.5,
-                  color: colors.onPrimary,
-                ),
+                Icon(Icons.add_rounded, size: 19.5, color: colors.onPrimary),
                 AnimatedSwitcher(
                   duration: motionDuration(
                     Timings.fast,
@@ -1441,10 +1464,8 @@ class _AddLedgerFab extends StatelessWidget {
                   ),
                   switchInCurve: Curves2.out,
                   switchOutCurve: Curves2.out,
-                  transitionBuilder: (child, animation) => FadeTransition(
-                    opacity: animation,
-                    child: child,
-                  ),
+                  transitionBuilder: (child, animation) =>
+                      FadeTransition(opacity: animation, child: child),
                   child: expanded
                       ? Padding(
                           key: const ValueKey('fab-label'),

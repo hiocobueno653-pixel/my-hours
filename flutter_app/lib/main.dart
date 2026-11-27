@@ -225,42 +225,67 @@ class _BootErrorScreen extends StatelessWidget {
   }
 }
 
-class MyHoursApp extends StatelessWidget {
+class MyHoursApp extends StatefulWidget {
   const MyHoursApp({super.key, required this.settings});
 
   final AppSettings settings;
 
   @override
+  State<MyHoursApp> createState() => _MyHoursAppState();
+}
+
+class _MyHoursAppState extends State<MyHoursApp> {
+  int? _themeCacheKey;
+  late ThemeData _lightTheme;
+  late ThemeData _darkTheme;
+
+  void _ensureThemes() {
+    final settings = widget.settings;
+    final key = Object.hash(
+      settings.accentColor.toARGB32(),
+      settings.colorStyle,
+      settings.pureBlack,
+      settings.fontFamily,
+    );
+    if (_themeCacheKey == key) return;
+    _themeCacheKey = key;
+    final lightColors = AppColors.light.withAccent(
+      settings.accentColor,
+      isDark: false,
+      style: settings.colorStyle,
+    );
+    final darkColors =
+        (settings.pureBlack ? AppColors.darkPureBlack : AppColors.dark)
+            .withAccent(
+              settings.accentColor,
+              isDark: true,
+              style: settings.colorStyle,
+              pureBlack: settings.pureBlack,
+            );
+    _lightTheme = buildAppTheme(
+      lightColors,
+      AppTokens.lightTokens.copyWith(colors: lightColors),
+      fontFamily: settings.fontFamily,
+    );
+    _darkTheme = buildAppTheme(
+      darkColors,
+      AppTokens.darkTokens.copyWith(colors: darkColors),
+      fontFamily: settings.fontFamily,
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final settings = widget.settings;
     return AnimatedBuilder(
       animation: settings,
       builder: (context, _) {
-        final lightColors = AppColors.light.withAccent(
-          settings.accentColor,
-          isDark: false,
-          style: settings.colorStyle,
-        );
-        final darkColors =
-            (settings.pureBlack ? AppColors.darkPureBlack : AppColors.dark)
-                .withAccent(
-                  settings.accentColor,
-                  isDark: true,
-                  style: settings.colorStyle,
-                  pureBlack: settings.pureBlack,
-                );
+        _ensureThemes();
         return MaterialApp(
           title: kHoursOnly ? '时页·工时' : '时页',
           debugShowCheckedModeBanner: false,
-          theme: buildAppTheme(
-            lightColors,
-            AppTokens.lightTokens.copyWith(colors: lightColors),
-            fontFamily: settings.fontFamily,
-          ),
-          darkTheme: buildAppTheme(
-            darkColors,
-            AppTokens.darkTokens.copyWith(colors: darkColors),
-            fontFamily: settings.fontFamily,
-          ),
+          theme: _lightTheme,
+          darkTheme: _darkTheme,
           themeMode: settings.themeMode,
           // 主题切换是状态变化，不是空间动画；不要整页渐变 200ms。
           themeAnimationDuration: Duration.zero,
@@ -375,10 +400,7 @@ class _AppLaunchGate extends ConsumerWidget {
       animation: settings,
       builder: (context, _) {
         final content = AnimatedSwitcher(
-          duration: motionDuration(
-            Timings.toast,
-            disableAnimations: disable,
-          ),
+          duration: motionDuration(Timings.toast, disableAnimations: disable),
           switchInCurve: Curves2.linear,
           switchOutCurve: Curves2.linear,
           transitionBuilder: (child, animation) {

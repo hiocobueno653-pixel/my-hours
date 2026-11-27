@@ -233,7 +233,12 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                 children: [
                   BackdropLayer(
                     backdrop: _backdrop,
-                    child: AmbientPageGlow(child: tabView),
+                    motionPixelRatio: 1.0,
+                    changeMargin: 24.0,
+                    child: AppBackdropScope(
+                      backdrop: nativeBackdrop,
+                      child: AmbientPageGlow(child: tabView),
+                    ),
                   ),
                   if (!showSidebar)
                     Positioned(
@@ -258,49 +263,50 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                     child: const _SaveStatusBanner(),
                   ),
                   Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  child: SafeArea(
-                    bottom: false,
-                    child: AnimatedSlide(
-                      duration: motionDuration(
-                        Timings.fast,
-                        disableAnimations: disable,
-                      ),
-                      offset: _exitHint == null
-                          ? const Offset(0, -1.4)
-                          : Offset.zero,
-                      curve: Curves2.out,
-                      child: AnimatedOpacity(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    child: SafeArea(
+                      bottom: false,
+                      child: AnimatedSlide(
                         duration: motionDuration(
                           Timings.fast,
                           disableAnimations: disable,
                         ),
-                        opacity: _exitHint == null ? 0 : 1,
-                        child: Padding(
-                          padding: const EdgeInsets.only(top: Gaps.sm),
-                          child: IgnorePointer(
-                            child: Center(
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: Gaps.lg,
-                                  vertical: 8,
-                                ),
-                                decoration: ShapeDecoration(
-                                  color: colors.isDark
-                                      ? colors.block
-                                      : const Color(0xE6141416),
-                                  shape: Radii.shape(Radii.md),
-                                ),
-                                child: Text(
-                                  _exitHint ?? '',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontSize: 12,
+                        offset: _exitHint == null
+                            ? const Offset(0, -1.4)
+                            : Offset.zero,
+                        curve: Curves2.out,
+                        child: AnimatedOpacity(
+                          duration: motionDuration(
+                            Timings.fast,
+                            disableAnimations: disable,
+                          ),
+                          opacity: _exitHint == null ? 0 : 1,
+                          child: Padding(
+                            padding: const EdgeInsets.only(top: Gaps.sm),
+                            child: IgnorePointer(
+                              child: Center(
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: Gaps.lg,
+                                    vertical: 8,
+                                  ),
+                                  decoration: ShapeDecoration(
                                     color: colors.isDark
-                                        ? colors.text
-                                        : Colors.white,
+                                        ? colors.block
+                                        : const Color(0xE6141416),
+                                    shape: Radii.shape(Radii.md),
+                                  ),
+                                  child: Text(
+                                    _exitHint ?? '',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: colors.isDark
+                                          ? colors.text
+                                          : Colors.white,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -310,7 +316,6 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                       ),
                     ),
                   ),
-                ),
                 ],
               ),
             );
@@ -496,12 +501,68 @@ class _FlClashTabPage extends StatefulWidget {
 class _FlClashTabPageState extends State<_FlClashTabPage>
     with AutomaticKeepAliveClientMixin<_FlClashTabPage> {
   final SnapshotController _snapshot = SnapshotController();
+  late final _TabFadeAnimation _fadeAnimation = _TabFadeAnimation();
+  bool _moving = false;
+  bool _disableAnimations = false;
 
   @override
   bool get wantKeepAlive => true;
 
+  double _currentDelta() {
+    final controller = widget.controller;
+    final hasPage =
+        controller.hasClients && controller.position.hasContentDimensions;
+    final page = hasPage
+        ? (controller.page ?? widget.slotIndex.toDouble())
+        : widget.slotIndex.toDouble();
+    return (page - widget.slotIndex).clamp(-1.0, 1.0);
+  }
+
+  void _syncMotion({bool allowSetState = true}) {
+    final delta = _currentDelta();
+    final absDelta = delta.abs();
+    final moving = !_disableAnimations && absDelta > 0.001 && absDelta < 0.999;
+    _snapshot.allowSnapshotting = moving;
+    if (widget.fadeMode && !_disableAnimations) {
+      _fadeAnimation.setValue((1.0 - absDelta).clamp(0.0, 1.0));
+    } else {
+      _fadeAnimation.setValue(1.0);
+    }
+    if (_moving != moving) {
+      _moving = moving;
+      if (allowSetState && mounted) {
+        setState(() {});
+      }
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_syncMotion);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _disableAnimations = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    _syncMotion(allowSetState: false);
+  }
+
+  @override
+  void didUpdateWidget(covariant _FlClashTabPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller.removeListener(_syncMotion);
+      widget.controller.addListener(_syncMotion);
+    }
+    _syncMotion(allowSetState: false);
+  }
+
   @override
   void dispose() {
+    widget.controller.removeListener(_syncMotion);
+    _fadeAnimation.dispose();
     _snapshot.dispose();
     super.dispose();
   }
@@ -509,56 +570,62 @@ class _FlClashTabPageState extends State<_FlClashTabPage>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    final disable = _disableAnimations;
     final body = RepaintBoundary(
       child: ColoredBox(
         color: Theme.of(context).scaffoldBackgroundColor,
         child: widget.child,
       ),
     );
+    final snapshotted = SnapshotWidget(
+      controller: _snapshot,
+      mode: SnapshotMode.permissive,
+      child: body,
+    );
+    final gated = TickerMode(
+      enabled: widget.active || _moving,
+      child: IgnorePointer(
+        ignoring: !widget.active,
+        child: ExcludeSemantics(
+          excluding: !widget.active,
+          child: ExcludeFocus(excluding: !widget.active, child: snapshotted),
+        ),
+      ),
+    );
+
+    if (!widget.fadeMode || disable) return gated;
 
     return AnimatedBuilder(
       animation: widget.controller,
-      child: SnapshotWidget(
-        controller: _snapshot,
-        mode: SnapshotMode.permissive,
-        child: body,
-      ),
+      child: FadeTransition(opacity: _fadeAnimation, child: gated),
       builder: (context, child) {
-        final hasPage =
-            widget.controller.hasClients &&
-            widget.controller.position.hasContentDimensions;
-        final page = hasPage
-            ? (widget.controller.page ?? widget.slotIndex.toDouble())
-            : widget.slotIndex.toDouble();
-        final delta = (page - widget.slotIndex).clamp(-1.0, 1.0);
-        final moving = !disable && delta.abs() > 0.001;
-        _snapshot.allowSnapshotting = moving;
-
-        final gated = TickerMode(
-          enabled: widget.active || moving,
-          child: IgnorePointer(
-            ignoring: !widget.active,
-            child: ExcludeSemantics(
-              excluding: !widget.active,
-              child: ExcludeFocus(
-                excluding: !widget.active,
-                child: child!,
-              ),
-            ),
-          ),
-        );
-
-        if (!widget.fadeMode || disable) return gated;
         return FractionalTranslation(
-          translation: Offset(delta, 0),
-          child: Opacity(
-            opacity: (1.0 - delta.abs()).clamp(0.0, 1.0),
-            child: gated,
-          ),
+          translation: Offset(_currentDelta(), 0),
+          child: child,
         );
       },
     );
+  }
+}
+
+class _TabFadeAnimation extends Animation<double>
+    with
+        AnimationEagerListenerMixin,
+        AnimationLocalListenersMixin,
+        AnimationLocalStatusListenersMixin {
+  double _value = 1.0;
+
+  @override
+  double get value => _value;
+
+  @override
+  AnimationStatus get status =>
+      _value <= 0 ? AnimationStatus.dismissed : AnimationStatus.completed;
+
+  void setValue(double next) {
+    if ((_value - next).abs() < 0.0005) return;
+    _value = next;
+    notifyListeners();
   }
 }
 
@@ -578,8 +645,8 @@ class _BottomNavBar extends StatelessWidget {
   static const double dockHeight = 56;
   static const double _maxWidth = 340;
   static final ImageFilter _fixedBarBlur = ImageFilter.blur(
-    sigmaX: 22,
-    sigmaY: 22,
+    sigmaX: 14,
+    sigmaY: 14,
   );
 
   final List<AppTab> tabs;
@@ -622,8 +689,8 @@ class _BottomNavBar extends StatelessWidget {
       final barColor = highContrast
           ? colors.card
           : (colors.isDark
-              ? colors.card.withValues(alpha: 0.78)
-              : Colors.white.withValues(alpha: 0.80));
+                ? colors.card.withValues(alpha: 0.78)
+                : Colors.white.withValues(alpha: 0.80));
       final barSurface = DecoratedBox(
         decoration: BoxDecoration(
           color: barColor,
@@ -666,12 +733,9 @@ class _BottomNavBar extends StatelessWidget {
           ),
         ),
       );
-      if (highContrast) return barSurface;
+      if (highContrast || disable) return barSurface;
       return ClipRect(
-        child: BackdropFilter(
-          filter: _fixedBarBlur,
-          child: barSurface,
-        ),
+        child: BackdropFilter(filter: _fixedBarBlur, child: barSurface),
       );
     }
 
@@ -690,12 +754,12 @@ class _BottomNavBar extends StatelessWidget {
                 accent: colors.primary,
                 content: colors.text,
                 container: colors.isDark
-                    ? const Color(0xFF131926).withValues(
-                        alpha: highContrast ? 1.0 : 0.86,
-                      )
-                    : colors.card.withValues(
-                        alpha: highContrast ? 1.0 : 0.92,
-                      ),
+                    ? Color.lerp(
+                        colors.card,
+                        Colors.white,
+                        0.045,
+                      )!.withValues(alpha: highContrast ? 1.0 : 0.88)
+                    : colors.card.withValues(alpha: highContrast ? 1.0 : 0.92),
               ),
               child: LiquidBottomTabs(
                 selectedTabIndex: activeIndex,
@@ -719,9 +783,7 @@ class _BottomNavBar extends StatelessWidget {
                           onSelect(tab);
                         }
                       },
-                      children: [
-                        _LiquidTabFace(tab: tab),
-                      ],
+                      children: [_LiquidTabFace(tab: tab)],
                     ),
                 ],
               ),
@@ -742,7 +804,8 @@ class _LiquidTabFace extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final inAccentCopy =
-        context.getElementForInheritedWidgetOfExactType<LiquidBottomTabScale>() !=
+        context
+            .getElementForInheritedWidgetOfExactType<LiquidBottomTabScale>() !=
         null;
     return Column(
       mainAxisSize: MainAxisSize.min,

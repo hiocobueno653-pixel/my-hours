@@ -25,6 +25,19 @@ List<double> _lerpSeries(List<double> from, List<double> to, double t) {
   });
 }
 
+void _disposeTextPainters(List<TextPainter> painters) {
+  for (final painter in painters) {
+    painter.dispose();
+  }
+}
+
+TextPainter _layoutTextPainter(String text, TextStyle style) {
+  return TextPainter(
+    text: TextSpan(text: text, style: style),
+    textDirection: TextDirection.ltr,
+  )..layout();
+}
+
 /// 双序列柱状图（收入/支出）。
 class BarPairChart extends StatefulWidget {
   const BarPairChart({
@@ -71,11 +84,82 @@ class _BarPairChartState extends State<BarPairChart>
     duration: Timings.fast,
     value: 1,
   );
+  late final Listenable _repaint = Listenable.merge([
+    _dataController,
+    _selectController,
+  ]);
   late List<double> _fromA = List<double>.filled(widget.seriesA.length, 0);
   late List<double> _fromB = List<double>.filled(widget.seriesB.length, 0);
   double? _fromSelected;
   double? _toSelected;
   bool _started = false;
+  int? _xCacheKey;
+  List<TextPainter> _xLabelPainters = const [];
+  int? _yCacheKey;
+  List<TextPainter> _yLabelPainters = const [];
+
+  void _syncLabelCaches({
+    required double targetMax,
+    required Color labelColor,
+    required Color selectedLabelColor,
+    required String? fontFamily,
+  }) {
+    final xKey = Object.hash(
+      Object.hashAll(widget.labels),
+      widget.selectedIndex,
+      labelColor.toARGB32(),
+      selectedLabelColor.toARGB32(),
+      fontFamily,
+    );
+    if (_xCacheKey != xKey) {
+      _disposeTextPainters(_xLabelPainters);
+      _xCacheKey = xKey;
+      _xLabelPainters = [
+        for (var i = 0; i < widget.labels.length; i++)
+          _layoutTextPainter(
+            widget.labels[i],
+            TextStyle(
+              fontSize: TypeScale.micro,
+              color: i == widget.selectedIndex
+                  ? selectedLabelColor
+                  : labelColor,
+              fontWeight: i == widget.selectedIndex
+                  ? FontWeight.w600
+                  : FontWeight.w400,
+              fontFamily: fontFamily,
+            ),
+          ),
+      ];
+    }
+
+    final yKey = Object.hash(targetMax, labelColor.toARGB32(), fontFamily);
+    if (_yCacheKey != yKey) {
+      _disposeTextPainters(_yLabelPainters);
+      _yCacheKey = yKey;
+      if (targetMax <= 0) {
+        _yLabelPainters = const [];
+      } else {
+        final yStyle = TextStyle(
+          fontSize: 9.5,
+          fontWeight: FontWeight.w500,
+          color: labelColor.withValues(alpha: 0.82),
+          fontFamily: fontFamily,
+          fontFeatures: tabularFigures,
+        );
+        _yLabelPainters = [
+          _layoutTextPainter(_compactNumber(targetMax.roundToDouble()), yStyle),
+          _layoutTextPainter(
+            _compactNumber((targetMax * 2 / 3).roundToDouble()),
+            yStyle,
+          ),
+          _layoutTextPainter(
+            _compactNumber((targetMax / 3).roundToDouble()),
+            yStyle,
+          ),
+        ];
+      }
+    }
+  }
 
   @override
   void initState() {
@@ -145,6 +229,8 @@ class _BarPairChartState extends State<BarPairChart>
 
   @override
   void dispose() {
+    _disposeTextPainters(_xLabelPainters);
+    _disposeTextPainters(_yLabelPainters);
     _dataController.dispose();
     _selectController.dispose();
     super.dispose();
@@ -167,6 +253,13 @@ class _BarPairChartState extends State<BarPairChart>
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    var targetMax = 0.0;
+    for (final v in widget.seriesA) {
+      if (v > targetMax) targetMax = v;
+    }
+    for (final v in widget.seriesB) {
+      if (v > targetMax) targetMax = v;
+    }
     return Semantics(
       container: true,
       excludeSemantics: true,
@@ -175,6 +268,12 @@ class _BarPairChartState extends State<BarPairChart>
       child: LayoutBuilder(
         builder: (context, constraints) {
           final fontFamily = DefaultTextStyle.of(context).style.fontFamily;
+          _syncLabelCaches(
+            targetMax: targetMax,
+            labelColor: colors.text3,
+            selectedLabelColor: colors.primary,
+            fontFamily: fontFamily,
+          );
           return GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTapDown: widget.onSelected == null || widget.labels.isEmpty
@@ -190,53 +289,36 @@ class _BarPairChartState extends State<BarPairChart>
                     widget.onSelected!(index);
                   },
             child: RepaintBoundary(
-              child: AnimatedBuilder(
-                animation: Listenable.merge([
-                  _dataController,
-                  _selectController,
-                ]),
-                builder: (context, _) {
-                  final t = Curves2.out.transform(_dataController.value);
-                  final animatedA = _lerpSeries(_fromA, widget.seriesA, t);
-                  final animatedB = _lerpSeries(_fromB, widget.seriesB, t);
-                  final targetMax = [
-                    ...widget.seriesA,
-                    ...widget.seriesB,
-                  ].fold<double>(0, (m, v) => math.max(m, v));
-                  final animatedMax = [
-                    ...animatedA,
-                    ...animatedB,
-                    targetMax,
-                  ].fold<double>(0, (m, v) => math.max(m, v));
-                  return CustomPaint(
-                    isComplex: true,
-                    willChange:
-                        _dataController.isAnimating ||
-                        _selectController.isAnimating,
-                    painter: _BarPairPainter(
-                      labels: widget.labels,
-                      seriesA: animatedA,
-                      seriesB: animatedB,
-                      scaleMax: animatedMax,
-                      labelMax: targetMax,
-                      colorA: widget.colorA,
-                      colorB: widget.colorB,
-                      gridColor: colors.divider,
-                      labelColor: colors.text3,
-                      selectedIndex: widget.selectedIndex,
-                      selectedSlot: _currentSelectedSlot(),
-                      highlightColor: colors.primary.withValues(
-                        alpha: colors.isDark ? 0.12 : 0.07,
-                      ),
-                      selectedLabelColor: colors.primary,
-                      fontFamily: fontFamily,
-                    ),
-                    child: SizedBox(
-                      height: widget.height,
-                      width: double.infinity,
-                    ),
-                  );
-                },
+              child: CustomPaint(
+                isComplex: true,
+                willChange:
+                    _dataController.isAnimating ||
+                    _selectController.isAnimating,
+                painter: _BarPairPainter(
+                  repaint: _repaint,
+                  dataAnimation: _dataController,
+                  selectAnimation: _selectController,
+                  labels: widget.labels,
+                  fromA: _fromA,
+                  toA: widget.seriesA,
+                  fromB: _fromB,
+                  toB: widget.seriesB,
+                  targetMax: targetMax,
+                  colorA: widget.colorA,
+                  colorB: widget.colorB,
+                  gridColor: colors.divider,
+                  selectedIndex: widget.selectedIndex,
+                  fromSelected: _fromSelected,
+                  toSelected: _toSelected,
+                  highlightColor: colors.primary.withValues(
+                    alpha: colors.isDark ? 0.12 : 0.07,
+                  ),
+                  xLabelPainters: _xLabelPainters,
+                  yLabelPainters: _yLabelPainters,
+                  xCacheKey: _xCacheKey ?? 0,
+                  yCacheKey: _yCacheKey ?? 0,
+                ),
+                child: SizedBox(height: widget.height, width: double.infinity),
               ),
             ),
           );
@@ -253,92 +335,115 @@ String _compactNumber(double value) {
 
 class _BarPairPainter extends CustomPainter {
   _BarPairPainter({
+    required Listenable repaint,
+    required this.dataAnimation,
+    required this.selectAnimation,
     required this.labels,
-    required this.seriesA,
-    required this.seriesB,
-    required this.scaleMax,
-    required this.labelMax,
+    required this.fromA,
+    required this.toA,
+    required this.fromB,
+    required this.toB,
+    required this.targetMax,
     required this.colorA,
     required this.colorB,
     required this.gridColor,
-    required this.labelColor,
     required this.selectedIndex,
-    required this.selectedSlot,
+    required this.fromSelected,
+    required this.toSelected,
     required this.highlightColor,
-    required this.selectedLabelColor,
-    this.fontFamily,
-  });
+    required this.xLabelPainters,
+    required this.yLabelPainters,
+    required this.xCacheKey,
+    required this.yCacheKey,
+  }) : super(repaint: repaint);
 
+  final Animation<double> dataAnimation;
+  final Animation<double> selectAnimation;
   final List<String> labels;
-  final List<double> seriesA;
-  final List<double> seriesB;
-  final double scaleMax;
-  final double labelMax;
+  final List<double> fromA;
+  final List<double> toA;
+  final List<double> fromB;
+  final List<double> toB;
+  final double targetMax;
   final Color colorA;
   final Color colorB;
   final Color gridColor;
-  final Color labelColor;
   final int? selectedIndex;
-  final double? selectedSlot;
+  final double? fromSelected;
+  final double? toSelected;
   final Color highlightColor;
-  final Color selectedLabelColor;
-  final String? fontFamily;
+  final List<TextPainter> xLabelPainters;
+  final List<TextPainter> yLabelPainters;
+  final int xCacheKey;
+  final int yCacheKey;
+
+  double _valueAt(List<double> from, List<double> to, int index, double t) {
+    if (index >= to.length) return 0.0;
+    final start = index < from.length ? from[index] : 0.0;
+    return start + (to[index] - start) * t;
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
     if (labels.isEmpty) return;
     const bottomInset = 20.0;
     final chartHeight = size.height - bottomInset;
+    final t = Curves2.out.transform(dataAnimation.value);
+    var scaleMax = targetMax;
+    final countA = toA.length;
+    for (var i = 0; i < countA; i++) {
+      final v = _valueAt(fromA, toA, i, t);
+      if (v > scaleMax) scaleMax = v;
+    }
+    final countB = toB.length;
+    for (var i = 0; i < countB; i++) {
+      final v = _valueAt(fromB, toB, i, t);
+      if (v > scaleMax) scaleMax = v;
+    }
     final scale = scaleMax <= 0 ? 1.0 : chartHeight / (scaleMax * 1.15);
 
     final gridPaint = Paint()
       ..color = gridColor.withValues(alpha: 0.65)
+      ..style = PaintingStyle.stroke
       ..strokeWidth = 0.8;
+    final dashPath = Path();
     for (var i = 0; i <= 3; i++) {
       final y = chartHeight * i / 3;
       if (i == 3) {
         canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
       } else {
-        _drawDashedLine(canvas, Offset(0, y), Offset(size.width, y), gridPaint);
+        _addDashedLine(dashPath, Offset(0, y), Offset(size.width, y));
       }
     }
+    canvas.drawPath(dashPath, gridPaint);
 
-    if (labelMax > 0) {
-      final maxTp = TextPainter(
-        text: TextSpan(
-          text: _compactNumber(labelMax),
-          style: TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w600,
-            color: labelColor.withValues(alpha: 0.90),
-            fontFamily: fontFamily,
-            fontFeatures: tabularFigures,
-          ),
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout();
-      final pillRect = Rect.fromLTWH(
-        size.width - maxTp.width - 10,
-        0,
-        maxTp.width + 10,
-        maxTp.height + 4,
-      );
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(pillRect, const Radius.circular(6)),
-        Paint()..color = gridColor.withValues(alpha: 0.65),
-      );
-      maxTp.paint(canvas, Offset(pillRect.left + 5, pillRect.top + 2));
+    if (yLabelPainters.length == 3) {
+      yLabelPainters[0].paint(canvas, const Offset(0, 2));
+      yLabelPainters[1].paint(canvas, Offset(0, chartHeight / 3 + 2));
+      yLabelPainters[2].paint(canvas, Offset(0, chartHeight * 2 / 3 + 2));
     }
 
     final slot = size.width / labels.length;
-    final barWidth = math.min(8.5, slot * 0.26);
+    final barWidth = math.min(9.0, slot * 0.28);
     final radius = Radius.circular(barWidth / 2);
-    final trackPaint = Paint()..color = gridColor.withValues(alpha: 0.36);
+    final notchPaint = Paint()..color = gridColor.withValues(alpha: 0.72);
+
+    final double? selectedSlot;
+    if (toSelected == null) {
+      selectedSlot = null;
+    } else {
+      final start = fromSelected ?? toSelected!;
+      final st = Curves2.out.transform(selectAnimation.value);
+      selectedSlot = start + (toSelected! - start) * st;
+    }
 
     if (selectedSlot != null &&
-        selectedSlot! >= -0.5 &&
-        selectedSlot! <= labels.length - 0.5) {
-      final clampedSlot = selectedSlot!.clamp(0.0, (labels.length - 1).toDouble());
+        selectedSlot >= -0.5 &&
+        selectedSlot <= labels.length - 0.5) {
+      final clampedSlot = selectedSlot.clamp(
+        0.0,
+        (labels.length - 1).toDouble(),
+      );
       final left = slot * clampedSlot + 2;
       final right = slot * (clampedSlot + 1) - 2;
       canvas.drawRRect(
@@ -350,31 +455,36 @@ class _BarPairPainter extends CustomPainter {
       );
     }
 
+    final gradientA = LinearGradient(
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+      colors: [Color.lerp(colorA, Colors.white, 0.14)!, colorA],
+    );
+    final gradientB = LinearGradient(
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+      colors: [Color.lerp(colorB, Colors.white, 0.14)!, colorB],
+    );
+    final barPaint = Paint();
+
     for (var i = 0; i < labels.length; i++) {
       final cx = slot * i + slot / 2;
-      const trackTop = 10.0;
-      final trackHeight = math.max(0.0, chartHeight - trackTop);
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromLTWH(
-            cx - barWidth - 1.5,
-            trackTop,
-            barWidth,
-            trackHeight,
+      final a = _valueAt(fromA, toA, i, t) * scale;
+      final b = _valueAt(fromB, toB, i, t) * scale;
+      if (a <= 0 && b <= 0) {
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            Rect.fromLTWH(
+              cx - barWidth * 0.65,
+              chartHeight - 3,
+              barWidth * 1.3,
+              3,
+            ),
+            const Radius.circular(999),
           ),
-          radius,
-        ),
-        trackPaint,
-      );
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromLTWH(cx + 1.5, trackTop, barWidth, trackHeight),
-          radius,
-        ),
-        trackPaint,
-      );
-      final a = (i < seriesA.length ? seriesA[i] : 0.0) * scale;
-      final b = (i < seriesB.length ? seriesB[i] : 0.0) * scale;
+          notchPaint,
+        );
+      }
       if (a > 0) {
         final rectA = Rect.fromLTWH(
           cx - barWidth - 1.5,
@@ -382,64 +492,38 @@ class _BarPairPainter extends CustomPainter {
           barWidth,
           a,
         );
-        canvas.drawRRect(
-          RRect.fromRectAndRadius(rectA, radius),
-          Paint()
-            ..shader = LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Color.lerp(colorA, Colors.white, 0.14)!,
-                colorA,
-              ],
-            ).createShader(rectA),
-        );
+        barPaint.shader = gradientA.createShader(rectA);
+        canvas.drawRRect(RRect.fromRectAndRadius(rectA, radius), barPaint);
       }
       if (b > 0) {
         final rectB = Rect.fromLTWH(cx + 1.5, chartHeight - b, barWidth, b);
-        canvas.drawRRect(
-          RRect.fromRectAndRadius(rectB, radius),
-          Paint()
-            ..shader = LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Color.lerp(colorB, Colors.white, 0.14)!,
-                colorB,
-              ],
-            ).createShader(rectB),
-        );
+        barPaint.shader = gradientB.createShader(rectB);
+        canvas.drawRRect(RRect.fromRectAndRadius(rectB, radius), barPaint);
       }
-      final tp = TextPainter(
-        text: TextSpan(
-          text: labels[i],
-          style: TextStyle(
-            fontSize: TypeScale.micro,
-            color: i == selectedIndex ? selectedLabelColor : labelColor,
-            fontWeight: i == selectedIndex ? FontWeight.w600 : FontWeight.w400,
-            fontFamily: fontFamily,
-          ),
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout();
-      tp.paint(canvas, Offset(cx - tp.width / 2, chartHeight + 6));
+      if (i < xLabelPainters.length) {
+        final tp = xLabelPainters[i];
+        tp.paint(canvas, Offset(cx - tp.width / 2, chartHeight + 6));
+      }
     }
   }
 
   @override
   bool shouldRepaint(_BarPairPainter old) =>
-      !listEquals(old.seriesA, seriesA) ||
-      !listEquals(old.seriesB, seriesB) ||
+      !listEquals(old.fromA, fromA) ||
+      !listEquals(old.toA, toA) ||
+      !listEquals(old.fromB, fromB) ||
+      !listEquals(old.toB, toB) ||
       !listEquals(old.labels, labels) ||
-      old.scaleMax != scaleMax ||
-      old.labelMax != labelMax ||
+      old.targetMax != targetMax ||
       old.colorA != colorA ||
       old.colorB != colorB ||
+      old.gridColor != gridColor ||
       old.selectedIndex != selectedIndex ||
-      old.selectedSlot != selectedSlot ||
+      old.fromSelected != fromSelected ||
+      old.toSelected != toSelected ||
       old.highlightColor != highlightColor ||
-      old.selectedLabelColor != selectedLabelColor ||
-      old.fontFamily != fontFamily;
+      old.xCacheKey != xCacheKey ||
+      old.yCacheKey != yCacheKey;
 }
 
 /// 环形占比图。
@@ -535,6 +619,7 @@ class _DonutChartState extends State<DonutChart>
   Widget build(BuildContext context) {
     final tokens = context.colors;
     final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    final fromTotal = _fromValues.fold<double>(0, (s, v) => s + v);
     return Semantics(
       container: true,
       excludeSemantics: true,
@@ -543,25 +628,17 @@ class _DonutChartState extends State<DonutChart>
         width: widget.size,
         height: widget.size,
         child: RepaintBoundary(
-          child: AnimatedBuilder(
-            animation: _controller,
-            builder: (context, child) {
-              final t = Curves2.out.transform(_controller.value);
-              final animatedValues = _lerpSeries(_fromValues, widget.values, t);
-              final fromTotal = _fromValues.fold<double>(0, (s, v) => s + v);
-              final sweepProgress = fromTotal <= 0 ? t : 1.0;
-              return CustomPaint(
-                isComplex: true,
-                willChange: _controller.isAnimating,
-                painter: _DonutPainter(
-                  values: animatedValues,
-                  colors: widget.colors,
-                  trackColor: tokens.inset,
-                  sweepProgress: sweepProgress,
-                ),
-                child: child,
-              );
-            },
+          child: CustomPaint(
+            isComplex: true,
+            willChange: _controller.isAnimating,
+            painter: _DonutPainter(
+              animation: _controller,
+              fromValues: _fromValues,
+              toValues: widget.values,
+              fromTotal: fromTotal,
+              colors: widget.colors,
+              trackColor: tokens.inset,
+            ),
             child: Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -606,20 +683,31 @@ class _DonutChartState extends State<DonutChart>
 
 class _DonutPainter extends CustomPainter {
   _DonutPainter({
-    required this.values,
+    required this.animation,
+    required this.fromValues,
+    required this.toValues,
+    required this.fromTotal,
     required this.colors,
     required this.trackColor,
-    this.sweepProgress = 1.0,
-  });
+  }) : super(repaint: animation);
 
-  final List<double> values;
+  final Animation<double> animation;
+  final List<double> fromValues;
+  final List<double> toValues;
+  final double fromTotal;
   final List<Color> colors;
   final Color trackColor;
-  final double sweepProgress;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final total = values.fold<double>(0, (s, v) => s + v);
+    final t = Curves2.out.transform(animation.value);
+    final sweepProgress = fromTotal <= 0 ? t : 1.0;
+    final count = toValues.length;
+    var total = 0.0;
+    for (var i = 0; i < count; i++) {
+      final start = i < fromValues.length ? fromValues[i] : 0.0;
+      total += start + (toValues[i] - start) * t;
+    }
     final stroke = size.width * 0.14;
     final rect = Rect.fromCircle(
       center: size.center(Offset.zero),
@@ -638,8 +726,10 @@ class _DonutPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = stroke
       ..strokeCap = StrokeCap.round;
-    for (var i = 0; i < values.length; i++) {
-      final sweep = maxArc * (values[i] / total);
+    for (var i = 0; i < count; i++) {
+      final fromVal = i < fromValues.length ? fromValues[i] : 0.0;
+      final value = fromVal + (toValues[i] - fromVal) * t;
+      final sweep = maxArc * (value / total);
       if (sweep <= 0) continue;
       arcPaint.color = colors[i % colors.length];
       canvas.drawArc(
@@ -655,10 +745,11 @@ class _DonutPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_DonutPainter old) =>
-      !listEquals(old.values, values) ||
+      !listEquals(old.fromValues, fromValues) ||
+      !listEquals(old.toValues, toValues) ||
+      old.fromTotal != fromTotal ||
       !listEquals(old.colors, colors) ||
-      old.trackColor != trackColor ||
-      old.sweepProgress != sweepProgress;
+      old.trackColor != trackColor;
 }
 
 /// 进度条（预算/目标）。
@@ -708,10 +799,7 @@ class ProgressBar extends StatelessWidget {
                     disableAnimations: disable,
                   ),
                   curve: Curves2.soft,
-                  decoration: BoxDecoration(
-                    color: color,
-                    borderRadius: radius,
-                  ),
+                  decoration: BoxDecoration(color: color, borderRadius: radius),
                 ),
               ),
             ),
@@ -753,6 +841,76 @@ class _TrendChartState extends State<TrendChart>
   );
   late List<double> _fromValues = List<double>.filled(widget.values.length, 0);
   bool _started = false;
+  int? _xCacheKey;
+  List<TextPainter> _xLabelPainters = const [];
+  int? _yCacheKey;
+  List<TextPainter> _yLabelPainters = const [];
+  int? _peakCacheKey;
+  TextPainter? _peakLabelPainter;
+
+  void _syncLabelCaches({
+    required double targetMax,
+    required Color labelColor,
+    required Color onColor,
+    required String? fontFamily,
+  }) {
+    final xKey = Object.hash(
+      Object.hashAll(widget.labels),
+      labelColor.toARGB32(),
+      fontFamily,
+    );
+    if (_xCacheKey != xKey) {
+      _disposeTextPainters(_xLabelPainters);
+      _xCacheKey = xKey;
+      final xStyle = TextStyle(
+        fontSize: TypeScale.micro,
+        color: labelColor,
+        fontFamily: fontFamily,
+      );
+      _xLabelPainters = [
+        for (final label in widget.labels) _layoutTextPainter(label, xStyle),
+      ];
+    }
+
+    final yKey = Object.hash(targetMax, labelColor.toARGB32(), fontFamily);
+    if (_yCacheKey != yKey) {
+      _disposeTextPainters(_yLabelPainters);
+      _yCacheKey = yKey;
+      if (targetMax <= 0) {
+        _yLabelPainters = const [];
+      } else {
+        final yStyle = TextStyle(
+          fontSize: 9.5,
+          fontWeight: FontWeight.w500,
+          color: labelColor.withValues(alpha: 0.85),
+          fontFamily: fontFamily,
+          fontFeatures: tabularFigures,
+        );
+        _yLabelPainters = [
+          _layoutTextPainter(_compactNumber(targetMax), yStyle),
+          _layoutTextPainter(_compactNumber(targetMax / 2), yStyle),
+        ];
+      }
+    }
+
+    final peakKey = Object.hash(targetMax, onColor.toARGB32(), fontFamily);
+    if (_peakCacheKey != peakKey) {
+      _peakLabelPainter?.dispose();
+      _peakCacheKey = peakKey;
+      _peakLabelPainter = targetMax <= 0
+          ? null
+          : _layoutTextPainter(
+              _compactNumber(targetMax),
+              TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w700,
+                color: onColor,
+                fontFamily: fontFamily,
+                fontFeatures: tabularFigures,
+              ),
+            );
+    }
+  }
 
   @override
   void didChangeDependencies() {
@@ -789,6 +947,9 @@ class _TrendChartState extends State<TrendChart>
 
   @override
   void dispose() {
+    _disposeTextPainters(_xLabelPainters);
+    _disposeTextPainters(_yLabelPainters);
+    _peakLabelPainter?.dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -808,6 +969,16 @@ class _TrendChartState extends State<TrendChart>
   Widget build(BuildContext context) {
     final colors = context.colors;
     final fontFamily = DefaultTextStyle.of(context).style.fontFamily;
+    var targetMax = 0.0;
+    for (final v in widget.values) {
+      if (v > targetMax) targetMax = v;
+    }
+    _syncLabelCaches(
+      targetMax: targetMax,
+      labelColor: colors.text3,
+      onColor: colors.onPrimary,
+      fontFamily: fontFamily,
+    );
     return Semantics(
       container: true,
       excludeSemantics: true,
@@ -815,36 +986,26 @@ class _TrendChartState extends State<TrendChart>
       child: SizedBox(
         height: widget.height,
         child: RepaintBoundary(
-          child: AnimatedBuilder(
-            animation: _controller,
-            builder: (context, child) {
-              final t = Curves2.out.transform(_controller.value);
-              final animatedValues = _lerpSeries(_fromValues, widget.values, t);
-              final targetMax = widget.values.fold<double>(
-                0,
-                (m, v) => math.max(m, v),
-              );
-              final scaleMax = animatedValues.fold<double>(
-                targetMax,
-                (m, v) => math.max(m, v),
-              );
-              return CustomPaint(
-                isComplex: true,
-                willChange: _controller.isAnimating,
-                painter: _TrendPainter(
-                  values: animatedValues,
-                  scaleMax: scaleMax,
-                  labelMax: targetMax,
-                  peakOpacity: t,
-                  labels: widget.labels,
-                  color: widget.color,
-                  gridColor: colors.divider,
-                  labelColor: colors.text3,
-                  fontFamily: fontFamily,
-                ),
-                child: child,
-              );
-            },
+          child: CustomPaint(
+            isComplex: true,
+            willChange: _controller.isAnimating,
+            painter: _TrendPainter(
+              animation: _controller,
+              fromValues: _fromValues,
+              toValues: widget.values,
+              labelMax: targetMax,
+              labels: widget.labels,
+              color: widget.color,
+              onColor: colors.onPrimary,
+              surfaceColor: colors.card,
+              gridColor: colors.divider,
+              fontFamily: fontFamily,
+              xLabelPainters: _xLabelPainters,
+              yLabelPainters: _yLabelPainters,
+              peakLabelPainter: _peakLabelPainter,
+              xCacheKey: _xCacheKey ?? 0,
+              yCacheKey: _yCacheKey ?? 0,
+            ),
             child: const SizedBox.expand(),
           ),
         ),
@@ -855,30 +1016,52 @@ class _TrendChartState extends State<TrendChart>
 
 class _TrendPainter extends CustomPainter {
   _TrendPainter({
-    required this.values,
-    required this.scaleMax,
+    required this.animation,
+    required this.fromValues,
+    required this.toValues,
     required this.labelMax,
-    required this.peakOpacity,
     required this.labels,
     required this.color,
+    required this.onColor,
+    required this.surfaceColor,
     required this.gridColor,
-    required this.labelColor,
     this.fontFamily,
-  });
+    required this.xLabelPainters,
+    required this.yLabelPainters,
+    required this.peakLabelPainter,
+    required this.xCacheKey,
+    required this.yCacheKey,
+  }) : super(repaint: animation);
 
-  final List<double> values;
-  final double scaleMax;
+  final Animation<double> animation;
+  final List<double> fromValues;
+  final List<double> toValues;
   final double labelMax;
-  final double peakOpacity;
   final List<String> labels;
   final Color color;
+  final Color onColor;
+  final Color surfaceColor;
   final Color gridColor;
-  final Color labelColor;
   final String? fontFamily;
+  final List<TextPainter> xLabelPainters;
+  final List<TextPainter> yLabelPainters;
+  final TextPainter? peakLabelPainter;
+  final int xCacheKey;
+  final int yCacheKey;
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (values.isEmpty) return;
+    final count = toValues.length;
+    if (count == 0) return;
+    final t = Curves2.out.transform(animation.value);
+    final values = List<double>.generate(count, (i) {
+      final start = i < fromValues.length ? fromValues[i] : 0.0;
+      return start + (toValues[i] - start) * t;
+    });
+    var scaleMax = labelMax;
+    for (final v in values) {
+      if (v > scaleMax) scaleMax = v;
+    }
     const bottomInset = 18.0;
     final chartHeight = size.height - bottomInset;
     final top = scaleMax <= 0 ? 1.0 : scaleMax * 1.12;
@@ -924,14 +1107,22 @@ class _TrendPainter extends CustomPainter {
 
     final gridPaint = Paint()
       ..color = gridColor.withValues(alpha: 0.65)
+      ..style = PaintingStyle.stroke
       ..strokeWidth = 0.8;
+    final dashPath = Path();
     for (var i = 0; i <= 2; i++) {
       final y = chartHeight * i / 2;
       if (i == 2) {
         canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
       } else {
-        _drawDashedLine(canvas, Offset(0, y), Offset(size.width, y), gridPaint);
+        _addDashedLine(dashPath, Offset(0, y), Offset(size.width, y));
       }
+    }
+    canvas.drawPath(dashPath, gridPaint);
+
+    if (yLabelPainters.length == 2) {
+      yLabelPainters[0].paint(canvas, const Offset(0, 2));
+      yLabelPainters[1].paint(canvas, Offset(0, chartHeight / 2 + 2));
     }
 
     final areaPaint = Paint()
@@ -939,11 +1130,11 @@ class _TrendPainter extends CustomPainter {
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: [
-          color.withValues(alpha: 0.26),
-          color.withValues(alpha: 0.06),
-          color.withValues(alpha: 0.01),
+          color.withValues(alpha: 0.16),
+          color.withValues(alpha: 0.04),
+          color.withValues(alpha: 0.0),
         ],
-        stops: const [0.0, 0.62, 1.0],
+        stops: const [0.0, 0.65, 1.0],
       ).createShader(Rect.fromLTWH(0, 0, size.width, chartHeight));
 
     canvas
@@ -953,27 +1144,23 @@ class _TrendPainter extends CustomPainter {
       ..drawPath(
         path,
         Paint()
-          ..color = color.withValues(alpha: 0.22)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 6.0
-          ..strokeCap = StrokeCap.round
-          ..strokeJoin = StrokeJoin.round,
-      )
-      ..drawPath(
-        path,
-        Paint()
           ..color = color
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 2.4
+          ..strokeWidth = 2.2
           ..strokeCap = StrokeCap.round
           ..strokeJoin = StrokeJoin.round,
       )
       ..restore();
 
-    final nodePaint = Paint()..color = gridColor.withValues(alpha: 0.85);
+    final nodePaint = Paint()..color = gridColor.withValues(alpha: 0.72);
+    final dotFillPaint = Paint()..color = color;
+    final dotCorePaint = Paint()..color = surfaceColor;
     for (var i = 0; i < points.length; i++) {
       if (values[i] <= 0) {
-        canvas.drawCircle(Offset(points[i].dx, chartHeight), 1.8, nodePaint);
+        canvas.drawCircle(Offset(points[i].dx, chartHeight), 1.6, nodePaint);
+      } else {
+        canvas.drawCircle(points[i], 3.2, dotFillPaint);
+        canvas.drawCircle(points[i], 1.5, dotCorePaint);
       }
     }
 
@@ -983,13 +1170,18 @@ class _TrendPainter extends CustomPainter {
         if (values[i] > values[peakIndex]) peakIndex = i;
       }
       final peak = points[peakIndex];
-      final alpha = peakOpacity.clamp(0.0, 1.0);
-      _drawDashedLine(
-        canvas,
+      final alpha = t.clamp(0.0, 1.0);
+      final peakDash = Path();
+      _addDashedLine(
+        peakDash,
         Offset(peak.dx, peak.dy + 6),
         Offset(peak.dx, chartHeight),
+      );
+      canvas.drawPath(
+        peakDash,
         Paint()
           ..color = color.withValues(alpha: 0.34 * alpha)
+          ..style = PaintingStyle.stroke
           ..strokeWidth = 1.0,
       );
       canvas.drawCircle(
@@ -1005,21 +1197,21 @@ class _TrendPainter extends CustomPainter {
       canvas.drawCircle(
         peak,
         2.0,
-        Paint()..color = Colors.white.withValues(alpha: alpha),
+        Paint()..color = surfaceColor.withValues(alpha: alpha),
       );
-      final peakTp = TextPainter(
-        text: TextSpan(
-          text: _compactNumber(labelMax),
-          style: TextStyle(
-            fontSize: 10.5,
-            fontWeight: FontWeight.w700,
-            color: Colors.white.withValues(alpha: alpha),
-            fontFamily: fontFamily,
-            fontFeatures: tabularFigures,
-          ),
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout();
+      final useCachedPeak = alpha >= 0.99 && peakLabelPainter != null;
+      final peakTp = useCachedPeak
+          ? peakLabelPainter!
+          : _layoutTextPainter(
+              _compactNumber(labelMax),
+              TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w700,
+                color: onColor.withValues(alpha: alpha),
+                fontFamily: fontFamily,
+                fontFeatures: tabularFigures,
+              ),
+            );
       final pillW = peakTp.width + 12;
       final pillH = peakTp.height + 5;
       final px = (peak.dx - pillW / 2).clamp(0.0, size.width - pillW);
@@ -1032,20 +1224,13 @@ class _TrendPainter extends CustomPainter {
         Paint()..color = color.withValues(alpha: alpha),
       );
       peakTp.paint(canvas, Offset(px + 6, py + 2.5));
+      if (!useCachedPeak) {
+        peakTp.dispose();
+      }
     }
 
-    for (var i = 0; i < labels.length; i++) {
-      final tp = TextPainter(
-        text: TextSpan(
-          text: labels[i],
-          style: TextStyle(
-            fontSize: TypeScale.micro,
-            color: labelColor,
-            fontFamily: fontFamily,
-          ),
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout();
+    for (var i = 0; i < xLabelPainters.length; i++) {
+      final tp = xLabelPainters[i];
       final x = (step * i - tp.width / 2).clamp(0.0, size.width - tp.width);
       tp.paint(canvas, Offset(x, chartHeight + 5));
     }
@@ -1053,22 +1238,23 @@ class _TrendPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_TrendPainter old) =>
-      !listEquals(old.values, values) ||
-      old.scaleMax != scaleMax ||
+      !listEquals(old.fromValues, fromValues) ||
+      !listEquals(old.toValues, toValues) ||
       old.labelMax != labelMax ||
-      old.peakOpacity != peakOpacity ||
       !listEquals(old.labels, labels) ||
       old.color != color ||
+      old.onColor != onColor ||
+      old.surfaceColor != surfaceColor ||
       old.gridColor != gridColor ||
-      old.labelColor != labelColor ||
-      old.fontFamily != fontFamily;
+      old.fontFamily != fontFamily ||
+      old.xCacheKey != xCacheKey ||
+      old.yCacheKey != yCacheKey;
 }
 
-void _drawDashedLine(
-  Canvas canvas,
+void _addDashedLine(
+  Path path,
   Offset start,
-  Offset end,
-  Paint paint, {
+  Offset end, {
   double dash = 3.5,
   double gap = 3.5,
 }) {
@@ -1081,11 +1267,9 @@ void _drawDashedLine(
   var distance = 0.0;
   while (distance < total) {
     final next = math.min(distance + dash, total);
-    canvas.drawLine(
-      Offset(start.dx + ux * distance, start.dy + uy * distance),
-      Offset(start.dx + ux * next, start.dy + uy * next),
-      paint,
-    );
+    path
+      ..moveTo(start.dx + ux * distance, start.dy + uy * distance)
+      ..lineTo(start.dx + ux * next, start.dy + uy * next);
     distance += dash + gap;
   }
 }

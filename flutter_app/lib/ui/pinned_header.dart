@@ -1,8 +1,6 @@
 /// 吸顶顶栏：FlClash 悬浮液态玻璃岛 + 顶部柔和渐隐遮罩 + 胶囊变形搜索。
 library;
 
-import 'dart:ui' show ImageFilter;
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -19,14 +17,7 @@ class _HeaderScrim extends StatelessWidget {
     final colors = context.colors;
     final highContrast = MediaQuery.maybeOf(context)?.highContrast ?? false;
     if (highContrast) return ColoredBox(color: colors.page);
-    final pureBlack = colors.isDark && colors.page.toARGB32() == 0xFF000000;
-    final base = pureBlack
-        ? colors.page
-        : Color.lerp(
-            colors.page,
-            colors.primary,
-            colors.isDark ? 0.055 : 0.032,
-          )!;
+    final base = colors.page;
     return DecoratedBox(
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -97,9 +88,7 @@ class PinnedHeader extends StatelessWidget {
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          const Positioned.fill(
-            child: IgnorePointer(child: _HeaderScrim()),
-          ),
+          const Positioned.fill(child: IgnorePointer(child: _HeaderScrim())),
           Positioned(
             top: topInset,
             left: 0,
@@ -214,10 +203,7 @@ class _HeaderTitleState extends State<_HeaderTitle> {
           duration: motionDuration(Timings.press, disableAnimations: disable),
           curve: Curves2.out,
           alignment: Alignment.centerLeft,
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: textWidget,
-          ),
+          child: Align(alignment: Alignment.centerLeft, child: textWidget),
         ),
       ),
     );
@@ -250,9 +236,7 @@ class PinnedSubHeader extends StatelessWidget {
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          const Positioned.fill(
-            child: IgnorePointer(child: _HeaderScrim()),
-          ),
+          const Positioned.fill(child: IgnorePointer(child: _HeaderScrim())),
           Positioned(
             top: topInset,
             left: 0,
@@ -383,9 +367,7 @@ class _MorphingSearchHeaderState extends State<MorphingSearchHeader> {
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          const Positioned.fill(
-            child: IgnorePointer(child: _HeaderScrim()),
-          ),
+          const Positioned.fill(child: IgnorePointer(child: _HeaderScrim())),
           Positioned(
             top: topInset,
             left: 0,
@@ -409,31 +391,18 @@ class _MorphingSearchHeaderState extends State<MorphingSearchHeader> {
                 switchOutCurve: FlClashSprings.searchCloseCurve,
                 transitionBuilder: (child, animation) {
                   if (disable) return child;
-                  return AnimatedBuilder(
-                    animation: animation,
-                    child: child,
-                    builder: (context, inner) {
-                      final raw = animation.value;
-                      final t = raw.clamp(0.0, 1.0);
-                      final blur = (1 - t) * 4.0;
-                      final scale = (0.94 + 0.06 * raw).clamp(0.90, 1.03);
-                      return Opacity(
-                        opacity: t,
-                        child: Transform.scale(
-                          scale: scale,
-                          alignment: Alignment.centerRight,
-                          child: blur > 0.15
-                              ? ImageFiltered(
-                                  imageFilter: ImageFilter.blur(
-                                    sigmaX: blur,
-                                    sigmaY: blur,
-                                  ),
-                                  child: inner,
-                                )
-                              : inner,
-                        ),
-                      );
-                    },
+                  final fade = animation.drive(CurveTween(curve: Curves2.out));
+                  final scale = Tween<double>(
+                    begin: 0.94,
+                    end: 1.0,
+                  ).animate(animation);
+                  return FadeTransition(
+                    opacity: fade,
+                    child: ScaleTransition(
+                      scale: scale,
+                      alignment: Alignment.centerRight,
+                      child: child,
+                    ),
                   );
                 },
                 child: widget.searching
@@ -514,19 +483,19 @@ class _MorphingSearchHeaderState extends State<MorphingSearchHeader> {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                            fontSize: compact ? 20 : 22,
-                            height: 1.22,
+                                fontSize: compact ? 20 : 22,
+                                height: 1.22,
                                 fontWeight: FontWeight.w700,
-                            letterSpacing: -0.4,
+                                letterSpacing: -0.4,
                                 color: colors.text,
                               ),
                             ),
                           ),
                           if (widget.middleAction != null) ...[
-                            const SizedBox(width: Gaps.sm),
+                            const SizedBox(width: 6),
                             widget.middleAction!,
                           ],
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 6),
                           GlassIconButton(
                             icon: Icons.search_rounded,
                             tooltip: '搜索',
@@ -536,7 +505,7 @@ class _MorphingSearchHeaderState extends State<MorphingSearchHeader> {
                             },
                           ),
                           if (widget.trailingAction != null) ...[
-                            const SizedBox(width: 8),
+                            const SizedBox(width: 6),
                             widget.trailingAction!,
                           ],
                         ],

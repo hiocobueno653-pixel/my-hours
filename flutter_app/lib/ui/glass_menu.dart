@@ -58,7 +58,8 @@ Future<void> showDropletGlassMenu(
   final screenSize = overlay != null
       ? (overlay.context.findRenderObject() as RenderBox?)?.size ?? media.size
       : media.size;
-  final resolvedAnchor = anchorRect ??
+  final resolvedAnchor =
+      anchorRect ??
       (anchorOffset != null
           ? Rect.fromCenter(center: anchorOffset, width: 32, height: 32)
           : Rect.fromCenter(
@@ -120,10 +121,7 @@ class _DropletGlassMenuRoute extends PopupRoute<void> {
         reverseDuration: Duration.zero,
       );
     }
-    return AnimationController.unbounded(
-      vsync: navigator!,
-      value: 0.0,
-    );
+    return AnimationController.unbounded(vsync: navigator!, value: 0.0);
   }
 
   @override
@@ -200,7 +198,8 @@ class _DropletGlassMenuOverlayState extends State<_DropletGlassMenuOverlay> {
     final safeTop = media.padding.top + 12;
     final safeBottom = screen.height - media.padding.bottom - 20;
     final width = math.min(widget.panelWidth, screen.width - 40);
-    final estimatedHeight = _estimateMenuHeight(widget.items).clamp(80.0, screen.height * 0.68);
+    final estimatedHeight = _estimateMenuHeight(widget.items)
+        .clamp(80.0, screen.height * 0.68);
 
     final openBelow =
         widget.anchorRect.bottom + 8 + estimatedHeight <= safeBottom ||
@@ -222,9 +221,7 @@ class _DropletGlassMenuOverlayState extends State<_DropletGlassMenuOverlay> {
       anchorOnRight
           ? math.min(left + width - 12, widget.anchorRect.right - 10)
           : math.max(left + 12, widget.anchorRect.left + 10),
-      anchorOnTop
-          ? widget.anchorRect.center.dy
-          : widget.anchorRect.center.dy,
+      anchorOnTop ? widget.anchorRect.center.dy : widget.anchorRect.center.dy,
     );
 
     return Material(
@@ -245,8 +242,7 @@ class _DropletGlassMenuOverlayState extends State<_DropletGlassMenuOverlay> {
               builder: (context, _) {
                 final t = widget.animation.value.clamp(0.0, 1.0);
                 final fadeIn = (t / 0.14).clamp(0.0, 1.0);
-                final fadeOut =
-                    1.0 - ((t - 0.54) / 0.34).clamp(0.0, 1.0);
+                final fadeOut = 1.0 - ((t - 0.54) / 0.34).clamp(0.0, 1.0);
                 final beadOpacity = (fadeIn * fadeOut).clamp(0.0, 1.0);
                 if (beadOpacity <= 0.01) return const SizedBox.shrink();
                 final colors = context.colors;
@@ -266,7 +262,8 @@ class _DropletGlassMenuOverlayState extends State<_DropletGlassMenuOverlay> {
                             shape: BoxShape.circle,
                             color: colors.isDark
                                 ? Colors.white.withValues(alpha: 0.14)
-                                : const Color(0xFFE2E8F2).withValues(alpha: 0.85),
+                                : const Color(0xFFE2E8F2)
+                                      .withValues(alpha: 0.85),
                             border: Border.all(
                               color: colors.isDark
                                   ? Colors.white.withValues(alpha: 0.24)
@@ -295,10 +292,6 @@ class _DropletGlassMenuOverlayState extends State<_DropletGlassMenuOverlay> {
                 final opacity = widget.disableAnimations
                     ? 1.0
                     : (t / 0.22).clamp(0.0, 1.0);
-                final blurPhase = ((t - 0.24) / 0.68).clamp(0.0, 1.0);
-                final contentBlur = widget.disableAnimations
-                    ? 0.0
-                    : (1.0 - Curves.easeOutCubic.transform(blurPhase)) * 11.5;
                 final pullShift = widget.disableAnimations
                     ? 0.0
                     : (1.0 - Curves.easeOutCubic.transform(t)) *
@@ -310,7 +303,6 @@ class _DropletGlassMenuOverlayState extends State<_DropletGlassMenuOverlay> {
                     offset: Offset(0, pullShift),
                     child: _DropletMenuSurface(
                       rawProgress: raw,
-                      contentBlur: contentBlur,
                       anchorOnTop: anchorOnTop,
                       anchorOnRight: anchorOnRight,
                       disableAnimations: widget.disableAnimations,
@@ -319,11 +311,13 @@ class _DropletGlassMenuOverlayState extends State<_DropletGlassMenuOverlay> {
                   ),
                 );
               },
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxHeight: screen.height * 0.68),
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(vertical: 5),
-                  child: _buildMenuBody(context),
+              child: RepaintBoundary(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxHeight: screen.height * 0.68),
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(vertical: 5),
+                    child: _buildMenuBody(context),
+                  ),
                 ),
               ),
             ),
@@ -346,11 +340,7 @@ class _DropletGlassMenuOverlayState extends State<_DropletGlassMenuOverlay> {
           if (widget.items[i].dividerBefore && i > 0)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              child: Divider(
-                height: 1,
-                thickness: 0.6,
-                color: colors.divider,
-              ),
+              child: Divider(height: 1, thickness: 0.6, color: colors.divider),
             ),
           if (widget.items[i].sectionTitle != null)
             AnimatedOpacity(
@@ -380,8 +370,7 @@ class _DropletGlassMenuOverlayState extends State<_DropletGlassMenuOverlay> {
               onToggle: () {
                 HapticFeedback.selectionClick();
                 setState(() {
-                  _expandedSubmenuIndex =
-                      _expandedSubmenuIndex == i ? null : i;
+                  _expandedSubmenuIndex = _expandedSubmenuIndex == i ? null : i;
                 });
               },
               onSelectChild: _selectAction,
@@ -425,15 +414,15 @@ class _DropletGlassMenuOverlayState extends State<_DropletGlassMenuOverlay> {
 class _DropletMenuSurface extends StatelessWidget {
   const _DropletMenuSurface({
     required this.rawProgress,
-    required this.contentBlur,
     required this.anchorOnTop,
     required this.anchorOnRight,
     required this.disableAnimations,
     required this.child,
   });
 
+  static final ImageFilter _menuBlur = ImageFilter.blur(sigmaX: 14, sigmaY: 14);
+
   final double rawProgress;
-  final double contentBlur;
   final bool anchorOnTop;
   final bool anchorOnRight;
   final bool disableAnimations;
@@ -464,7 +453,7 @@ class _DropletMenuSurface extends StatelessWidget {
       anchorOnTop ? -1.0 : 1.0,
     );
 
-    Widget innerContent = disableAnimations || t > 0.988
+    final Widget innerContent = disableAnimations || t > 0.988
         ? child
         : Transform(
             alignment: contentAlign,
@@ -475,15 +464,7 @@ class _DropletMenuSurface extends StatelessWidget {
             ),
             child: child,
           );
-    if (contentBlur > 0.2) {
-      innerContent = ImageFiltered(
-        imageFilter: ImageFilter.blur(
-          sigmaX: contentBlur,
-          sigmaY: contentBlur,
-        ),
-        child: innerContent,
-      );
-    }
+    final surfaceBody = ColoredBox(color: surface, child: innerContent);
 
     return CustomPaint(
       painter: _LiquidDropletShadowPainter(
@@ -507,16 +488,9 @@ class _DropletMenuSurface extends StatelessWidget {
           anchorOnRight: anchorOnRight,
           disableAnimations: disableAnimations,
         ),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(
-            sigmaX: highContrast ? 0 : 20,
-            sigmaY: highContrast ? 0 : 20,
-          ),
-          child: ColoredBox(
-            color: surface,
-            child: innerContent,
-          ),
-        ),
+        child: highContrast || disableAnimations
+            ? surfaceBody
+            : BackdropFilter(filter: _menuBlur, child: surfaceBody),
       ),
     );
   }
@@ -537,26 +511,31 @@ Path buildLiquidDropletPath(
   final height = size.height;
   if (width <= 0 || height <= 0) return Path();
   if (disableAnimations || (rawProgress - 1.0).abs() < 0.001) {
-    return Path()
-      ..addRSuperellipse(
-        RSuperellipse.fromRectAndRadius(
-          Offset.zero & size,
-          const Radius.circular(22),
-        ),
-      );
+    return Path()..addRSuperellipse(
+      RSuperellipse.fromRectAndRadius(
+        Offset.zero & size,
+        const Radius.circular(22),
+      ),
+    );
   }
 
   final t = rawProgress.clamp(0.0, 1.0);
   final overshoot = math.max(0.0, rawProgress - 1.0);
-  final widthEase = (Curves.easeOutCubic.transform(t) + overshoot * 0.48)
-      .clamp(0.0, 1.05);
+  final widthEase = (Curves.easeOutCubic.transform(t) + overshoot * 0.48).clamp(
+    0.0,
+    1.05,
+  );
   final heightEase = (Curves.easeOutQuart.transform(t) + overshoot * 0.72)
       .clamp(0.0, 1.06);
 
   final startW = math.min(width * 0.34, 58.0);
   final startH = math.min(height * 0.24, 42.0);
   final curW = lerpDouble(startW, width, widthEase)!.clamp(24.0, width * 1.06);
-  final curH = lerpDouble(startH, height, heightEase)!.clamp(24.0, height * 1.06);
+  final curH = lerpDouble(
+    startH,
+    height,
+    heightEase,
+  )!.clamp(24.0, height * 1.06);
 
   final rectLeft = anchorOnRight ? (width - curW) : 0.0;
   final rectTop = anchorOnTop ? 0.0 : (height - curH);
@@ -564,7 +543,8 @@ Path buildLiquidDropletPath(
 
   final teardrop = math.sin(((t - 0.02) / 0.62).clamp(0.0, 1.0) * math.pi);
   final ovalness =
-      1.0 - Curves.easeInOutCubic.transform(((t - 0.30) / 0.64).clamp(0.0, 1.0));
+      1.0 -
+      Curves.easeInOutCubic.transform(((t - 0.30) / 0.64).clamp(0.0, 1.0));
 
   final minDim = math.min(curW, curH);
   final finalR = math.min(22.0, minDim * 0.44);
@@ -733,20 +713,11 @@ class _LiquidDropletShadowPainter extends CustomPainter {
     );
     final alphaScale = disableAnimations ? 1.0 : rawProgress.clamp(0.0, 1.0);
     canvas.drawPath(
-      path.shift(const Offset(0, 10)),
+      path.shift(const Offset(0, 8)),
       Paint()
-        ..color = const Color(0xFF0F172A).withValues(
-          alpha: (isDark ? 0.44 : 0.12) * alphaScale,
-        )
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 20),
-    );
-    canvas.drawPath(
-      path.shift(const Offset(0, 2)),
-      Paint()
-        ..color = const Color(0xFF0F172A).withValues(
-          alpha: (isDark ? 0.22 : 0.045) * alphaScale,
-        )
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5),
+        ..color = const Color(0xFF0F172A)
+            .withValues(alpha: (isDark ? 0.42 : 0.11) * alphaScale)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 14),
     );
   }
 
@@ -877,10 +848,7 @@ class _GlassMenuRow extends StatelessWidget {
                         action.subtitle!,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: colors.text3,
-                        ),
+                        style: TextStyle(fontSize: 11, color: colors.text3),
                       ),
                     ],
                   ],
@@ -935,9 +903,7 @@ class _AccordionSubmenuItem extends StatelessWidget {
             : EdgeInsets.zero,
         decoration: expanded
             ? ShapeDecoration(
-                color: colors.isDark
-                    ? colors.block
-                    : colors.page,
+                color: colors.isDark ? colors.block : colors.page,
                 shape: Radii.shape(12).copyWith(
                   side: BorderSide(
                     color: colors.isDark
@@ -1041,9 +1007,7 @@ class GlassSelectMenu<T> extends StatelessWidget {
 
   void _open(BuildContext context) {
     final box = context.findRenderObject() as RenderBox?;
-    final rect = box == null
-        ? null
-        : box.localToGlobal(Offset.zero) & box.size;
+    final rect = box == null ? null : box.localToGlobal(Offset.zero) & box.size;
     HapticFeedback.selectionClick();
     unawaited(
       showDropletGlassMenu(
@@ -1117,9 +1081,7 @@ class GlassMenuButton extends StatelessWidget {
 
   void _open(BuildContext context) {
     final box = context.findRenderObject() as RenderBox?;
-    final rect = box == null
-        ? null
-        : box.localToGlobal(Offset.zero) & box.size;
+    final rect = box == null ? null : box.localToGlobal(Offset.zero) & box.size;
     HapticFeedback.selectionClick();
     unawaited(
       showDropletGlassMenu(
@@ -1164,59 +1126,127 @@ class LiquidContextMenuRegion extends StatefulWidget {
       _LiquidContextMenuRegionState();
 }
 
-class _LiquidContextMenuRegionState extends State<LiquidContextMenuRegion> {
+class _LiquidContextMenuRegionState extends State<LiquidContextMenuRegion>
+    with SingleTickerProviderStateMixin {
+  static const Animation<double> _fullHighlight =
+      AlwaysStoppedAnimation<double>(1.0);
+
   bool _highlighted = false;
+  AnimationController? _controller;
+  CurvedAnimation? _curved;
+
+  AnimationController _ensureController() {
+    final existing = _controller;
+    if (existing != null) return existing;
+    final controller = AnimationController(vsync: this, duration: Timings.micro)
+      ..addStatusListener(_handleStatus);
+    _curved = CurvedAnimation(parent: controller, curve: Curves2.soft);
+    _controller = controller;
+    return controller;
+  }
+
+  void _handleStatus(AnimationStatus status) {
+    if (status == AnimationStatus.dismissed && !_highlighted && mounted) {
+      setState(() {});
+    }
+  }
+
+  void _setHighlighted(bool next) {
+    if (_highlighted == next) return;
+    _highlighted = next;
+    final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    if (disable) {
+      if (mounted) setState(() {});
+      return;
+    }
+    final controller = _ensureController();
+    if (next) {
+      controller.forward();
+      if (mounted) setState(() {});
+    } else {
+      controller.reverse();
+    }
+  }
+
+  @override
+  void dispose() {
+    _curved?.dispose();
+    _controller?.dispose();
+    super.dispose();
+  }
 
   Future<void> _handleLongPress(LongPressStartDetails details) async {
     final items = widget.itemsBuilder();
     if (items.isEmpty) return;
     unawaited(HapticFeedback.mediumImpact());
-    setState(() => _highlighted = true);
+    _setHighlighted(true);
     try {
       await showDropletGlassMenu(
         context,
         anchorOffset: details.globalPosition,
         panelWidth: widget.panelWidth,
-        preferRightAlign: details.globalPosition.dx >
-            MediaQuery.sizeOf(context).width * 0.45,
+        preferRightAlign:
+            details.globalPosition.dx > MediaQuery.sizeOf(context).width * 0.45,
         items: items,
       );
     } finally {
-      if (mounted) setState(() => _highlighted = false);
+      if (mounted) _setHighlighted(false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final shape = Radii.shape(widget.highlightRadius);
+    final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    final showHighlight =
+        _highlighted ||
+        (!disable && _controller != null && _controller!.value > 0);
     return GestureDetector(
       onLongPressStart: _handleLongPress,
-      child: Stack(
-        fit: StackFit.passthrough,
-        children: [
-          widget.child,
-          Positioned.fill(
-            child: IgnorePointer(
-              child: AnimatedOpacity(
-                duration: motionDuration(
-                  Timings.micro,
-                  disableAnimations:
-                      MediaQuery.maybeDisableAnimationsOf(context) ?? false,
-                ),
-                curve: Curves2.soft,
-                opacity: _highlighted ? 1.0 : 0.0,
-                child: ClipPath(
-                  clipper: ShapeBorderClipper(shape: shape),
-                  child: ColoredBox(
-                    color: colors.text.withValues(alpha: colors.isDark ? 0.14 : 0.08),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
+      child: CustomPaint(
+        foregroundPainter: showHighlight
+            ? _ContextHighlightPainter(
+                shape: Radii.shape(widget.highlightRadius),
+                color: colors.text,
+                maxAlpha: colors.isDark ? 0.14 : 0.08,
+                progress: disable || _curved == null
+                    ? _fullHighlight
+                    : _curved!,
+              )
+            : null,
+        child: widget.child,
       ),
     );
   }
+}
+
+class _ContextHighlightPainter extends CustomPainter {
+  _ContextHighlightPainter({
+    required this.shape,
+    required this.color,
+    required this.maxAlpha,
+    required this.progress,
+  }) : super(repaint: progress);
+
+  final ShapeBorder shape;
+  final Color color;
+  final double maxAlpha;
+  final Animation<double> progress;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final alpha = (maxAlpha * progress.value).clamp(0.0, 1.0);
+    if (alpha <= 0.001) return;
+    canvas.drawPath(
+      shape.getOuterPath(Offset.zero & size),
+      Paint()..color = color.withValues(alpha: alpha),
+    );
+  }
+
+  @override
+  bool shouldRepaint(_ContextHighlightPainter old) =>
+      old.shape != shape ||
+      old.color != color ||
+      old.maxAlpha != maxAlpha ||
+      old.progress != progress;
 }

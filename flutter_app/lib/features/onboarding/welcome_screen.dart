@@ -111,78 +111,79 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
-                              _StaggerReveal(
-                                controller: _entryController,
-                                begin: 0,
-                                end: 0.38,
-                                offset: 0.06,
-                                child: const _WelcomeHeading(),
-                              ),
-                              const SizedBox(height: 22),
-                              _StaggerReveal(
-                                controller: _entryController,
-                                begin: 0.10,
-                                end: 0.48,
-                                offset: 0.12,
-                                child: const _BentoPreview(),
-                              ),
-                              const SizedBox(height: 12),
-                              IntrinsicHeight(
-                                child: Row(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.stretch,
-                                  children: [
-                                    Expanded(
-                                      child: _StaggerReveal(
-                                        controller: _entryController,
-                                        begin: 0.20,
-                                        end: 0.58,
-                                        offset: 0.12,
-                                        child: const _LocalFirstCard(),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: _StaggerReveal(
-                                        controller: _entryController,
-                                        begin: 0.26,
-                                        end: 0.64,
-                                        offset: 0.12,
-                                        child: const _HoursPresetCard(),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(height: 14),
-                              _StaggerReveal(
-                                controller: _entryController,
-                                begin: 0.34,
-                                end: 0.72,
-                                offset: 0.06,
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.lock_outline_rounded,
-                                      size: 13,
-                                      color: colors.text3,
-                                    ),
-                                    const SizedBox(width: 5),
-                                    Flexible(
-                                      child: Text(
-                                        '数据只保存在本机 · 无需账号',
-                                        style: TextStyle(
-                                          color: colors.text3,
-                                          fontSize: 11.5,
+                                  _StaggerReveal(
+                                    controller: _entryController,
+                                    begin: 0,
+                                    end: 0.38,
+                                    offset: 0.06,
+                                    child: const _WelcomeHeading(),
+                                  ),
+                                  const SizedBox(height: 22),
+                                  _StaggerReveal(
+                                    controller: _entryController,
+                                    begin: 0.10,
+                                    end: 0.48,
+                                    offset: 0.12,
+                                    child: const _BentoPreview(),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  IntrinsicHeight(
+                                    child: Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        Expanded(
+                                          child: _StaggerReveal(
+                                            controller: _entryController,
+                                            begin: 0.20,
+                                            end: 0.58,
+                                            offset: 0.12,
+                                            child: const _LocalFirstCard(),
+                                          ),
                                         ),
-                                      ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: _StaggerReveal(
+                                            controller: _entryController,
+                                            begin: 0.26,
+                                            end: 0.64,
+                                            offset: 0.12,
+                                            child: const _HoursPresetCard(),
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                  const SizedBox(height: 14),
+                                  _StaggerReveal(
+                                    controller: _entryController,
+                                    begin: 0.34,
+                                    end: 0.72,
+                                    offset: 0.06,
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.lock_outline_rounded,
+                                          size: 13,
+                                          color: colors.text3,
+                                        ),
+                                        const SizedBox(width: 5),
+                                        Flexible(
+                                          child: Text(
+                                            '数据只保存在本机 · 无需账号',
+                                            style: TextStyle(
+                                              color: colors.text3,
+                                              fontSize: 11.5,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
                             ),
                           ),
                         ),
@@ -245,38 +246,39 @@ class _WelcomeHeading extends StatelessWidget {
               ),
             ),
             Container(
-              width: 76,
-              height: 76,
-              padding: const EdgeInsets.all(10),
+              width: 72,
+              height: 72,
               decoration: ShapeDecoration(
                 color: colors.card,
-                shape: Radii.shape(22).copyWith(
+                shape: Radii.shape(20).copyWith(
                   side: BorderSide(
                     color: dark
-                        ? Colors.white.withValues(alpha: 0.12)
-                        : colors.primary.withValues(alpha: 0.12),
-                    width: 0.9,
+                        ? Colors.white.withValues(alpha: 0.14)
+                        : colors.cardBorder,
+                    width: 0.75,
                   ),
                 ),
                 shadows: [
                   BoxShadow(
-                    color: colors.primary.withValues(alpha: dark ? 0.34 : 0.18),
-                    blurRadius: 24,
-                    offset: const Offset(0, 10),
+                    color: colors.primary.withValues(alpha: dark ? 0.24 : 0.14),
+                    blurRadius: 22,
+                    offset: const Offset(0, 8),
                   ),
                   BoxShadow(
-                    color: const Color(0xFF0F172A).withValues(
-                      alpha: dark ? 0.26 : 0.06,
-                    ),
+                    color: const Color(0xFF141519)
+                        .withValues(alpha: dark ? 0.26 : 0.06),
                     blurRadius: 5,
                     offset: const Offset(0, 2),
                   ),
                 ],
               ),
-              child: Image.asset(
-                'assets/brand/app_icon.png',
-                fit: BoxFit.contain,
-                filterQuality: FilterQuality.high,
+              child: ClipPath(
+                clipper: ShapeBorderClipper(shape: Radii.shape(20)),
+                child: Image.asset(
+                  'assets/brand/app_icon.png',
+                  fit: BoxFit.cover,
+                  filterQuality: FilterQuality.high,
+                ),
               ),
             ),
           ],
@@ -359,106 +361,90 @@ class _BentoPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    const ivory = Color(0xFFF8FAFC);
-    const muted = Color(0xFFA8B5CE);
-    const emerald = Color(0xFF34D399);
     return Container(
       decoration: studioHeroDecoration(colors, radius: Radii.hero),
       child: ClipPath(
         clipper: ShapeBorderClipper(shape: Radii.shape(Radii.hero)),
-        child: Stack(
-          children: [
-            Positioned(
-              top: -46,
-              right: -30,
-              width: 170,
-              height: 170,
-              child: IgnorePointer(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: RadialGradient(
-                      colors: [
-                        colors.primary.withValues(alpha: 0.34),
-                        colors.primary.withValues(alpha: 0.0),
-                      ],
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    '本周预览',
+                    style: TextStyle(
+                      color: colors.text,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-          Row(
-            children: [
-              Text(
-                '本周预览',
-                style: TextStyle(
-                  color: ivory,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: ShapeDecoration(
-                  color: Colors.white.withValues(alpha: 0.10),
-                  shape: Radii.shape(Radii.sm),
-                ),
-                child: Text(
-                  '示例',
-                  style: TextStyle(
-                    color: muted,
-                    fontSize: TypeScale.micro,
-                    fontWeight: FontWeight.w500,
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: ShapeDecoration(
+                      color: colors.block,
+                      shape: Radii.shape(Radii.sm),
+                    ),
+                    child: Text(
+                      '示例',
+                      style: TextStyle(
+                        color: colors.text3,
+                        fontSize: TypeScale.micro,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                   ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      flex: 3,
+                      child: _PreviewMetric(
+                        label: '本周工时',
+                        value: '32.0',
+                        unit: 'h',
+                        background: colors.block,
+                        foreground: colors.text,
+                        labelColor: colors.text2,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      flex: 2,
+                      child: _PreviewMetric(
+                        label: kHoursOnly ? '出勤' : '本周工资',
+                        value: kHoursOnly ? '5' : '¥800',
+                        unit: kHoursOnly ? '天' : '',
+                        background: colors.block,
+                        foreground: colors.text,
+                        labelColor: colors.text2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+              _WeekBars(colors: colors),
+              const SizedBox(height: 9),
+              Text(
+                kHoursOnly ? '日历点选记工 · 工时与出勤一起看清' : '日历点选记工 · 工时、工资与收支一起看清',
+                style: TextStyle(
+                  color: colors.text3,
+                  fontSize: 11.5,
+                  height: 1.45,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(
-                  flex: 3,
-                  child: _PreviewMetric(
-                    label: '本周工时',
-                    value: '32.0',
-                    unit: 'h',
-                    background: Colors.white.withValues(alpha: 0.07),
-                    foreground: ivory,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  flex: 2,
-                  child: _PreviewMetric(
-                    label: kHoursOnly ? '出勤' : '本周工资',
-                    value: kHoursOnly ? '5' : '¥800',
-                    unit: kHoursOnly ? '天' : '',
-                    background: Colors.white.withValues(alpha: 0.07),
-                    foreground: emerald,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 10),
-          _WeekBars(colors: colors),
-          const SizedBox(height: 9),
-          Text(
-            kHoursOnly ? '日历点选记工 · 工时与出勤一起看清' : '日历点选记工 · 工时、工资与收支一起看清',
-            style: const TextStyle(color: muted, fontSize: 11.5, height: 1.45),
-          ),
-        ],
-              ),
-            ),
-          ],
         ),
       ),
     );
@@ -472,6 +458,7 @@ class _PreviewMetric extends StatelessWidget {
     required this.unit,
     required this.background,
     required this.foreground,
+    required this.labelColor,
   });
 
   final String label;
@@ -479,6 +466,7 @@ class _PreviewMetric extends StatelessWidget {
   final String unit;
   final Color background;
   final Color foreground;
+  final Color labelColor;
 
   @override
   Widget build(BuildContext context) {
@@ -496,7 +484,7 @@ class _PreviewMetric extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: foreground.withValues(alpha: 0.72),
+              color: labelColor,
               fontSize: TypeScale.micro,
               fontWeight: FontWeight.w600,
             ),
@@ -546,7 +534,6 @@ class _WeekBars extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const levels = [0.42, 0.72, 0.56, 0.92, 0.68, 0.34, 0.46];
-    final barAccent = Color.lerp(colors.primary, Colors.white, 0.34)!;
     return SizedBox(
       height: 26,
       child: Row(
@@ -557,9 +544,7 @@ class _WeekBars extends StatelessWidget {
               child: Container(
                 height: 8 + 16 * level,
                 decoration: ShapeDecoration(
-                  color: barAccent.withValues(
-                    alpha: 0.24 + 0.72 * level,
-                  ),
+                  color: colors.primary.withValues(alpha: 0.22 + 0.68 * level),
                   shape: Radii.shape(5),
                 ),
               ),
@@ -646,10 +631,7 @@ class _HoursPresetCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 3),
-          Text(
-            '记工时一键选',
-            style: TextStyle(color: colors.text2, fontSize: 11.5),
-          ),
+          Text('记工时一键选', style: TextStyle(color: colors.text2, fontSize: 11.5)),
           const SizedBox(height: 10),
           Row(
             children: [
@@ -659,7 +641,9 @@ class _HoursPresetCard extends StatelessWidget {
                     height: 32,
                     alignment: Alignment.center,
                     decoration: ShapeDecoration(
-                      color: hours == 8 ? colors.primaryContainer : colors.block,
+                      color: hours == 8
+                          ? colors.primaryContainer
+                          : colors.block,
                       shape: Radii.shape(Radii.sm),
                     ),
                     child: Text(
@@ -798,11 +782,7 @@ class _StaggerRevealState extends State<_StaggerReveal> {
   }
 
   void _buildAnimations() {
-    final interval = Interval(
-      widget.begin,
-      widget.end,
-      curve: Curves2.out,
-    );
+    final interval = Interval(widget.begin, widget.end, curve: Curves2.out);
     _fade = CurvedAnimation(parent: widget.controller, curve: interval);
     _slideCurve = CurvedAnimation(parent: widget.controller, curve: interval);
     _slide = Tween<Offset>(

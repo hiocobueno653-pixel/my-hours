@@ -125,10 +125,7 @@ class WorkBentoHeader extends StatelessWidget {
         );
       }
       if (id == DashboardCardIds.ledgerBalance) {
-        return _MonthBalanceStrip(
-          summary: ledgerSummary,
-          onTap: onOpenLedger,
-        );
+        return _MonthBalanceStrip(summary: ledgerSummary, onTap: onOpenLedger);
       }
       return buildMetricCard(id);
     }
@@ -390,13 +387,6 @@ class _TodayWorkspaceCardState extends ConsumerState<_TodayWorkspaceCard> {
 
     final dateLabel =
         '今天 · 周${weekdayName(DateTime.parse(widget.date).weekday % 7)}';
-    const inkIvory = Color(0xFFF8FAFC);
-    const inkMuted = Color(0xFFA8B5CE);
-    const inkFaint = Color(0xFF72819E);
-    const inkEmerald = Color(0xFF34D399);
-    const inkAmber = Color(0xFFFBBF24);
-    final accentGlow = Color.lerp(colors.primary, Colors.white, 0.34)!;
-    final consoleDivider = Colors.white.withValues(alpha: 0.11);
 
     final statusText = active
         ? (running ? '计时中' : '已暂停')
@@ -408,26 +398,24 @@ class _TodayWorkspaceCardState extends ConsumerState<_TodayWorkspaceCard> {
         ? '已记录'
         : '休息';
     final statusColor = active
-        ? (running ? accentGlow : inkAmber)
+        ? (running ? colors.primary : colors.warning)
         : settled
-        ? inkEmerald
+        ? colors.income
         : current == null
-        ? inkFaint
-        : inkEmerald;
+        ? colors.text3
+        : colors.income;
     final statusBg = active
-        ? (running
-              ? accentGlow.withValues(alpha: 0.20)
-              : inkAmber.withValues(alpha: 0.18))
+        ? (running ? colors.primaryContainer : colors.warningSoft)
         : Colors.transparent;
     final consoleShape = Radii.shape(Radii.hero);
     final loggedHours = current?.hours ?? 0.0;
     final dialArcColor = active && running
-        ? accentGlow
+        ? colors.primary
         : settled
-        ? inkEmerald
+        ? colors.income
         : loggedHours > 8.0
-        ? inkAmber
-        : accentGlow;
+        ? colors.warning
+        : colors.primary;
     final progressPct = ((loggedHours / 8.0) * 100).round().clamp(0, 999);
 
     return Container(
@@ -435,28 +423,9 @@ class _TodayWorkspaceCardState extends ConsumerState<_TodayWorkspaceCard> {
       decoration: studioHeroDecoration(colors, radius: Radii.hero),
       child: ClipPath(
         clipper: ShapeBorderClipper(shape: consoleShape),
-        child: Stack(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Positioned(
-              top: -56,
-              right: -36,
-              width: 215,
-              height: 215,
-              child: IgnorePointer(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: RadialGradient(
-                      colors: [
-                        colors.primary.withValues(alpha: 0.34),
-                        colors.primary.withValues(alpha: 0.08),
-                        colors.primary.withValues(alpha: 0.0),
-                      ],
-                      stops: const [0.0, 0.55, 1.0],
-                    ),
-                  ),
-                ),
-              ),
-            ),
             Padding(
               padding: const EdgeInsets.fromLTRB(18, 15, 18, 14),
               child: Column(
@@ -474,10 +443,10 @@ class _TodayWorkspaceCardState extends ConsumerState<_TodayWorkspaceCard> {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
-                                  color: inkIvory.withValues(alpha: 0.90),
+                                  color: colors.text2,
                                   fontSize: 12.5,
                                   fontWeight: FontWeight.w600,
-                                  letterSpacing: 0.2,
+                                  letterSpacing: 0.1,
                                 ),
                               ),
                             ),
@@ -519,7 +488,9 @@ class _TodayWorkspaceCardState extends ConsumerState<_TodayWorkspaceCard> {
                                       statusText,
                                       key: ValueKey(statusText),
                                       style: TextStyle(
-                                        color: active ? statusColor : inkMuted,
+                                        color: active
+                                            ? statusColor
+                                            : colors.text3,
                                         fontSize: 11.5,
                                         fontWeight: active
                                             ? FontWeight.w600
@@ -538,13 +509,13 @@ class _TodayWorkspaceCardState extends ConsumerState<_TodayWorkspaceCard> {
                                   vertical: 3,
                                 ),
                                 decoration: ShapeDecoration(
-                                  color: inkAmber.withValues(alpha: 0.18),
+                                  color: colors.warningSoft,
                                   shape: Radii.pillShape,
                                 ),
                                 child: Text(
                                   '跨日',
                                   style: TextStyle(
-                                    color: inkAmber,
+                                    color: colors.warning,
                                     fontSize: TypeScale.micro,
                                     fontWeight: FontWeight.w600,
                                   ),
@@ -566,13 +537,8 @@ class _TodayWorkspaceCardState extends ConsumerState<_TodayWorkspaceCard> {
                                 vertical: 4,
                               ),
                               decoration: ShapeDecoration(
-                                color: Colors.white.withValues(alpha: 0.08),
-                                shape: Radii.pillShape.copyWith(
-                                  side: BorderSide(
-                                    color: Colors.white.withValues(alpha: 0.10),
-                                    width: 0.6,
-                                  ),
-                                ),
+                                color: colors.block,
+                                shape: Radii.pillShape,
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
@@ -587,7 +553,7 @@ class _TodayWorkspaceCardState extends ConsumerState<_TodayWorkspaceCard> {
                                       style: TextStyle(
                                         fontSize: 11.5,
                                         fontWeight: FontWeight.w500,
-                                        color: inkIvory.withValues(alpha: 0.88),
+                                        color: colors.text2,
                                         fontFeatures: tabularFigures,
                                       ),
                                     ),
@@ -596,7 +562,7 @@ class _TodayWorkspaceCardState extends ConsumerState<_TodayWorkspaceCard> {
                                   Icon(
                                     Icons.chevron_right_rounded,
                                     size: 13.5,
-                                    color: inkMuted,
+                                    color: colors.text3,
                                   ),
                                 ],
                               ),
@@ -615,157 +581,161 @@ class _TodayWorkspaceCardState extends ConsumerState<_TodayWorkspaceCard> {
                           shape: Radii.shape(10),
                           child: Padding(
                             padding: const EdgeInsets.symmetric(vertical: 2),
-                            child: AnimatedSwitcher(
+                            child: AnimatedSize(
+                              alignment: Alignment.topLeft,
                               duration: motionDuration(
-                                Timings.base,
+                                Timings.fast,
                                 disableAnimations: disable,
                               ),
-                              switchInCurve: Curves2.out,
-                              switchOutCurve: Curves2.out,
-                              layoutBuilder: (currentChild, previousChildren) =>
-                                  Stack(
-                                    alignment: Alignment.centerLeft,
-                                    children: [
-                                      ...previousChildren,
-                                      ?currentChild,
-                                    ],
-                                  ),
-                              transitionBuilder: (child, animation) =>
-                                  FadeTransition(
-                                    opacity: animation,
-                                    child: SlideTransition(
-                                      position: Tween<Offset>(
-                                        begin: const Offset(0, 0.08),
-                                        end: Offset.zero,
-                                      ).animate(animation),
-                                      child: child,
-                                    ),
-                                  ),
-                              child: active
-                                  ? KeyedSubtree(
-                                      key: const ValueKey('today-readout-timer'),
-                                      child: _LiveTimerReadout(
-                                        timer: timer,
-                                        currentHours: current?.hours ?? 0,
-                                        activeRate: activeRate,
-                                        crossDay: crossDay,
-                                      ),
-                                    )
-                                  : Column(
-                                      key: const ValueKey('today-readout-hours'),
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
+                              curve: Curves2.out,
+                              child: AnimatedSwitcher(
+                                duration: motionDuration(
+                                  Timings.base,
+                                  disableAnimations: disable,
+                                ),
+                                switchInCurve: Curves2.out,
+                                switchOutCurve: Curves2.out,
+                                layoutBuilder:
+                                    (currentChild, previousChildren) => Stack(
+                                      alignment: Alignment.centerLeft,
                                       children: [
-                                        Row(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.baseline,
-                                          textBaseline: TextBaseline.alphabetic,
-                                          children: [
-                                            if (current == null)
-                                              Text(
-                                                '—',
-                                                style: TextStyle(
-                                                  color: inkFaint,
-                                                  fontSize: 48,
-                                                  height: 0.96,
-                                                  fontWeight: FontWeight.w600,
-                                                ),
-                                              )
-                                            else
-                                              AnimatedNumericText(
-                                                value: current.hours,
-                                                formatter: (value) =>
-                                                    formatHoursValue(
-                                                      value.toDouble(),
-                                                    ),
-                                                style: const TextStyle(
-                                                  color: inkIvory,
-                                                  fontSize: 48,
-                                                  height: 0.96,
-                                                  fontWeight: FontWeight.w700,
-                                                  letterSpacing: -1.8,
-                                                ),
-                                              ),
-                                            const SizedBox(width: 6),
-                                            Text(
-                                              context.unit.name,
-                                              style: TextStyle(
-                                                color: inkMuted,
-                                                fontSize: 13.5,
-                                                fontWeight: FontWeight.w500,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 9),
-                                        Wrap(
-                                          spacing: 7,
-                                          runSpacing: 4,
-                                          crossAxisAlignment:
-                                              WrapCrossAlignment.center,
-                                          children: [
-                                            if (!kHoursOnly)
-                                              Container(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                      horizontal: 8,
-                                                      vertical: 3,
-                                                    ),
-                                                decoration: ShapeDecoration(
-                                                  color: pay > 0
-                                                      ? inkEmerald.withValues(
-                                                          alpha: 0.16,
-                                                        )
-                                                      : Colors.white.withValues(
-                                                          alpha: 0.06,
-                                                        ),
-                                                  shape: Radii.pillShape.copyWith(
-                                                    side: BorderSide(
-                                                      color: pay > 0
-                                                          ? inkEmerald
-                                                                .withValues(
-                                                                  alpha: 0.26,
-                                                                )
-                                                          : Colors.white
-                                                                .withValues(
-                                                                  alpha: 0.08,
-                                                                ),
-                                                      width: 0.6,
-                                                    ),
-                                                  ),
-                                                ),
-                                                child: AnimatedNumericText(
-                                                  value: pay,
-                                                  formatter: (value) =>
-                                                      '今日工资 ${formatAmount(value.toDouble(), withSymbol: true)}',
-                                                  style: TextStyle(
-                                                    color: pay > 0
-                                                        ? inkEmerald
-                                                        : inkFaint,
-                                                    fontSize: 11.5,
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
-                                                ),
-                                              ),
-                                            Text(
-                                              loggedHours > 8
-                                                  ? '加班 +${formatHoursValue(loggedHours - 8)}${context.unit.short}'
-                                                  : '日标 $progressPct%',
-                                              style: TextStyle(
-                                                color: loggedHours > 8
-                                                    ? inkAmber
-                                                    : inkMuted.withValues(
-                                                        alpha: 0.85,
-                                                      ),
-                                                fontSize: 11.5,
-                                                fontWeight: FontWeight.w500,
-                                                fontFeatures: tabularFigures,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
+                                        ...previousChildren,
+                                        ?currentChild,
                                       ],
                                     ),
+                                transitionBuilder: (child, animation) =>
+                                    FadeTransition(
+                                      opacity: animation,
+                                      child: SlideTransition(
+                                        position: Tween<Offset>(
+                                          begin: const Offset(0, 0.08),
+                                          end: Offset.zero,
+                                        ).animate(animation),
+                                        child: child,
+                                      ),
+                                    ),
+                                child: active
+                                    ? KeyedSubtree(
+                                        key: const ValueKey(
+                                          'today-readout-timer',
+                                        ),
+                                        child: _LiveTimerReadout(
+                                          timer: timer,
+                                          currentHours: current?.hours ?? 0,
+                                          activeRate: activeRate,
+                                          crossDay: crossDay,
+                                        ),
+                                      )
+                                    : Column(
+                                        key: const ValueKey(
+                                          'today-readout-hours',
+                                        ),
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.baseline,
+                                            textBaseline:
+                                                TextBaseline.alphabetic,
+                                            children: [
+                                              if (current == null)
+                                                Text(
+                                                  '—',
+                                                  style: TextStyle(
+                                                    color: colors.text3,
+                                                    fontSize: 44,
+                                                    height: 0.96,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                )
+                                              else
+                                                AnimatedNumericText(
+                                                  value: current.hours,
+                                                  formatter: (value) =>
+                                                      formatHoursValue(
+                                                        value.toDouble(),
+                                                      ),
+                                                  style: TextStyle(
+                                                    color: colors.text,
+                                                    fontSize: 44,
+                                                    height: 0.96,
+                                                    fontWeight: FontWeight.w600,
+                                                    letterSpacing: -1.5,
+                                                  ),
+                                                ),
+                                              const SizedBox(width: 6),
+                                              Text(
+                                                context.unit.name,
+                                                style: TextStyle(
+                                                  color: colors.text3,
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 9),
+                                          Wrap(
+                                            spacing: 8,
+                                            runSpacing: 4,
+                                            crossAxisAlignment:
+                                                WrapCrossAlignment.center,
+                                            children: [
+                                              if (!kHoursOnly && pay > 0)
+                                                Container(
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        horizontal: 8,
+                                                        vertical: 3,
+                                                      ),
+                                                  decoration: ShapeDecoration(
+                                                    color: colors.incomeSoft,
+                                                    shape: Radii.pillShape
+                                                        .copyWith(
+                                                          side: BorderSide(
+                                                            color: colors.income
+                                                                .withValues(
+                                                                  alpha:
+                                                                      colors
+                                                                          .isDark
+                                                                      ? 0.24
+                                                                      : 0.14,
+                                                                ),
+                                                            width: 0.75,
+                                                          ),
+                                                        ),
+                                                  ),
+                                                  child: AnimatedNumericText(
+                                                    value: pay,
+                                                    formatter: (value) =>
+                                                        '今日工资 ${formatAmount(value.toDouble(), withSymbol: true)}',
+                                                    style: TextStyle(
+                                                      color: colors.income,
+                                                      fontSize: 11.5,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                    ),
+                                                  ),
+                                                ),
+                                              Text(
+                                                loggedHours > 8
+                                                    ? '加班 +${formatHoursValue(loggedHours - 8)}${context.unit.short}'
+                                                    : '日标 $progressPct%',
+                                                style: TextStyle(
+                                                  color: loggedHours > 8
+                                                      ? colors.warning
+                                                      : colors.text3,
+                                                  fontSize: 11.5,
+                                                  fontWeight: FontWeight.w500,
+                                                  fontFeatures: tabularFigures,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                              ),
                             ),
                           ),
                         ),
@@ -812,9 +782,7 @@ class _TodayWorkspaceCardState extends ConsumerState<_TodayWorkspaceCard> {
                                           ? Icons.pause_rounded
                                           : Icons.play_arrow_rounded,
                                       primary: true,
-                                      onTap: running
-                                          ? _pause
-                                          : _startOrResume,
+                                      onTap: running ? _pause : _startOrResume,
                                     ),
                                     const SizedBox(height: 6),
                                     _TimerCompactButton(
@@ -824,9 +792,7 @@ class _TodayWorkspaceCardState extends ConsumerState<_TodayWorkspaceCard> {
                                           : Icons.close_rounded,
                                       primary: false,
                                       positive: canFinish,
-                                      onTap: canFinish
-                                          ? _stop
-                                          : _discardTimer,
+                                      onTap: canFinish ? _stop : _discardTimer,
                                     ),
                                   ],
                                 ),
@@ -834,57 +800,61 @@ class _TodayWorkspaceCardState extends ConsumerState<_TodayWorkspaceCard> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  Divider(height: 1, thickness: 0.6, color: consoleDivider),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              for (var i = 0; i < quickSteps.length; i++) ...[
-                                if (i > 0) const SizedBox(width: 6),
-                                _QuickStepChip(
-                                  label:
-                                      '${i == quickSteps.length - 1 ? '' : '＋'}'
-                                      '${formatHoursValue(quickSteps[i])}'
-                                      '${context.unit.short}',
-                                  enabled: canQuickEdit,
-                                  onTap: () {
-                                    HapticFeedback.lightImpact();
-                                    widget.onQuickAmount(
-                                      quickSteps[i],
-                                      replace: i == quickSteps.length - 1,
-                                    );
-                                  },
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      if (!kHoursOnly && widget.onOpenLedger != null) ...[
-                        _ToolbarMiniAction(
-                          icon: Icons.add_rounded,
-                          label: widget.entryCount > 0
-                              ? '账目 ${widget.entryCount}'
-                              : '记账',
-                          onTap: widget.onOpenLedger!,
-                        ),
-                        const SizedBox(width: 6),
-                      ],
-                      _ToolbarMiniAction(
-                        icon: Icons.edit_outlined,
-                        label: '编辑',
-                        onTap: widget.onOpenToday,
-                      ),
-                    ],
-                  ),
                 ],
+              ),
+            ),
+            Divider(height: 1, thickness: 0.7, color: colors.divider),
+            ColoredBox(
+              color: colors.heroWell,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(14, 9, 12, 10),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            for (var i = 0; i < quickSteps.length; i++) ...[
+                              if (i > 0) const SizedBox(width: 6),
+                              _QuickStepChip(
+                                label:
+                                    '${i == quickSteps.length - 1 ? '' : '+'}'
+                                    '${formatHoursValue(quickSteps[i])}'
+                                    '${context.unit.short}',
+                                enabled: canQuickEdit,
+                                onTap: () {
+                                  HapticFeedback.lightImpact();
+                                  widget.onQuickAmount(
+                                    quickSteps[i],
+                                    replace: i == quickSteps.length - 1,
+                                  );
+                                },
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    if (!kHoursOnly && widget.onOpenLedger != null) ...[
+                      _ToolbarMiniAction(
+                        icon: Icons.add_rounded,
+                        label: widget.entryCount > 0
+                            ? '账目 ${widget.entryCount}'
+                            : '记账',
+                        onTap: widget.onOpenLedger!,
+                      ),
+                      const SizedBox(width: 2),
+                    ],
+                    _ToolbarMiniAction(
+                      icon: Icons.edit_outlined,
+                      label: '编辑',
+                      onTap: widget.onOpenToday,
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
@@ -915,6 +885,9 @@ class _LiveTimerReadout extends StatefulWidget {
 class _LiveTimerReadoutState extends State<_LiveTimerReadout> {
   Timer? _ticker;
   bool _tickerEnabled = true;
+  late final ValueNotifier<String> _clockText = ValueNotifier(
+    _clock(widget.timer.elapsed),
+  );
 
   @override
   void initState() {
@@ -934,6 +907,7 @@ class _LiveTimerReadoutState extends State<_LiveTimerReadout> {
   @override
   void didUpdateWidget(covariant _LiveTimerReadout oldWidget) {
     super.didUpdateWidget(oldWidget);
+    _clockText.value = _clock(widget.timer.elapsed);
     _syncTicker();
   }
 
@@ -941,7 +915,8 @@ class _LiveTimerReadoutState extends State<_LiveTimerReadout> {
     final needed = widget.timer.running && _tickerEnabled;
     if (needed && _ticker == null) {
       _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
-        if (mounted) setState(() {});
+        final next = _clock(widget.timer.elapsed);
+        if (_clockText.value != next) _clockText.value = next;
       });
     } else if (!needed) {
       _ticker?.cancel();
@@ -952,6 +927,7 @@ class _LiveTimerReadoutState extends State<_LiveTimerReadout> {
   @override
   void dispose() {
     _ticker?.cancel();
+    _clockText.dispose();
     super.dispose();
   }
 
@@ -966,6 +942,7 @@ class _LiveTimerReadoutState extends State<_LiveTimerReadout> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     final timer = widget.timer;
     final running = timer.running;
     final liveEstimate = widget.activeRate > 0
@@ -985,17 +962,18 @@ class _LiveTimerReadoutState extends State<_LiveTimerReadout> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        RepaintBoundary(
-          child: RollingDigitsText(
-            text: _clock(timer.elapsed),
-            style: TextStyle(
-              color: running
-                  ? const Color(0xFF7AA7FF)
-                  : const Color(0xFFF6F2EA),
-              fontSize: 36,
-              height: 1.0,
-              fontWeight: FontWeight.w700,
-              letterSpacing: -1.0,
+        ValueListenableBuilder<String>(
+          valueListenable: _clockText,
+          builder: (context, value, _) => RepaintBoundary(
+            child: RollingDigitsText(
+              text: value,
+              style: TextStyle(
+                color: running ? colors.primary : colors.text,
+                fontSize: 36,
+                height: 1.0,
+                fontWeight: FontWeight.w600,
+                letterSpacing: -1.0,
+              ),
             ),
           ),
         ),
@@ -1005,7 +983,7 @@ class _LiveTimerReadoutState extends State<_LiveTimerReadout> {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
-            color: const Color(0xFFA8A095),
+            color: colors.text2,
             fontSize: 12,
             fontFeatures: tabularFigures,
           ),
@@ -1079,44 +1057,44 @@ class _LiveStatusDotState extends State<_LiveStatusDot>
         decoration: BoxDecoration(color: widget.color, shape: BoxShape.circle),
       );
     }
-    return SizedBox(
-      width: 10,
-      height: 10,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          AnimatedBuilder(
-            animation: _pulse,
-            builder: (context, _) {
-              final t = Curves2.out.transform(_pulse.value);
-              return Opacity(
-                opacity: ((1 - t) * 0.55).clamp(0.0, 1.0),
-                child: Transform.scale(
-                  scale: 0.7 + 0.9 * t,
-                  child: Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: widget.color,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-          Container(
-            width: 6,
-            height: 6,
-            decoration: BoxDecoration(
-              color: widget.color,
-              shape: BoxShape.circle,
-            ),
-          ),
-        ],
+    return RepaintBoundary(
+      child: SizedBox(
+        width: 14,
+        height: 14,
+        child: CustomPaint(
+          painter: _LiveDotPainter(animation: _pulse, color: widget.color),
+        ),
       ),
     );
   }
+}
+
+class _LiveDotPainter extends CustomPainter {
+  _LiveDotPainter({required this.animation, required this.color})
+    : super(repaint: animation);
+
+  final Animation<double> animation;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final t = Curves2.out.transform(animation.value);
+    final alpha = ((1.0 - t) * 0.55).clamp(0.0, 1.0);
+    if (alpha > 0.01) {
+      final radius = 4.0 * (0.7 + 0.9 * t);
+      canvas.drawCircle(
+        center,
+        radius,
+        Paint()..color = color.withValues(alpha: alpha),
+      );
+    }
+    canvas.drawCircle(center, 3.0, Paint()..color = color);
+  }
+
+  @override
+  bool shouldRepaint(_LiveDotPainter old) =>
+      old.color != color || old.animation != animation;
 }
 
 class _TimerCompactButton extends StatelessWidget {
@@ -1136,20 +1114,18 @@ class _TimerCompactButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
-    const ivory = Color(0xFFF8FAFC);
-    const obsidian = Color(0xFF0C1324);
-    const emerald = Color(0xFF34D399);
     final bg = primary
-        ? ivory
+        ? colors.primary
         : positive
-        ? emerald.withValues(alpha: 0.16)
-        : Colors.white.withValues(alpha: 0.12);
+        ? colors.incomeSoft
+        : colors.block;
     final fg = primary
-        ? obsidian
+        ? colors.onPrimary
         : positive
-        ? emerald
-        : ivory;
+        ? colors.income
+        : colors.text2;
     final shape = Radii.shape(Radii.md);
     return Pressable(
       onTap: onTap,
@@ -1159,21 +1135,24 @@ class _TimerCompactButton extends StatelessWidget {
       child: Container(
         height: 40,
         padding: const EdgeInsets.symmetric(horizontal: 14),
-        decoration: ShapeDecoration(
-          color: bg,
-          shape: shape,
-        ),
+        decoration: ShapeDecoration(color: bg, shape: shape),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             AnimatedSwitcher(
-              duration: motionDuration(Timings.fast, disableAnimations: disable),
+              duration: motionDuration(
+                Timings.fast,
+                disableAnimations: disable,
+              ),
               switchInCurve: Curves2.out,
               switchOutCurve: Curves2.out,
               transitionBuilder: (child, animation) => FadeTransition(
                 opacity: animation,
                 child: ScaleTransition(
-                  scale: Tween<double>(begin: 0.85, end: 1.0).animate(animation),
+                  scale: Tween<double>(
+                    begin: 0.85,
+                    end: 1.0,
+                  ).animate(animation),
                   child: child,
                 ),
               ),
@@ -1214,8 +1193,9 @@ class _QuickStepChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
-    final shape = Radii.shape(9);
+    final shape = Radii.shape(9.5);
     return AnimatedOpacity(
       duration: motionDuration(Timings.instant, disableAnimations: disable),
       curve: Curves2.soft,
@@ -1226,24 +1206,37 @@ class _QuickStepChip extends StatelessWidget {
         shape: shape,
         pressedScale: 0.94,
         child: Container(
-          constraints: const BoxConstraints(minWidth: 42, minHeight: 32),
+          constraints: const BoxConstraints(minWidth: 42, minHeight: 30),
           padding: const EdgeInsets.symmetric(horizontal: 10),
           alignment: Alignment.center,
           decoration: ShapeDecoration(
-            color: Colors.white.withValues(alpha: 0.09),
+            color: colors.isDark
+                ? Color.lerp(colors.card, Colors.white, 0.05)!
+                : colors.card,
             shape: shape.copyWith(
               side: BorderSide(
-                color: Colors.white.withValues(alpha: 0.08),
-                width: 0.6,
+                color: colors.isDark
+                    ? Colors.white.withValues(alpha: 0.08)
+                    : colors.cardBorder,
+                width: 0.75,
               ),
             ),
+            shadows: colors.isDark
+                ? null
+                : [
+                    BoxShadow(
+                      color: const Color(0xFF141519).withValues(alpha: 0.04),
+                      blurRadius: 3,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
           ),
           child: Text(
             label,
             style: TextStyle(
-              color: const Color(0xFFF6F2EA),
+              color: colors.text,
               fontSize: 12,
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.w600,
               fontFeatures: tabularFigures,
             ),
           ),
@@ -1266,33 +1259,25 @@ class _ToolbarMiniAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return Pressable(
       onTap: onTap,
       shape: Radii.shape(9),
       pressedScale: 0.94,
       child: Container(
         constraints: const BoxConstraints(minHeight: 32),
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-        decoration: ShapeDecoration(
-          color: Colors.transparent,
-          shape: Radii.shape(9).copyWith(
-            side: BorderSide(
-              color: Colors.white.withValues(alpha: 0.14),
-              width: 0.7,
-            ),
-          ),
-        ),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 13.5, color: const Color(0xFFD5CFC5)),
+            Icon(icon, size: 14, color: colors.text2),
             const SizedBox(width: 3),
             Text(
               label,
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
-                color: const Color(0xFFD5CFC5),
+                color: colors.text2,
               ),
             ),
           ],
@@ -1302,8 +1287,8 @@ class _ToolbarMiniAction extends StatelessWidget {
   }
 }
 
-/// 270° 精密时计圆盘 + 中心物理按压启停钮：
-/// 用 24 道制表刻度与发光弧线表达今日相对 8h 标准进度的饱满度，超 8h 转琥珀金。
+/// 360° 精密制表圆盘 + 实体表冠启停钮：
+/// 从 12 点顺时针扫掠表达今日相对 8h 标准进度，超 8h 转琥珀金，克制不抢读数重心。
 class _ChronographDialTrigger extends StatelessWidget {
   const _ChronographDialTrigger({
     super.key,
@@ -1324,6 +1309,17 @@ class _ChronographDialTrigger extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
+    final crownTop = disabled
+        ? colors.block
+        : colors.isDark
+        ? Color.lerp(colors.block, Colors.white, 0.08)!
+        : colors.card;
+    final crownBottom = disabled
+        ? colors.block
+        : colors.isDark
+        ? colors.card
+        : Color.lerp(colors.card, colors.block, 0.35)!;
     return Pressable(
       onTap: onTap,
       haptic: false,
@@ -1335,56 +1331,87 @@ class _ChronographDialTrigger extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             SizedBox(
-              width: 82,
-              height: 82,
+              width: 86,
+              height: 86,
               child: Stack(
                 alignment: Alignment.center,
                 children: [
-                  CustomPaint(
-                    size: const Size(82, 82),
-                    painter: _ChronographDialPainter(
-                      ratio: (hours / 8.0).clamp(0.0, 1.0),
-                      arcColor: arcColor,
+                  RepaintBoundary(
+                    child: CustomPaint(
+                      size: const Size(86, 86),
+                      painter: _ChronographDialPainter(
+                        ratio: (hours / 8.0).clamp(0.0, 1.0),
+                        arcColor: arcColor,
+                        trackColor: colors.isDark
+                            ? Colors.white.withValues(alpha: 0.09)
+                            : colors.block,
+                        tickColor: colors.isDark
+                            ? Colors.white.withValues(alpha: 0.20)
+                            : colors.outline.withValues(alpha: 0.52),
+                        wellColor: colors.heroWell.withValues(
+                          alpha: colors.isDark ? 0.52 : 0.65,
+                        ),
+                      ),
                     ),
                   ),
                   Container(
-                    width: 44,
-                    height: 44,
+                    width: 46,
+                    height: 46,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: disabled
-                          ? Colors.white.withValues(alpha: 0.12)
-                          : Colors.white,
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [crownTop, crownBottom],
+                      ),
+                      border: Border.all(
+                        color: disabled
+                            ? colors.divider
+                            : colors.isDark
+                            ? Colors.white.withValues(alpha: 0.14)
+                            : colors.cardBorder,
+                        width: 1.0,
+                      ),
                       boxShadow: disabled
                           ? null
                           : [
                               BoxShadow(
-                                color: arcColor.withValues(alpha: 0.36),
-                                blurRadius: 14,
-                                offset: const Offset(0, 4),
+                                color: const Color(0xFF141519).withValues(
+                                  alpha: colors.isDark ? 0.42 : 0.10,
+                                ),
+                                blurRadius: 10,
+                                offset: const Offset(0, 3),
                               ),
+                              if (!colors.isDark)
+                                BoxShadow(
+                                  color: const Color(0xFF141519)
+                                      .withValues(alpha: 0.04),
+                                  blurRadius: 2,
+                                  offset: const Offset(0, 1),
+                                ),
                             ],
                     ),
-                    child: Icon(
-                      icon,
-                      size: 22,
-                      color: disabled
-                          ? const Color(0xFF72819E)
-                          : const Color(0xFF0C1324),
+                    child: Transform.translate(
+                      offset: icon == Icons.play_arrow_rounded
+                          ? const Offset(1.2, 0)
+                          : Offset.zero,
+                      child: Icon(
+                        icon,
+                        size: 22,
+                        color: disabled ? colors.text3 : arcColor,
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 1),
+            const SizedBox(height: 3),
             Text(
               label,
               style: TextStyle(
-                color: disabled
-                    ? const Color(0xFF72819E)
-                    : const Color(0xFFE2E8F0),
+                color: disabled ? colors.text3 : colors.text2,
                 fontSize: 11,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w500,
                 letterSpacing: 0.2,
               ),
             ),
@@ -1399,25 +1426,33 @@ class _ChronographDialPainter extends CustomPainter {
   const _ChronographDialPainter({
     required this.ratio,
     required this.arcColor,
+    required this.trackColor,
+    required this.tickColor,
+    required this.wellColor,
   });
 
   final double ratio;
   final Color arcColor;
+  final Color trackColor;
+  final Color tickColor;
+  final Color wellColor;
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
-    final outerRadius = size.width / 2 - 2;
-    final arcRadius = outerRadius - 6.5;
-    const startAngle = math.pi * 0.75;
-    const sweepTotal = math.pi * 1.5;
+    final outerRadius = size.width / 2 - 1.5;
+    final arcRadius = outerRadius - 7.5;
+    const startAngle = -math.pi / 2;
+    const sweepTotal = math.pi * 2;
     const ticks = 24;
 
-    final filledTicks = ratio <= 0 ? 0 : (ratio * ticks).ceil();
-    for (var i = 0; i <= ticks; i++) {
+    canvas.drawCircle(center, arcRadius - 2.2, Paint()..color = wellColor);
+
+    final filledTicks = ratio <= 0 ? 0 : (ratio * ticks).floor();
+    for (var i = 0; i < ticks; i++) {
       final angle = startAngle + sweepTotal * (i / ticks);
       final isMajor = i % 6 == 0;
-      final innerR = outerRadius - (isMajor ? 4.8 : 2.8);
+      final innerR = outerRadius - (isMajor ? 4.2 : 2.2);
       final p0 = Offset(
         center.dx + math.cos(angle) * innerR,
         center.dy + math.sin(angle) * innerR,
@@ -1426,29 +1461,27 @@ class _ChronographDialPainter extends CustomPainter {
         center.dx + math.cos(angle) * outerRadius,
         center.dy + math.sin(angle) * outerRadius,
       );
+      final lit = ratio > 0 && (i == 0 || i <= filledTicks);
       canvas.drawLine(
         p0,
         p1,
         Paint()
-          ..strokeWidth = isMajor ? 1.4 : 0.95
+          ..strokeWidth = isMajor ? 1.35 : 0.85
           ..strokeCap = StrokeCap.round
-          ..color = i <= filledTicks && ratio > 0
-              ? arcColor.withValues(alpha: isMajor ? 0.95 : 0.65)
-              : Colors.white.withValues(alpha: isMajor ? 0.28 : 0.14),
+          ..color = lit
+              ? arcColor.withValues(alpha: isMajor ? 0.92 : 0.55)
+              : tickColor.withValues(alpha: isMajor ? 0.82 : 0.36),
       );
     }
 
     final arcRect = Rect.fromCircle(center: center, radius: arcRadius);
-    canvas.drawArc(
-      arcRect,
-      startAngle,
-      sweepTotal,
-      false,
+    canvas.drawCircle(
+      center,
+      arcRadius,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 3.2
-        ..strokeCap = StrokeCap.round
-        ..color = Colors.white.withValues(alpha: 0.12),
+        ..strokeWidth = 3.4
+        ..color = trackColor,
     );
 
     if (ratio > 0.005) {
@@ -1464,23 +1497,16 @@ class _ChronographDialPainter extends CustomPainter {
           ..strokeCap = StrokeCap.round
           ..color = arcColor,
       );
-      final endAngle = startAngle + sweep;
-      final tip = Offset(
-        center.dx + math.cos(endAngle) * arcRadius,
-        center.dy + math.sin(endAngle) * arcRadius,
-      );
-      canvas.drawCircle(
-        tip,
-        5.5,
-        Paint()..color = arcColor.withValues(alpha: 0.32),
-      );
-      canvas.drawCircle(tip, 2.5, Paint()..color = Colors.white);
     }
   }
 
   @override
   bool shouldRepaint(_ChronographDialPainter old) =>
-      old.ratio != ratio || old.arcColor != arcColor;
+      old.ratio != ratio ||
+      old.arcColor != arcColor ||
+      old.trackColor != trackColor ||
+      old.tickColor != tickColor ||
+      old.wellColor != wellColor;
 }
 
 class _MonthHoursCard extends StatelessWidget {
@@ -1510,71 +1536,78 @@ class _MonthHoursCard extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 13, 14, 13),
         child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.schedule_rounded,
-                size: 14,
-                color: colors.primary,
-              ),
-              const SizedBox(width: 5),
-              Text(
-                '本月${context.unit.quantity}',
-                style: TextStyle(
-                  color: colors.text2,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: colors.primary,
+                    shape: BoxShape.circle,
+                  ),
                 ),
-              ),
-              const Spacer(),
-              Icon(Icons.chevron_right_rounded, size: 14.5, color: colors.text3),
-            ],
-          ),
-          const SizedBox(height: 9),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              Flexible(
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: AnimatedNumericText(
-                    value: summary.totalHours,
-                    formatter: (value) => formatHoursValue(value.toDouble()),
-                    style: TextStyle(
-                      color: colors.text,
-                      fontSize: 25,
-                      height: 1.05,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -0.9,
+                const SizedBox(width: 6),
+                Text(
+                  '本月${context.unit.quantity}',
+                  style: TextStyle(
+                    color: colors.text2,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const Spacer(),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  size: 14.5,
+                  color: colors.text3,
+                ),
+              ],
+            ),
+            const SizedBox(height: 9),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Flexible(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: AnimatedNumericText(
+                      value: summary.totalHours,
+                      formatter: (value) => formatHoursValue(value.toDouble()),
+                      style: TextStyle(
+                        color: colors.text,
+                        fontSize: 25,
+                        height: 1.05,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.9,
+                      ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 3),
-              Text(
-                context.unit.short,
-                style: TextStyle(fontSize: 11.5, color: colors.text3),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          ProgressBar(ratio: progress, color: colors.primary, height: 2.5),
-          const SizedBox(height: 6),
-          Text(
-            '${summary.workDays}天 · 日均 ${formatHoursValue(summary.averageHours)}${context.unit.short}',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: colors.text3,
-              fontSize: 11,
-              fontFeatures: tabularFigures,
+                const SizedBox(width: 3),
+                Text(
+                  context.unit.short,
+                  style: TextStyle(fontSize: 11.5, color: colors.text3),
+                ),
+              ],
             ),
-          ),
-        ],
+            const SizedBox(height: 8),
+            ProgressBar(ratio: progress, color: colors.primary, height: 2.5),
+            const SizedBox(height: 6),
+            Text(
+              '${summary.workDays}天 · 日均 ${formatHoursValue(summary.averageHours)}${context.unit.short}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: colors.text3,
+                fontSize: 11,
+                fontFeatures: tabularFigures,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -1608,72 +1641,105 @@ class _MonthSalaryCard extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 13, 14, 13),
         child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                kHoursOnly
-                    ? Icons.event_available_rounded
-                    : Icons.payments_outlined,
-                size: 14,
-                color: colors.income,
-              ),
-              const SizedBox(width: 5),
-              Text(
-                kHoursOnly ? '本月出勤' : '本月工资',
-                style: TextStyle(
-                  color: colors.text2,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: colors.income,
+                    shape: BoxShape.circle,
+                  ),
                 ),
+                const SizedBox(width: 6),
+                Text(
+                  kHoursOnly ? '本月出勤' : '本月工资',
+                  style: TextStyle(
+                    color: colors.text2,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const Spacer(),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  size: 14.5,
+                  color: colors.text3,
+                ),
+              ],
+            ),
+            const SizedBox(height: 9),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: kHoursOnly
+                  ? AnimatedNumericText(
+                      value: summary.workDays,
+                      formatter: (value) => '${value.toInt()} 天',
+                      style: TextStyle(
+                        color: colors.text,
+                        fontSize: 25,
+                        height: 1.05,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.9,
+                      ),
+                    )
+                  : Row(
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
+                      children: [
+                        Text(
+                          '¥',
+                          style: TextStyle(
+                            color: colors.text2,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(width: 1.5),
+                        AnimatedNumericText(
+                          value: monthPay,
+                          formatter: (value) =>
+                              formatAmount(value.toDouble(), withSymbol: false),
+                          style: TextStyle(
+                            color: colors.text,
+                            fontSize: 25,
+                            height: 1.05,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.9,
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
+            const SizedBox(height: 8),
+            if (!kHoursOnly) ...[
+              ProgressBar(
+                ratio: settleRatio,
+                color: colors.income,
+                height: 2.5,
               ),
+              const SizedBox(height: 6),
+            ] else
               const Spacer(),
-              Icon(Icons.chevron_right_rounded, size: 14.5, color: colors.text3),
-            ],
-          ),
-          const SizedBox(height: 9),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: AnimatedNumericText(
-              value: kHoursOnly ? summary.workDays : monthPay,
-              formatter: (value) => kHoursOnly
-                  ? '${value.toInt()} 天'
-                  : formatAmount(value.toDouble(), withSymbol: true),
+            Text(
+              kHoursOnly
+                  ? '工作日出勤 ${summary.workDays} 天'
+                  : allSettled
+                  ? '已全部结算入账'
+                  : '待结算 ${formatAmount(settlement.pending, withSymbol: true)}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: kHoursOnly
-                    ? colors.income
-                    : (monthPay > 0 ? colors.income : colors.text),
-                fontSize: 25,
-                height: 1.05,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -0.9,
+                color: allSettled ? colors.income : colors.text3,
+                fontSize: 11,
+                fontWeight: allSettled ? FontWeight.w600 : FontWeight.w400,
+                fontFeatures: tabularFigures,
               ),
             ),
-          ),
-          const SizedBox(height: 8),
-          if (!kHoursOnly) ...[
-            ProgressBar(ratio: settleRatio, color: colors.income, height: 2.5),
-            const SizedBox(height: 6),
-          ] else
-            const Spacer(),
-          Text(
-            kHoursOnly
-                ? '工作日出勤 ${summary.workDays} 天'
-                : allSettled
-                ? '已全部结算入账'
-                : '待结算 ${formatAmount(settlement.pending, withSymbol: true)}',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: allSettled ? colors.income : colors.text3,
-              fontSize: 11,
-              fontWeight: allSettled ? FontWeight.w600 : FontWeight.w400,
-              fontFeatures: tabularFigures,
-            ),
-          ),
-        ],
+          ],
         ),
       ),
     );
@@ -1681,10 +1747,7 @@ class _MonthSalaryCard extends StatelessWidget {
 }
 
 class _MonthBalanceMiniCard extends StatelessWidget {
-  const _MonthBalanceMiniCard({
-    required this.summary,
-    required this.onTap,
-  });
+  const _MonthBalanceMiniCard({required this.summary, required this.onTap});
 
   final LedgerMonthSummary summary;
   final VoidCallback? onTap;
@@ -1699,56 +1762,60 @@ class _MonthBalanceMiniCard extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 13, 14, 13),
         child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.account_balance_wallet_outlined,
-                size: 14,
-                color: colors.chart[1],
-              ),
-              const SizedBox(width: 5),
-              Text(
-                '本月结余',
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.account_balance_wallet_outlined,
+                  size: 14,
+                  color: colors.chart[1],
+                ),
+                const SizedBox(width: 5),
+                Text(
+                  '本月结余',
+                  style: TextStyle(
+                    color: colors.text2,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const Spacer(),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  size: 14.5,
+                  color: colors.text3,
+                ),
+              ],
+            ),
+            const SizedBox(height: 9),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                formatAmount(net, withSymbol: true),
                 style: TextStyle(
-                  color: colors.text2,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
+                  color: net < 0 ? colors.expense : colors.text,
+                  fontSize: 23,
+                  height: 1.05,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.6,
+                  fontFeatures: tabularFigures,
                 ),
               ),
-              const Spacer(),
-              Icon(Icons.chevron_right_rounded, size: 14.5, color: colors.text3),
-            ],
-          ),
-          const SizedBox(height: 9),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text(
-              formatAmount(net, withSymbol: true),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '收 ${formatAmount(summary.income, withSymbol: true)} · 支 ${formatAmount(summary.expense, withSymbol: true)}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: net < 0 ? colors.expense : colors.text,
-                fontSize: 23,
-                height: 1.05,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -0.6,
+                color: colors.text3,
+                fontSize: 11,
                 fontFeatures: tabularFigures,
               ),
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '收 ${formatAmount(summary.income, withSymbol: true)} · 支 ${formatAmount(summary.expense, withSymbol: true)}',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: colors.text3,
-              fontSize: 11,
-              fontFeatures: tabularFigures,
-            ),
-          ),
-        ],
+          ],
         ),
       ),
     );
@@ -1777,53 +1844,57 @@ class _TodayLedgerMiniCard extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 13, 14, 13),
         child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.receipt_long_outlined,
-                size: 14,
-                color: colors.warning,
-              ),
-              const SizedBox(width: 5),
-              Text(
-                '今日账目',
-                style: TextStyle(
-                  color: colors.text2,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.receipt_long_outlined,
+                  size: 14,
+                  color: colors.warning,
                 ),
+                const SizedBox(width: 5),
+                Text(
+                  '今日账目',
+                  style: TextStyle(
+                    color: colors.text2,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const Spacer(),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  size: 14.5,
+                  color: colors.text3,
+                ),
+              ],
+            ),
+            const SizedBox(height: 9),
+            Text(
+              entryCount == 0 ? '暂无收支' : '$entryCount 笔',
+              style: TextStyle(
+                color: entryCount == 0 ? colors.text3 : colors.text,
+                fontSize: 21,
+                height: 1.05,
+                fontWeight: FontWeight.w700,
+                fontFeatures: tabularFigures,
               ),
-              const Spacer(),
-              Icon(Icons.chevron_right_rounded, size: 14.5, color: colors.text3),
-            ],
-          ),
-          const SizedBox(height: 9),
-          Text(
-            entryCount == 0 ? '暂无收支' : '$entryCount 笔',
-            style: TextStyle(
-              color: entryCount == 0 ? colors.text3 : colors.text,
-              fontSize: 21,
-              height: 1.05,
-              fontWeight: FontWeight.w700,
-              fontFeatures: tabularFigures,
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            entryCount == 0
-                ? '轻点快捷记一笔'
-                : '收 ${formatAmount(income, withSymbol: true)} · 支 ${formatAmount(expense, withSymbol: true)}',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: colors.text3,
-              fontSize: 11,
-              fontFeatures: tabularFigures,
+            const SizedBox(height: 8),
+            Text(
+              entryCount == 0
+                  ? '轻点快捷记一笔'
+                  : '收 ${formatAmount(income, withSymbol: true)} · 支 ${formatAmount(expense, withSymbol: true)}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: colors.text3,
+                fontSize: 11,
+                fontFeatures: tabularFigures,
+              ),
             ),
-          ),
-        ],
+          ],
         ),
       ),
     );
@@ -1854,41 +1925,51 @@ class _TodayLedgerStrip extends StatelessWidget {
       onTap: onTap,
       shape: const RoundedRectangleBorder(),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         child: Row(
-        children: [
-          Icon(
-            Icons.receipt_long_outlined,
-            size: 16,
-            color: colors.text2,
-          ),
-          const SizedBox(width: 8),
-          Text(
-            '今日账目',
-            style: TextStyle(
-              color: colors.text,
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              detail,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.right,
-              style: TextStyle(
-                color: entryCount == 0 ? colors.text3 : colors.text2,
-                fontSize: 12.5,
-                fontWeight: entryCount == 0 ? FontWeight.w400 : FontWeight.w600,
-                fontFeatures: tabularFigures,
+          children: [
+            Container(
+              width: 26,
+              height: 26,
+              decoration: ShapeDecoration(
+                color: colors.block,
+                shape: Radii.shape(8),
+              ),
+              child: Icon(
+                Icons.receipt_long_outlined,
+                size: 14.5,
+                color: colors.text2,
               ),
             ),
-          ),
-          const SizedBox(width: 4),
-          Icon(Icons.chevron_right_rounded, size: 16, color: colors.text3),
-        ],
+            const SizedBox(width: 9),
+            Text(
+              '今日账目',
+              style: TextStyle(
+                color: colors.text,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                detail,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.right,
+                style: TextStyle(
+                  color: entryCount == 0 ? colors.text3 : colors.text2,
+                  fontSize: 12.5,
+                  fontWeight: entryCount == 0
+                      ? FontWeight.w400
+                      : FontWeight.w600,
+                  fontFeatures: tabularFigures,
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(Icons.chevron_right_rounded, size: 16, color: colors.text3),
+          ],
         ),
       ),
     );
@@ -1897,10 +1978,7 @@ class _TodayLedgerStrip extends StatelessWidget {
 
 /// 单独占整行时的紧凑本月结余条。
 class _MonthBalanceStrip extends StatelessWidget {
-  const _MonthBalanceStrip({
-    required this.summary,
-    required this.onTap,
-  });
+  const _MonthBalanceStrip({required this.summary, required this.onTap});
 
   final LedgerMonthSummary summary;
   final VoidCallback? onTap;
@@ -1915,39 +1993,39 @@ class _MonthBalanceStrip extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
         child: Row(
-        children: [
-          Icon(
-            Icons.account_balance_wallet_outlined,
-            size: 16,
-            color: colors.text2,
-          ),
-          const SizedBox(width: 8),
-          Text(
-            '本月结余',
-            style: TextStyle(
-              color: colors.text,
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
+          children: [
+            Icon(
+              Icons.account_balance_wallet_outlined,
+              size: 16,
+              color: colors.text2,
             ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              '${formatAmount(net, withSymbol: true)} · 收 ${formatAmount(summary.income, withSymbol: true)} / 支 ${formatAmount(summary.expense, withSymbol: true)}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.right,
+            const SizedBox(width: 8),
+            Text(
+              '本月结余',
               style: TextStyle(
-                color: net < 0 ? colors.expense : colors.text,
-                fontSize: 12.5,
-                fontWeight: FontWeight.w600,
-                fontFeatures: tabularFigures,
+                color: colors.text,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
               ),
             ),
-          ),
-          const SizedBox(width: 4),
-          Icon(Icons.chevron_right_rounded, size: 16, color: colors.text3),
-        ],
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                '${formatAmount(net, withSymbol: true)} · 收 ${formatAmount(summary.income, withSymbol: true)} / 支 ${formatAmount(summary.expense, withSymbol: true)}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.right,
+                style: TextStyle(
+                  color: net < 0 ? colors.expense : colors.text,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  fontFeatures: tabularFigures,
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(Icons.chevron_right_rounded, size: 16, color: colors.text3),
+          ],
         ),
       ),
     );

@@ -8,9 +8,7 @@ import '../../core/measure_unit.dart';
 import '../../core/theme_tokens.dart';
 import '../../data/constants.dart';
 import '../../data/dates.dart';
-import '../../data/ledger.dart';
 import '../../data/profiles.dart';
-import '../../data/records.dart';
 import '../../state/app_controller.dart';
 import '../../ui/export_sheet.dart';
 import '../../ui/month_picker.dart';
@@ -31,20 +29,18 @@ class MyView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colors = context.colors;
-    final state = ref.watch(appControllerProvider);
     final month = ref.watch(selectedMonthProvider);
-    final summary = getMonthSummary(state.records, month);
-    final pay = getMonthPay(state.records, month, state.workProfiles);
-    final ledger = getLedgerMonthSummary(state.entries, month);
-    final settlement = getSettlementSummary(
-      state.records,
-      month,
-      state.workProfiles,
-    );
+    final workProfiles = ref.watch(workProfilesProvider);
+    final summary = ref.watch(currentMonthWorkSummaryProvider);
+    final monthWork = ref.watch(currentMonthWorkViewDataProvider);
+    final monthLedger = ref.watch(currentMonthLedgerViewDataProvider);
+    final pay = monthWork.monthPay;
+    final ledger = monthLedger.summary;
+    final settlement = monthWork.settlement;
     final budget = ref.watch(budgetTargetsProvider);
     final defaultWork =
-        getWorkById(state.workProfiles, defaultWorkId) ??
-        (state.workProfiles.isEmpty ? null : state.workProfiles.first);
+        getWorkById(workProfiles, defaultWorkId) ??
+        (workProfiles.isEmpty ? null : workProfiles.first);
     final wageRatio = settlement.total <= 0
         ? 0.0
         : (settlement.settled / settlement.total).clamp(0.0, 1.0);
@@ -85,187 +81,243 @@ class MyView extends ConsumerWidget {
                               child: IgnorePointer(
                                 child: CustomPaint(
                                   painter: _PassportArcWatermark(
-                                    accent: colors.primary,
+                                    lineColor: colors.outline.withValues(
+                                      alpha: colors.isDark ? 0.14 : 0.22,
+                                    ),
                                   ),
                                 ),
                               ),
                             ),
                             Padding(
-                              padding: const EdgeInsets.fromLTRB(
-                                18,
-                                16,
-                                18,
-                                16,
-                              ),
+                              padding: EdgeInsets.zero,
                               child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
-                                  Row(
-                                    children: [
-                                      Pressable(
-                                        onTap: () async {
-                                          final picked = await showMonthPicker(
-                                            context,
-                                            initialMonth: month,
-                                          );
-                                          if (picked != null &&
-                                              context.mounted) {
-                                            ref
-                                                .read(
-                                                  selectedMonthProvider
-                                                      .notifier,
-                                                )
-                                                .setMonth(picked);
-                                          }
-                                        },
-                                        shape: Radii.pillShape,
-                                        pressedScale: 0.96,
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 11,
-                                            vertical: 5,
-                                          ),
-                                          decoration: ShapeDecoration(
-                                            color: Colors.white.withValues(
-                                              alpha: 0.10,
-                                            ),
-                                            shape: Radii.pillShape.copyWith(
-                                              side: BorderSide(
-                                                color: Colors.white.withValues(
-                                                  alpha: 0.12,
-                                                ),
-                                                width: 0.6,
-                                              ),
-                                            ),
-                                          ),
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              AnimatedMonthLabel(
-                                                label: formatMonthLabel(month),
-                                                style: const TextStyle(
-                                                  fontSize: 12.5,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: Color(0xFFF8FAFC),
-                                                ),
-                                              ),
-                                              const SizedBox(width: 2),
-                                              const Icon(
-                                                Icons.unfold_more_rounded,
-                                                size: 14,
-                                                color: Color(0xFFA8B5CE),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                      const Spacer(),
-                                      const Text(
-                                        'TIMEPAGE · 月度总览',
-                                        style: TextStyle(
-                                          fontSize: 10.5,
-                                          fontWeight: FontWeight.w500,
-                                          letterSpacing: 0.9,
-                                          color: Color(0xFF94A3B8),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 15),
-                                  Row(
-                                    children: [
-                                      _MiniMetric(
-                                        label: context.unit.quantity,
-                                        numericValue: summary.totalHours,
-                                        formatter: (v) =>
-                                            '${formatHoursValue(v.toDouble())}${context.unit.short}',
-                                        color: const Color(0xFFF8FAFC),
-                                        labelColor: const Color(0xFFA8B5CE),
-                                      ),
-                                      if (!kHoursOnly) ...[
-                                        _MiniMetric(
-                                          label: '工资',
-                                          numericValue: pay,
-                                          formatter: (v) => formatAmount(
-                                            v.toDouble(),
-                                            withSymbol: true,
-                                          ),
-                                          color: const Color(0xFF34D399),
-                                          labelColor: const Color(0xFFA8B5CE),
-                                        ),
-                                        _MiniMetric(
-                                          label: '结余',
-                                          numericValue: ledger.balance,
-                                          formatter: (v) => formatAmount(
-                                            v.toDouble(),
-                                            withSymbol: true,
-                                          ),
-                                          color: ledger.balance >= 0
-                                              ? const Color(0xFFF8FAFC)
-                                              : const Color(0xFFF87171),
-                                          labelColor: const Color(0xFFA8B5CE),
-                                        ),
-                                      ] else
-                                        _MiniMetric(
-                                          label: '出勤天数',
-                                          numericValue: summary.workDays,
-                                          formatter: (v) => '${v.round()} 天',
-                                          color: const Color(0xFF34D399),
-                                          labelColor: const Color(0xFFA8B5CE),
-                                        ),
-                                    ],
-                                  ),
-                                  if (!kHoursOnly) ...[
-                                    const SizedBox(height: 13),
-                                    Divider(
-                                      height: 1,
-                                      thickness: 0.7,
-                                      color: Colors.white.withValues(
-                                        alpha: 0.11,
-                                      ),
+                                  Padding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                      18,
+                                      15,
+                                      18,
+                                      15,
                                     ),
-                                    const SizedBox(height: 10),
-                                    Row(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
-                                        Text(
-                                          '本月工资结算 ${(wageRatio * 100).round()}%',
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w500,
-                                            color: Color(0xFFDCE4F2),
-                                            fontFeatures: tabularFigures,
-                                          ),
+                                        Row(
+                                          children: [
+                                            Pressable(
+                                              onTap: () async {
+                                                final picked =
+                                                    await showMonthPicker(
+                                                      context,
+                                                      initialMonth: month,
+                                                    );
+                                                if (picked != null &&
+                                                    context.mounted) {
+                                                  ref
+                                                      .read(
+                                                        selectedMonthProvider
+                                                            .notifier,
+                                                      )
+                                                      .setMonth(picked);
+                                                }
+                                              },
+                                              shape: Radii.pillShape,
+                                              pressedScale: 0.96,
+                                              child: Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 11,
+                                                      vertical: 5,
+                                                    ),
+                                                decoration: ShapeDecoration(
+                                                  color: colors.block,
+                                                  shape: Radii.pillShape,
+                                                ),
+                                                child: Row(
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
+                                                  children: [
+                                                    AnimatedMonthLabel(
+                                                      label: formatMonthLabel(
+                                                        month,
+                                                      ),
+                                                      style: TextStyle(
+                                                        fontSize: 12.5,
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                        color: colors.text,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 2),
+                                                    Icon(
+                                                      Icons.unfold_more_rounded,
+                                                      size: 14,
+                                                      color: colors.text3,
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                            const Spacer(),
+                                            Text(
+                                              'TIMEPAGE · 月度总览',
+                                              style: TextStyle(
+                                                fontSize: 10.5,
+                                                fontWeight: FontWeight.w500,
+                                                letterSpacing: 0.9,
+                                                color: colors.text3,
+                                              ),
+                                            ),
+                                          ],
                                         ),
-                                        const Spacer(),
-                                        Text(
-                                          '已结 ${formatAmount(settlement.settled, withSymbol: true)}'
-                                          ' · 待结 ${formatAmount(settlement.pending, withSymbol: true)}',
-                                          style: const TextStyle(
-                                            fontSize: 11.5,
-                                            color: Color(0xFF94A3B8),
-                                            fontFeatures: tabularFigures,
+                                        const SizedBox(height: 15),
+                                        IntrinsicHeight(
+                                          child: Row(
+                                            children: [
+                                              _MiniMetric(
+                                                label: context.unit.quantity,
+                                                numericValue:
+                                                    summary.totalHours,
+                                                formatter: (v) =>
+                                                    '${formatHoursValue(v.toDouble())}${context.unit.short}',
+                                                color: colors.text,
+                                                labelColor: colors.text3,
+                                              ),
+                                              if (!kHoursOnly) ...[
+                                                Container(
+                                                  width: 0.7,
+                                                  margin:
+                                                      const EdgeInsets.symmetric(
+                                                        horizontal: 10,
+                                                        vertical: 3,
+                                                      ),
+                                                  color: colors.divider,
+                                                ),
+                                                _MiniMetric(
+                                                  label: '工资',
+                                                  numericValue: pay,
+                                                  formatter: (v) =>
+                                                      formatAmount(
+                                                        v.toDouble(),
+                                                        withSymbol: true,
+                                                      ),
+                                                  color: colors.text,
+                                                  labelColor: colors.text3,
+                                                ),
+                                                Container(
+                                                  width: 0.7,
+                                                  margin:
+                                                      const EdgeInsets.symmetric(
+                                                        horizontal: 10,
+                                                        vertical: 3,
+                                                      ),
+                                                  color: colors.divider,
+                                                ),
+                                                _MiniMetric(
+                                                  label: '结余',
+                                                  numericValue: ledger.balance,
+                                                  formatter: (v) =>
+                                                      formatAmount(
+                                                        v.toDouble(),
+                                                        withSymbol: true,
+                                                      ),
+                                                  color: ledger.balance >= 0
+                                                      ? colors.text
+                                                      : colors.expense,
+                                                  labelColor: colors.text3,
+                                                ),
+                                              ] else ...[
+                                                Container(
+                                                  width: 0.7,
+                                                  margin:
+                                                      const EdgeInsets.symmetric(
+                                                        horizontal: 12,
+                                                        vertical: 3,
+                                                      ),
+                                                  color: colors.divider,
+                                                ),
+                                                _MiniMetric(
+                                                  label: '出勤天数',
+                                                  numericValue:
+                                                      summary.workDays,
+                                                  formatter: (v) =>
+                                                      '${v.round()} 天',
+                                                  color: colors.text,
+                                                  labelColor: colors.text3,
+                                                ),
+                                              ],
+                                            ],
                                           ),
                                         ),
                                       ],
                                     ),
-                                    const SizedBox(height: 7),
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(999),
-                                      child: SizedBox(
-                                        height: 4,
-                                        child: Stack(
-                                          fit: StackFit.expand,
+                                  ),
+                                  if (!kHoursOnly) ...[
+                                    Divider(
+                                      height: 1,
+                                      thickness: 0.7,
+                                      color: colors.divider,
+                                    ),
+                                    ColoredBox(
+                                      color: colors.heroWell,
+                                      child: Padding(
+                                        padding: const EdgeInsets.fromLTRB(
+                                          18,
+                                          11,
+                                          18,
+                                          13,
+                                        ),
+                                        child: Column(
                                           children: [
-                                            ColoredBox(
-                                              color: Colors.white.withValues(
-                                                alpha: 0.12,
-                                              ),
+                                            Row(
+                                              children: [
+                                                Text(
+                                                  '本月工资结算 ${(wageRatio * 100).round()}%',
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.w500,
+                                                    color: colors.text2,
+                                                    fontFeatures:
+                                                        tabularFigures,
+                                                  ),
+                                                ),
+                                                const Spacer(),
+                                                Text(
+                                                  '已结 ${formatAmount(settlement.settled, withSymbol: true)}'
+                                                  ' · 待结 ${formatAmount(settlement.pending, withSymbol: true)}',
+                                                  style: TextStyle(
+                                                    fontSize: 11.5,
+                                                    color: colors.text3,
+                                                    fontFeatures:
+                                                        tabularFigures,
+                                                  ),
+                                                ),
+                                              ],
                                             ),
-                                            FractionallySizedBox(
-                                              alignment: Alignment.centerLeft,
-                                              widthFactor: wageRatio,
-                                              child: const ColoredBox(
-                                                color: Color(0xFF34D399),
+                                            const SizedBox(height: 7),
+                                            ClipRRect(
+                                              borderRadius:
+                                                  BorderRadius.circular(999),
+                                              child: SizedBox(
+                                                height: 4,
+                                                child: Stack(
+                                                  fit: StackFit.expand,
+                                                  children: [
+                                                    ColoredBox(
+                                                      color: colors.inset,
+                                                    ),
+                                                    FractionallySizedBox(
+                                                      alignment:
+                                                          Alignment.centerLeft,
+                                                      widthFactor: wageRatio,
+                                                      child: ColoredBox(
+                                                        color: colors.income,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
                                               ),
                                             ),
                                           ],
@@ -296,11 +348,12 @@ class MyView extends ConsumerWidget {
                                 Expanded(
                                   child: _AtelierWorkspaceTile(
                                     title: '工作与${context.unit.rateName}',
-                                    subtitle: defaultWork == null ||
+                                    subtitle:
+                                        defaultWork == null ||
                                             defaultWork.hourlyRate <= 0
                                         ? '点此配置默认${context.unit.rateName}'
                                         : '${defaultWork.name} · ¥${formatRate(defaultWork.hourlyRate)}/${context.unit.rateShort}',
-                                    badge: '${state.workProfiles.length} 项',
+                                    badge: '${workProfiles.length} 项',
                                     icon: Icons.work_outline_rounded,
                                     accent: colors.primary,
                                     onTap: () => showWorkManager(context),
@@ -314,6 +367,12 @@ class MyView extends ConsumerWidget {
                                         ? '待结 ${formatAmount(settlement.pending, withSymbol: true)}'
                                         : '全部工资已结清',
                                     badge: settlement.pending > 0 ? '待结' : '已清',
+                                    badgeColor: settlement.pending > 0
+                                        ? colors.warning
+                                        : colors.income,
+                                    badgeBg: settlement.pending > 0
+                                        ? colors.warningSoft
+                                        : colors.incomeSoft,
                                     icon: Icons.payments_outlined,
                                     accent: colors.income,
                                     onTap: () => showWagePanel(context, month),
@@ -336,6 +395,12 @@ class MyView extends ConsumerWidget {
                                     badge: budget.monthlyExpenseBudget > 0
                                         ? '已启用'
                                         : '未设',
+                                    badgeColor: budget.monthlyExpenseBudget > 0
+                                        ? colors.primary
+                                        : null,
+                                    badgeBg: budget.monthlyExpenseBudget > 0
+                                        ? colors.primaryContainer
+                                        : null,
                                     icon: Icons.track_changes_rounded,
                                     accent: colors.warning,
                                     onTap: () => showBudgetPanel(context),
@@ -362,7 +427,7 @@ class MyView extends ConsumerWidget {
                         padding: const EdgeInsets.symmetric(vertical: 4),
                         child: ListRow(
                           title: '工作类型管理',
-                          subtitle: '共 ${state.workProfiles.length} 项工作',
+                          subtitle: '共 ${workProfiles.length} 项工作',
                           leading: AppIconBadge(
                             icon: Icons.work_outline_rounded,
                             color: colors.primary,
@@ -408,8 +473,8 @@ class MyView extends ConsumerWidget {
                             onTap: () => showExportSheet(
                               context,
                               month: month,
-                              records: state.records,
-                              entries: state.entries,
+                              records: ref.read(recordsProvider),
+                              entries: ref.read(entriesProvider),
                               includeLedger: !kHoursOnly,
                             ),
                           ),
@@ -460,7 +525,7 @@ class MyView extends ConsumerWidget {
                     const SizedBox(height: Gaps.xl),
                     Center(
                       child: Text(
-                        '时页 TIMEPAGE · 1.7.8 · 数据完全本地保存',
+                        '时页 TIMEPAGE · 1.7.9 · 数据完全本地保存',
                         style: TextStyle(fontSize: 11.5, color: colors.text3),
                       ),
                     ),
@@ -549,10 +614,7 @@ class _MiniMetric extends StatelessWidget {
         children: [
           Text(
             label,
-            style: TextStyle(
-              fontSize: 11.5,
-              color: labelColor ?? colors.text3,
-            ),
+            style: TextStyle(fontSize: 11.5, color: labelColor ?? colors.text3),
           ),
           const SizedBox(height: 3),
           FittedBox(
@@ -562,9 +624,9 @@ class _MiniMetric extends StatelessWidget {
               value: numericValue,
               formatter: formatter,
               style: TextStyle(
-                fontSize: 19,
+                fontSize: 21.5,
                 fontWeight: FontWeight.w700,
-                letterSpacing: -0.3,
+                letterSpacing: -0.5,
                 color: color,
               ),
             ),
@@ -584,6 +646,8 @@ class _AtelierWorkspaceTile extends StatelessWidget {
     required this.icon,
     required this.accent,
     required this.onTap,
+    this.badgeColor,
+    this.badgeBg,
   });
 
   final String title;
@@ -592,6 +656,8 @@ class _AtelierWorkspaceTile extends StatelessWidget {
   final IconData icon;
   final Color accent;
   final VoidCallback onTap;
+  final Color? badgeColor;
+  final Color? badgeBg;
 
   @override
   Widget build(BuildContext context) {
@@ -614,9 +680,16 @@ class _AtelierWorkspaceTile extends StatelessWidget {
               ),
               const Spacer(),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 7,
+                  vertical: 2.5,
+                ),
                 decoration: ShapeDecoration(
-                  color: colors.block.withValues(alpha: colors.isDark ? 0.85 : 0.72),
+                  color:
+                      badgeBg ??
+                      colors.block.withValues(
+                        alpha: colors.isDark ? 0.85 : 0.72,
+                      ),
                   shape: Radii.pillShape,
                 ),
                 child: Text(
@@ -624,7 +697,7 @@ class _AtelierWorkspaceTile extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 10.5,
                     fontWeight: FontWeight.w600,
-                    color: colors.text2,
+                    color: badgeColor ?? colors.text2,
                     fontFeatures: tabularFigures,
                   ),
                 ),
@@ -661,31 +734,17 @@ class _AtelierWorkspaceTile extends StatelessWidget {
 
 /// 护照卡背景精密同心弧纹 + 主题微光：模拟高级腕表底盖蚀刻线条，极轻不抢主读数。
 class _PassportArcWatermark extends CustomPainter {
-  const _PassportArcWatermark({required this.accent});
+  const _PassportArcWatermark({required this.lineColor});
 
-  final Color accent;
+  final Color lineColor;
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width * 0.65, size.height * 0.35);
-    final glowRect = Rect.fromCircle(center: center, radius: size.width * 0.62);
-    canvas.drawCircle(
-      center,
-      size.width * 0.62,
-      Paint()
-        ..shader = RadialGradient(
-          colors: [
-            accent.withValues(alpha: 0.32),
-            accent.withValues(alpha: 0.08),
-            accent.withValues(alpha: 0.0),
-          ],
-          stops: const [0.0, 0.55, 1.0],
-        ).createShader(glowRect),
-    );
     final arcPaint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 0.9
-      ..color = Colors.white.withValues(alpha: 0.09);
+      ..color = lineColor;
     for (final radius in const [44.0, 68.0, 92.0]) {
       canvas.drawArc(
         Rect.fromCircle(center: center, radius: radius),
@@ -698,5 +757,5 @@ class _PassportArcWatermark extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_PassportArcWatermark old) => old.accent != accent;
+  bool shouldRepaint(_PassportArcWatermark old) => old.lineColor != lineColor;
 }

@@ -55,11 +55,21 @@ class LiquidGlassSurface extends StatelessWidget {
     this.width,
     this.selected = false,
     this.bright = true,
-    this.blurSigma = 20,
+    this.blurSigma = 12,
     this.tintColor,
     this.refract = true,
     this.showShadow = true,
   });
+
+  static final Map<double, ImageFilter> _blurCache = <double, ImageFilter>{};
+
+  static ImageFilter _blurFilter(double sigma) {
+    final quantized = (sigma * 2).round() / 2;
+    return _blurCache.putIfAbsent(
+      quantized,
+      () => ImageFilter.blur(sigmaX: quantized, sigmaY: quantized),
+    );
+  }
 
   final Widget child;
   final double radius;
@@ -89,14 +99,18 @@ class LiquidGlassSurface extends StatelessWidget {
         quality == GlassQuality.liquid &&
         backdrop != nativeBackdrop;
 
-    final baseFill = tintColor ??
+    final baseFill =
+        tintColor ??
         (selected
             ? colors.primaryContainer.withValues(
                 alpha: colors.isDark ? 0.88 : 0.94,
               )
             : colors.isDark
-            ? Color.lerp(colors.card, Colors.white, bright ? 0.05 : 0.02)!
-                .withValues(alpha: highContrast ? 1.0 : (bright ? 0.88 : 0.80))
+            ? Color.lerp(
+                colors.card,
+                Colors.white,
+                bright ? 0.05 : 0.02,
+              )!.withValues(alpha: highContrast ? 1.0 : (bright ? 0.88 : 0.80))
             : colors.card.withValues(
                 alpha: highContrast ? 1.0 : (bright ? 0.92 : 0.86),
               ));
@@ -107,24 +121,20 @@ class LiquidGlassSurface extends StatelessWidget {
         ? Colors.white.withValues(alpha: 0.09)
         : const Color(0xFF1C160C).withValues(alpha: bright ? 0.075 : 0.085);
 
-    final shape = radius >= Radii.pill
-        ? Radii.pillShape
-        : Radii.shape(radius);
+    final shape = radius >= Radii.pill ? Radii.pillShape : Radii.shape(radius);
 
     final shadows = !showShadow
         ? null
         : <BoxShadow>[
             BoxShadow(
-              color: const Color(0xFF0F172A).withValues(
-                alpha: colors.isDark ? 0.24 : 0.04,
-              ),
+              color: const Color(0xFF141519)
+                  .withValues(alpha: colors.isDark ? 0.24 : 0.04),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
             BoxShadow(
-              color: const Color(0xFF0F172A).withValues(
-                alpha: colors.isDark ? 0.14 : 0.03,
-              ),
+              color: const Color(0xFF141519)
+                  .withValues(alpha: colors.isDark ? 0.14 : 0.03),
               blurRadius: 1.5,
               offset: const Offset(0, 1),
             ),
@@ -156,27 +166,23 @@ class LiquidGlassSurface extends StatelessWidget {
       );
     }
 
-    final sigma = highContrast ? 0.0 : (reduceEffects ? 10.0 : blurSigma);
+    final sigma = (highContrast || reduceEffects) ? 0.0 : blurSigma;
     final surface = DecoratedBox(
-      decoration: ShapeDecoration(
-        color: baseFill,
-        shape: shape,
-      ),
+      decoration: ShapeDecoration(color: baseFill, shape: shape),
       child: inner,
     );
     return DecoratedBox(
       decoration: ShapeDecoration(
-        shape: shape.copyWith(side: BorderSide(color: outerBorder, width: 0.75)),
+        shape: shape.copyWith(
+          side: BorderSide(color: outerBorder, width: 0.75),
+        ),
         shadows: shadows,
       ),
       child: ClipPath(
         clipper: ShapeBorderClipper(shape: shape),
         child: sigma <= 0.1
             ? surface
-            : BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
-                child: surface,
-              ),
+            : BackdropFilter(filter: _blurFilter(sigma), child: surface),
       ),
     );
   }
@@ -216,7 +222,7 @@ class GlassCard extends StatelessWidget {
         ? Colors.white.withValues(alpha: 0.10)
         : colors.isDark
         ? Colors.white.withValues(alpha: 0.075)
-        : const Color(0xFF0F172A).withValues(alpha: 0.055);
+        : colors.cardBorder.withValues(alpha: 0.72);
     final shape = base.copyWith(
       side: BorderSide(color: borderColor, width: bordered ? 0.9 : 0.75),
     );
@@ -265,45 +271,158 @@ class Pressable extends StatefulWidget {
   State<Pressable> createState() => _PressableState();
 }
 
-class _PressableState extends State<Pressable> {
+class _PressableState extends State<Pressable>
+    with SingleTickerProviderStateMixin {
+  static const Animation<double> _identityScale =
+      AlwaysStoppedAnimation<double>(1.0);
+  static const Animation<double> _fullOverlay = AlwaysStoppedAnimation<double>(
+    1.0,
+  );
+
   bool _pressed = false;
+  bool _disableAnimations = false;
   Timer? _pressDelay;
+  AnimationController? _controller;
+  CurvedAnimation? _curved;
+  Animation<double>? _scaleAnimation;
+
+  bool get _usesScale => widget.pressedScale != 1;
+
+  AnimationController _ensureController() {
+    final existing = _controller;
+    if (existing != null) return existing;
+    final controller = AnimationController(
+      vsync: this,
+      duration: _usesScale ? Timings.press : Timings.fast,
+    )..addStatusListener(_handleAnimationStatus);
+    _controller = controller;
+    _rebuildCurves();
+    return controller;
+  }
+
+  void _rebuildCurves() {
+    final controller = _controller;
+    if (controller == null) return;
+    controller.duration = _usesScale ? Timings.press : Timings.fast;
+    _curved?.dispose();
+    if (_usesScale) {
+      _curved = CurvedAnimation(parent: controller, curve: Curves2.out);
+      _scaleAnimation = Tween<double>(
+        begin: 1.0,
+        end: widget.pressedScale,
+      ).animate(_curved!);
+    } else {
+      _curved = null;
+      _scaleAnimation = null;
+    }
+  }
+
+  void _handleAnimationStatus(AnimationStatus status) {
+    if (status == AnimationStatus.dismissed && !_pressed && mounted) {
+      setState(() {});
+    }
+  }
+
+  void _setPressed(bool next) {
+    if (_pressed == next) return;
+    _pressed = next;
+    if (_disableAnimations) {
+      if (mounted) setState(() {});
+      return;
+    }
+    final firstCreate = _controller == null;
+    final controller = _ensureController();
+    if (next) {
+      controller.forward();
+      if ((firstCreate || !_usesScale) && mounted) {
+        setState(() {});
+      }
+    } else {
+      controller.reverse();
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _disableAnimations = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    if (_disableAnimations && _controller != null && _controller!.isAnimating) {
+      _controller!.value = _pressed ? 1.0 : 0.0;
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant Pressable oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.pressedScale != widget.pressedScale) {
+      _rebuildCurves();
+    }
+    if (widget.onTap == null && _pressed) {
+      _pressDelay?.cancel();
+      _setPressed(false);
+    }
+  }
 
   void _handleTapDown(TapDownDetails details) {
     _pressDelay?.cancel();
     final inScrollable = Scrollable.maybeOf(context) != null;
     if (inScrollable && widget.pressedScale == 1) {
       _pressDelay = Timer(Timings.press, () {
-        if (mounted) setState(() => _pressed = true);
+        if (mounted) _setPressed(true);
       });
     } else {
-      setState(() => _pressed = true);
+      _setPressed(true);
     }
   }
 
   void _handleTapCancel() {
     _pressDelay?.cancel();
-    if (_pressed) setState(() => _pressed = false);
+    _setPressed(false);
   }
 
   void _handleTapUp(TapUpDetails details) {
     _pressDelay?.cancel();
     MotionOrigin.record(details.globalPosition);
-    if (_pressed) setState(() => _pressed = false);
+    _setPressed(false);
   }
 
   @override
   void dispose() {
     _pressDelay?.cancel();
+    _curved?.dispose();
+    _controller?.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
-    final shape = widget.shape ?? Radii.shape(widget.radius);
-    final usesScale = widget.pressedScale != 1;
+    final disable = _disableAnimations;
+    final usesScale = _usesScale;
+    final showOverlay =
+        widget.onTap != null &&
+        !usesScale &&
+        (_pressed ||
+            (!disable && _controller != null && _controller!.value > 0));
+    final CustomPainter? overlayPainter = showOverlay
+        ? _ShapeOverlayPainter(
+            shape: widget.shape ?? Radii.shape(widget.radius),
+            color: colors.text,
+            maxAlpha: 0.10,
+            progress: disable || _controller == null
+                ? _fullOverlay
+                : _controller!,
+          )
+        : null;
+
+    final Widget visual = usesScale
+        ? ScaleTransition(
+            scale: disable
+                ? _identityScale
+                : (_scaleAnimation ?? _identityScale),
+            child: widget.child,
+          )
+        : CustomPaint(foregroundPainter: overlayPainter, child: widget.child);
 
     return Semantics(
       button: true,
@@ -321,39 +440,41 @@ class _PressableState extends State<Pressable> {
                 if (widget.haptic) HapticFeedback.selectionClick();
                 widget.onTap!();
               },
-        child: AnimatedScale(
-          scale: _pressed && !disable ? widget.pressedScale : 1,
-          duration: motionDuration(Timings.press, disableAnimations: disable),
-          curve: Curves2.out,
-          child: Stack(
-            fit: StackFit.passthrough,
-            children: [
-              widget.child,
-              if (widget.onTap != null && !usesScale)
-                Positioned.fill(
-                  child: IgnorePointer(
-                    child: AnimatedOpacity(
-                      opacity: _pressed ? 1 : 0,
-                      duration: motionDuration(
-                        Timings.fast,
-                        disableAnimations: disable,
-                      ),
-                      curve: Curves2.linear,
-                      child: ClipPath(
-                        clipper: ShapeBorderClipper(shape: shape),
-                        child: ColoredBox(
-                          color: colors.text.withValues(alpha: 0.10),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
+        child: visual,
       ),
     );
   }
+}
+
+class _ShapeOverlayPainter extends CustomPainter {
+  _ShapeOverlayPainter({
+    required this.shape,
+    required this.color,
+    required this.maxAlpha,
+    required this.progress,
+  }) : super(repaint: progress);
+
+  final ShapeBorder shape;
+  final Color color;
+  final double maxAlpha;
+  final Animation<double> progress;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final alpha = (maxAlpha * progress.value).clamp(0.0, 1.0);
+    if (alpha <= 0.001) return;
+    canvas.drawPath(
+      shape.getOuterPath(Offset.zero & size),
+      Paint()..color = color.withValues(alpha: alpha),
+    );
+  }
+
+  @override
+  bool shouldRepaint(_ShapeOverlayPainter old) =>
+      old.shape != shape ||
+      old.color != color ||
+      old.maxAlpha != maxAlpha ||
+      old.progress != progress;
 }
 
 /// 数字滚动文本：数值变化时从旧值平滑过渡到新值。
@@ -384,6 +505,17 @@ class AnimatedNumericText extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    final resolvedStyle = (style ?? DefaultTextStyle.of(context).style)
+        .copyWith(fontFeatures: tabularFigures);
+    if (disable) {
+      return Text(
+        formatter(value),
+        textAlign: textAlign,
+        maxLines: maxLines,
+        softWrap: softWrap,
+        style: resolvedStyle,
+      );
+    }
     return TweenAnimationBuilder<double>(
       tween: Tween<double>(end: value.toDouble()),
       duration: motionDuration(duration, disableAnimations: disable),
@@ -393,9 +525,7 @@ class AnimatedNumericText extends StatelessWidget {
         textAlign: textAlign,
         maxLines: maxLines,
         softWrap: softWrap,
-        style: (style ?? DefaultTextStyle.of(context).style).copyWith(
-          fontFeatures: tabularFigures,
-        ),
+        style: resolvedStyle,
       ),
     );
   }
@@ -553,9 +683,8 @@ class PrimaryButton extends StatelessWidget {
                 ? null
                 : [
                     BoxShadow(
-                      color: const Color(0xFF0F172A).withValues(
-                        alpha: colors.isDark ? 0.28 : 0.12,
-                      ),
+                      color: const Color(0xFF0F172A)
+                          .withValues(alpha: colors.isDark ? 0.28 : 0.12),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),
@@ -761,11 +890,7 @@ class GlassIconButton extends StatelessWidget {
 
 /// 融合式液态玻璃按钮组：多枚图标共居一枚悬浮玻璃胶囊，如 `[🔍  ✓]`。
 class GlassActionGroup extends StatelessWidget {
-  const GlassActionGroup({
-    super.key,
-    required this.children,
-    this.height = 36,
-  });
+  const GlassActionGroup({super.key, required this.children, this.height = 36});
 
   final List<Widget> children;
   final double height;
@@ -786,7 +911,9 @@ class GlassActionGroup extends StatelessWidget {
                 width: 0.8,
                 height: 18,
                 margin: const EdgeInsets.symmetric(horizontal: 2),
-                color: colors.text.withValues(alpha: colors.isDark ? 0.14 : 0.09),
+                color: colors.text.withValues(
+                  alpha: colors.isDark ? 0.14 : 0.09,
+                ),
               ),
             children[i],
           ],
@@ -1013,18 +1140,24 @@ class _UndoBarState extends State<UndoBar> with SingleTickerProviderStateMixin {
                     right: 0,
                     bottom: 0,
                     height: 2.5,
-                    child: AnimatedBuilder(
-                      animation: _countdown,
-                      builder: (context, _) {
-                        final remain = (1.0 - _countdown.value).clamp(0.0, 1.0);
-                        return FractionallySizedBox(
-                          alignment: Alignment.centerLeft,
-                          widthFactor: remain,
-                          child: ColoredBox(
-                            color: colors.primary.withValues(alpha: 0.72),
-                          ),
-                        );
-                      },
+                    child: RepaintBoundary(
+                      child: AnimatedBuilder(
+                        animation: _countdown,
+                        builder: (context, child) {
+                          final remain = (1.0 - _countdown.value).clamp(
+                            0.0,
+                            1.0,
+                          );
+                          return FractionallySizedBox(
+                            alignment: Alignment.centerLeft,
+                            widthFactor: remain,
+                            child: child,
+                          );
+                        },
+                        child: ColoredBox(
+                          color: colors.primary.withValues(alpha: 0.72),
+                        ),
+                      ),
                     ),
                   ),
               ],
@@ -1164,10 +1297,7 @@ class Segmented<T> extends StatelessWidget {
     return Container(
       height: 36,
       padding: const EdgeInsets.all(3),
-      decoration: ShapeDecoration(
-        color: colors.block,
-        shape: outerShape,
-      ),
+      decoration: ShapeDecoration(color: colors.block, shape: outerShape),
       child: LayoutBuilder(
         builder: (context, constraints) {
           final segmentWidth = constraints.maxWidth / values.length;
@@ -1194,9 +1324,8 @@ class Segmented<T> extends StatelessWidget {
                     shape: thumbShape,
                     shadows: [
                       BoxShadow(
-                        color: const Color(0xFF0F172A).withValues(
-                          alpha: colors.isDark ? 0.24 : 0.07,
-                        ),
+                        color: const Color(0xFF0F172A)
+                            .withValues(alpha: colors.isDark ? 0.24 : 0.07),
                         blurRadius: 4,
                         offset: const Offset(0, 1),
                       ),
@@ -1228,16 +1357,16 @@ class Segmented<T> extends StatelessWidget {
                                 curve: Curves2.inOut,
                                 style: DefaultTextStyle.of(context).style
                                     .copyWith(
-                                  fontSize: 13,
-                                  fontWeight: value == selected
-                                      ? FontWeight.w600
-                                      : FontWeight.w500,
-                                  color: value == selected
-                                      ? (accentActive
-                                          ? colors.onPrimary
-                                          : colors.text)
-                                      : colors.text2,
-                                ),
+                                      fontSize: 13,
+                                      fontWeight: value == selected
+                                          ? FontWeight.w600
+                                          : FontWeight.w500,
+                                      color: value == selected
+                                          ? (accentActive
+                                                ? colors.onPrimary
+                                                : colors.text)
+                                          : colors.text2,
+                                    ),
                                 child: Text(labelOf(value)),
                               ),
                             ),
@@ -1293,11 +1422,7 @@ class AppIconBadge extends StatelessWidget {
           ),
         ),
       ),
-      child: Icon(
-        icon,
-        size: iconSize,
-        color: useTint ? color : colors.text,
-      ),
+      child: Icon(icon, size: iconSize, color: useTint ? color : colors.text),
     );
   }
 }
@@ -1319,22 +1444,26 @@ class AmbientPageGlow extends StatelessWidget {
       fit: StackFit.expand,
       children: [
         Positioned(
-          top: -80,
+          top: -110,
           left: -40,
           right: -40,
-          height: 310,
+          height: 260,
           child: IgnorePointer(
             child: DecoratedBox(
               decoration: BoxDecoration(
                 gradient: RadialGradient(
-                  center: const Alignment(0.32, -0.55),
-                  radius: 1.05,
+                  center: const Alignment(0.25, -0.7),
+                  radius: 1.0,
                   colors: [
-                    colors.primary.withValues(alpha: colors.isDark ? 0.16 : 0.085),
-                    colors.primary.withValues(alpha: colors.isDark ? 0.05 : 0.025),
+                    colors.primary.withValues(
+                      alpha: colors.isDark ? 0.075 : 0.024,
+                    ),
+                    colors.primary.withValues(
+                      alpha: colors.isDark ? 0.02 : 0.008,
+                    ),
                     colors.primary.withValues(alpha: 0.0),
                   ],
-                  stops: const [0.0, 0.48, 1.0],
+                  stops: const [0.0, 0.50, 1.0],
                 ),
               ),
             ),
@@ -1430,11 +1559,7 @@ class LiquidSwitchRow extends StatelessWidget {
 
 /// 分组区标题：置于分组卡片外部上方，克制留白建立节奏。
 class SectionHeading extends StatelessWidget {
-  const SectionHeading({
-    super.key,
-    required this.title,
-    this.trailing,
-  });
+  const SectionHeading({super.key, required this.title, this.trailing});
 
   final String title;
   final Widget? trailing;
@@ -1455,10 +1580,7 @@ class SectionHeading extends StatelessWidget {
               letterSpacing: 0.3,
             ),
           ),
-          if (trailing != null) ...[
-            const Spacer(),
-            trailing!,
-          ],
+          if (trailing != null) ...[const Spacer(), trailing!],
         ],
       ),
     );
@@ -1561,7 +1683,7 @@ class _MonthArrowButton extends StatelessWidget {
         shape: Radii.shape(10),
         pressedScale: 0.92,
         child: SizedBox(
-          width: 26,
+          width: 24,
           height: 34,
           child: Icon(icon, size: 16.5, color: context.colors.text2),
         ),
@@ -1687,19 +1809,19 @@ class _RevealOnMountState extends State<RevealOnMount>
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _curve,
-      builder: (context, child) {
-        final t = _curve.value;
-        return Opacity(
-          opacity: t,
-          child: Transform.translate(
-            offset: Offset(0, widget.offset * (1 - t)),
+    return FadeTransition(
+      opacity: _curve,
+      child: AnimatedBuilder(
+        animation: _curve,
+        builder: (context, child) {
+          final dy = widget.offset * (1 - _curve.value);
+          return Transform.translate(
+            offset: dy.abs() < 0.05 ? Offset.zero : Offset(0, dy),
             child: child,
-          ),
-        );
-      },
-      child: widget.child,
+          );
+        },
+        child: widget.child,
+      ),
     );
   }
 }
