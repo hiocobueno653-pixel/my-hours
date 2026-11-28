@@ -96,6 +96,7 @@ class _BudgetPanelSheetState extends ConsumerState<BudgetPanelSheet> {
 
     return SheetScaffold(
       title: '预算与目标',
+      footer: PrimaryButton(label: '保存', expand: true, onPressed: _save),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -157,7 +158,6 @@ class _BudgetPanelSheetState extends ConsumerState<BudgetPanelSheet> {
             ),
             const SizedBox(height: Gaps.sm),
           ],
-          PrimaryButton(label: '保存', expand: true, onPressed: _save),
         ],
       ),
     );

@@ -360,7 +360,7 @@ class _MonthViewState extends ConsumerState<MonthView> {
                 )
               else ...[
                 GlassActionGroup(
-                  height: 46,
+                  height: 44,
                   children: [
                     MonthSwitchPill(
                       month: month,
@@ -2168,7 +2168,7 @@ class _DayEditorSheetState extends ConsumerState<DayEditorSheet> {
         onPrevious: () => _switchDay(-1),
         onNext: () => _switchDay(1),
       ),
-      actions: [TextActionButton(label: '保存', onPressed: _save)],
+      footer: PrimaryButton(label: '保存', expand: true, onPressed: _save),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -2342,8 +2342,6 @@ class _DayEditorSheetState extends ConsumerState<DayEditorSheet> {
               ),
             ),
           ],
-          const SizedBox(height: Gaps.lg),
-          PrimaryButton(label: '保存', expand: true, onPressed: _save),
         ],
       ),
     );
@@ -2366,30 +2364,48 @@ class _DayDateNavigator extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    return Row(
-      children: [
-        _DayStepButton(
-          icon: Icons.chevron_left_rounded,
-          label: '前一天',
-          onTap: onPrevious,
-        ),
-        Expanded(
-          child: Text(
-            formatDateLabel(date),
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: colors.text,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 224),
+      child: Container(
+        height: 46,
+        padding: const EdgeInsets.symmetric(horizontal: 2),
+        decoration: ShapeDecoration(
+          color: colors.block.withValues(alpha: colors.isDark ? 0.72 : 0.88),
+          shape: Radii.pillShape.copyWith(
+            side: BorderSide(
+              color: colors.cardBorder.withValues(alpha: 0.72),
+              width: 0.8,
             ),
           ),
         ),
-        _DayStepButton(
-          icon: Icons.chevron_right_rounded,
-          label: '后一天',
-          onTap: canGoNext ? onNext : null,
+        child: Row(
+          children: [
+            _DayStepButton(
+              icon: Icons.chevron_left_rounded,
+              label: '前一天',
+              onTap: onPrevious,
+            ),
+            Expanded(
+              child: Text(
+                formatDateLabel(date),
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: colors.text,
+                ),
+              ),
+            ),
+            _DayStepButton(
+              icon: Icons.chevron_right_rounded,
+              label: '后一天',
+              onTap: canGoNext ? onNext : null,
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
@@ -2419,18 +2435,13 @@ class _DayStepButton extends StatelessWidget {
         message: label,
         child: Pressable(
           onTap: onTap,
-          shape: Radii.shape(10),
-          pressedScale: 0.92,
+          shape: Radii.pillShape,
+          pressedScale: 0.94,
           child: Opacity(
             opacity: enabled ? 1 : 0.35,
-            child: Container(
-              width: 38,
-              height: 36,
-              alignment: Alignment.center,
-              decoration: ShapeDecoration(
-                color: colors.block,
-                shape: Radii.shape(10),
-              ),
+            child: SizedBox(
+              width: 44,
+              height: 44,
               child: Icon(icon, size: 19, color: colors.text2),
             ),
           ),

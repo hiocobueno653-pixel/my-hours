@@ -9,6 +9,8 @@ import '../core/motion.dart';
 import '../core/theme_tokens.dart';
 import 'widgets.dart';
 
+const double _headerFadeOverhang = 32;
+
 /// 顶部渐进式可变模糊遮罩：
 /// 状态栏区域保持 Apple 标准 20px 可变模糊，向下自然化清，下方卡片丝滑流过玻璃岛背后。
 class _HeaderScrim extends StatelessWidget {
@@ -42,8 +44,8 @@ class _HeaderScrim extends StatelessWidget {
     return ProgressiveBlur(
       maxBlurRadius: 18,
       direction: ProgressiveBlurDirection.blurredTopClearBottom,
-      startOffset: 0.30,
-      bands: 3,
+      startOffset: 0.16,
+      bands: 8,
       backdrop: backdrop,
       child: tintOverlay,
     );
@@ -125,7 +127,13 @@ class PinnedHeader extends StatelessWidget {
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          const Positioned.fill(child: IgnorePointer(child: _HeaderScrim())),
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: total + _headerFadeOverhang,
+            child: const IgnorePointer(child: _HeaderScrim()),
+          ),
           Positioned(
             top: topInset,
             left: 0,
@@ -288,7 +296,13 @@ class PinnedSubHeader extends StatelessWidget {
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          const Positioned.fill(child: IgnorePointer(child: _HeaderScrim())),
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: totalHeight(context) + _headerFadeOverhang,
+            child: const IgnorePointer(child: _HeaderScrim()),
+          ),
           Positioned(
             top: topInset,
             left: 0,
@@ -425,7 +439,13 @@ class _MorphingSearchHeaderState extends State<MorphingSearchHeader> {
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          const Positioned.fill(child: IgnorePointer(child: _HeaderScrim())),
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: total + _headerFadeOverhang,
+            child: const IgnorePointer(child: _HeaderScrim()),
+          ),
           Positioned(
             top: topInset,
             left: 0,

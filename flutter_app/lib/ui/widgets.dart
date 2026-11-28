@@ -1622,14 +1622,19 @@ class TextActionButton extends StatelessWidget {
         onTap: onPressed,
         shape: Radii.pillShape,
         pressedScale: 0.94,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: onPressed == null ? colors.text3 : colors.primary,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            child: Center(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: onPressed == null ? colors.text3 : colors.primary,
+                ),
+              ),
             ),
           ),
         ),
@@ -1916,9 +1921,12 @@ class MonthSwitchPill extends StatelessWidget {
     final compact =
         MediaQuery.sizeOf(context).width < 360 ||
         MediaQuery.textScalerOf(context).scale(1) > 1.15;
-    final label = compact && parsed != null
+    final currentYear = DateTime.now().year;
+    final label = parsed == null
+        ? formatMonthLabel(month)
+        : (compact || parsed.year == currentYear)
         ? '${parsed.month}月'
-        : formatMonthLabel(month);
+        : '${parsed.year}年${parsed.month}月';
     final content = Row(
       mainAxisSize: MainAxisSize.min,
       children: [

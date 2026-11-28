@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:my_hours/core/theme_tokens.dart';
+import 'package:my_hours/data/dates.dart';
 import 'package:my_hours/ui/glass_menu.dart';
 import 'package:my_hours/ui/pinned_header.dart';
 import 'package:my_hours/ui/widgets.dart';
@@ -54,7 +55,7 @@ void main() {
               title: '工时',
               actions: [
                 GlassActionGroup(
-                  height: 46,
+                  height: 44,
                   children: [
                     MonthSwitchPill(
                       month: month,
@@ -134,5 +135,30 @@ void main() {
 
     expect(title().style!.fontSize, lessThan(expandedSize));
     expect(scroll.offset, greaterThan(0));
+  });
+
+  testWidgets('月份胶囊在当前年省略年份，跨年保留完整年月', (tester) async {
+    Widget host(String month) => MaterialApp(
+      theme: buildAppTheme(AppColors.light, AppTokens.lightTokens),
+      home: Scaffold(
+        body: Center(
+          child: MonthSwitchPill(
+            month: month,
+            onChanged: (_) {},
+            onPick: () {},
+          ),
+        ),
+      ),
+    );
+
+    final current = parseMonthKey(currentMonthKey())!;
+    await tester.pumpWidget(host(currentMonthKey()));
+    await tester.pumpAndSettle();
+    expect(find.text('${current.month}月'), findsOneWidget);
+
+    final previousYear = DateTime.now().year - 1;
+    await tester.pumpWidget(host('$previousYear-${current.month}'));
+    await tester.pumpAndSettle();
+    expect(find.text('$previousYear年${current.month}月'), findsOneWidget);
   });
 }

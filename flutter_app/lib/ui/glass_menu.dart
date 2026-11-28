@@ -213,12 +213,6 @@ class _DropletGlassMenuOverlayState extends State<_DropletGlassMenuOverlay> {
 
     final anchorOnTop = openBelow;
     final anchorOnRight = widget.anchorRect.center.dx >= (left + width * 0.5);
-    final beadCenter = Offset(
-      anchorOnRight
-          ? math.min(left + width - 12, widget.anchorRect.right - 10)
-          : math.max(left + 12, widget.anchorRect.left + 10),
-      anchorOnTop ? widget.anchorRect.center.dy : widget.anchorRect.center.dy,
-    );
 
     return Material(
       type: MaterialType.transparency,
@@ -232,48 +226,6 @@ class _DropletGlassMenuOverlayState extends State<_DropletGlassMenuOverlay> {
               child: const SizedBox.expand(),
             ),
           ),
-          if (!widget.disableAnimations)
-            AnimatedBuilder(
-              animation: widget.animation,
-              builder: (context, _) {
-                final t = widget.animation.value.clamp(0.0, 1.0);
-                final fadeIn = (t / 0.14).clamp(0.0, 1.0);
-                final fadeOut = 1.0 - ((t - 0.54) / 0.34).clamp(0.0, 1.0);
-                final beadOpacity = (fadeIn * fadeOut).clamp(0.0, 1.0);
-                if (beadOpacity <= 0.01) return const SizedBox.shrink();
-                final colors = context.colors;
-                final beadScale = lerpDouble(0.75, 1.08, fadeIn)!;
-                return Positioned(
-                  left: beadCenter.dx - 7,
-                  top: beadCenter.dy - 7,
-                  child: IgnorePointer(
-                    child: Opacity(
-                      opacity: beadOpacity * (colors.isDark ? 0.65 : 0.78),
-                      child: Transform.scale(
-                        scale: beadScale,
-                        child: Container(
-                          width: 14,
-                          height: 14,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: colors.isDark
-                                ? Colors.white.withValues(alpha: 0.14)
-                                : const Color(0xFFE2E8F2)
-                                      .withValues(alpha: 0.85),
-                            border: Border.all(
-                              color: colors.isDark
-                                  ? Colors.white.withValues(alpha: 0.24)
-                                  : Colors.black.withValues(alpha: 0.08),
-                              width: 0.8,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
           Positioned(
             left: left,
             top: top,

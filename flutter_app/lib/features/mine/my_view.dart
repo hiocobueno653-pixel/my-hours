@@ -493,7 +493,7 @@ class MyView extends ConsumerWidget {
                 const SizedBox(height: Gaps.xl),
                 Center(
                   child: Text(
-                    '时页 TIMEPAGE · 1.8.2 · 数据完全本地保存',
+                    '时页 TIMEPAGE · 1.8.3 · 数据完全本地保存',
                     style: TextStyle(fontSize: 11.5, color: colors.text3),
                   ),
                 ),

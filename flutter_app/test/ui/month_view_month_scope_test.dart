@@ -120,7 +120,9 @@ void main() {
 
     final todayCard = find.byKey(const ValueKey('today-bento-card'));
     final initialHeight = tester.getSize(todayCard).height;
-    await tester.tap(find.bySemanticsLabel('开始计时'));
+    final startButton = find.bySemanticsLabel('开始计时');
+    final initialButtonCenter = tester.getCenter(startButton);
+    await tester.tap(startButton);
     expect(container.read(timerProvider)?.running, isTrue);
 
     // 读数区换成计时器后，旧文案先淡出，卡片高度随后才收拢：
@@ -137,12 +139,21 @@ void main() {
       isTrue,
       reason: '卡片高度应逐帧收拢，而不是一次性跳变',
     );
+    final pauseButton = find.bySemanticsLabel('暂停计时');
+    expect(pauseButton, findsOneWidget);
+    expect(
+      tester.getCenter(pauseButton).dx,
+      closeTo(initialButtonCenter.dx, 0.5),
+      reason: '次操作展开时，主计时变形按钮应固定在原位置不跳动',
+    );
+    expect(find.text('完成'), findsOneWidget);
 
-    container.read(timerProvider.notifier).pause();
+    await tester.tap(pauseButton);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 600));
     expect(container.read(timerProvider)?.running, isFalse);
     expect(find.text('已暂停'), findsOneWidget);
+    expect(find.bySemanticsLabel('继续计时'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

@@ -124,6 +124,7 @@ class SheetScaffold extends StatefulWidget {
     required this.title,
     required this.child,
     this.actions,
+    this.footer,
     this.titleWidget,
     this.guard,
     this.maxHeightFactor = 0.92,
@@ -132,6 +133,7 @@ class SheetScaffold extends StatefulWidget {
   final String title;
   final Widget child;
   final List<Widget>? actions;
+  final Widget? footer;
 
   /// 需要把日期导航等控件嵌进标题时使用；为空时显示 [title]。
   final Widget? titleWidget;
@@ -293,6 +295,37 @@ class _SheetScaffoldState extends State<SheetScaffold>
     final media = MediaQuery.of(context);
     final highContrast = media.highContrast;
     final disable = media.disableAnimations;
+    final actions = widget.actions ?? const <Widget>[];
+    final centeredTitle = widget.titleWidget != null && actions.isEmpty;
+    final closeButton = Semantics(
+      key: const ValueKey('sheet-close-button'),
+      button: true,
+      label: '关闭',
+      onTap: _requestClose,
+      excludeSemantics: true,
+      child: Pressable(
+        onTap: _requestClose,
+        shape: Radii.pillShape,
+        pressedScale: 0.94,
+        child: SizedBox(
+          width: 44,
+          height: 44,
+          child: Center(
+            child: Container(
+              width: 32,
+              height: 32,
+              decoration: ShapeDecoration(
+                color: colors.isDark
+                    ? Colors.white.withValues(alpha: 0.11)
+                    : colors.block,
+                shape: Radii.pillShape,
+              ),
+              child: Icon(Icons.close_rounded, size: 17, color: colors.text2),
+            ),
+          ),
+        ),
+      ),
+    );
     final sheetShape = RoundedSuperellipseBorder(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
     );
@@ -346,71 +379,94 @@ class _SheetScaffoldState extends State<SheetScaffold>
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    Gaps.xl,
+                  padding: EdgeInsets.fromLTRB(
+                    centeredTitle ? Gaps.md : Gaps.xl,
                     Gaps.md,
                     Gaps.md,
                     Gaps.sm,
                   ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child:
-                            widget.titleWidget ??
-                            Text(
-                              widget.title,
-                              style: TextStyle(
-                                fontSize: 17,
-                                fontWeight: FontWeight.w600,
-                                letterSpacing: 0,
-                                color: colors.text,
-                              ),
-                            ),
-                      ),
-                      ...?widget.actions,
-                      Semantics(
-                        button: true,
-                        label: '关闭',
-                        onTap: _requestClose,
-                        excludeSemantics: true,
-                        child: Pressable(
-                          onTap: _requestClose,
-                          shape: Radii.pillShape,
-                          pressedScale: 0.90,
-                          child: Container(
-                            width: 32,
-                            height: 32,
-                            decoration: ShapeDecoration(
-                              color: colors.isDark
-                                  ? Colors.white.withValues(alpha: 0.11)
-                                  : colors.block,
-                              shape: Radii.pillShape,
-                            ),
-                            child: Icon(
-                              Icons.close_rounded,
-                              size: 17,
-                              color: colors.text2,
-                            ),
+                  child: SizedBox(
+                    height: 48,
+                    child: Row(
+                      children: [
+                        if (centeredTitle) const SizedBox(width: 44),
+                        if (centeredTitle)
+                          Expanded(child: Center(child: widget.titleWidget))
+                        else
+                          Expanded(
+                            child:
+                                widget.titleWidget ??
+                                Text(
+                                  widget.title,
+                                  style: TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w600,
+                                    letterSpacing: 0,
+                                    color: colors.text,
+                                  ),
+                                ),
                           ),
-                        ),
-                      ),
-                    ],
+                        ...actions,
+                        closeButton,
+                      ],
+                    ),
                   ),
                 ),
               ],
             ),
           ),
-          Flexible(
-            child: SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(
-                Gaps.xl,
-                0,
-                Gaps.xl,
-                Gaps.xl + media.padding.bottom,
+          if (widget.footer == null)
+            Flexible(
+              child: SingleChildScrollView(
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                padding: EdgeInsets.fromLTRB(
+                  Gaps.xl,
+                  0,
+                  Gaps.xl,
+                  Gaps.xl + media.padding.bottom,
+                ),
+                child: widget.child,
               ),
-              child: widget.child,
+            )
+          else
+            Expanded(
+              child: SingleChildScrollView(
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                padding: const EdgeInsets.fromLTRB(
+                  Gaps.xl,
+                  0,
+                  Gaps.xl,
+                  Gaps.lg,
+                ),
+                child: widget.child,
+              ),
             ),
-          ),
+          if (widget.footer != null)
+            DecoratedBox(
+              key: const ValueKey('sheet-footer'),
+              decoration: BoxDecoration(
+                color: colors.card.withValues(
+                  alpha: colors.isDark ? 0.34 : 0.42,
+                ),
+                border: Border(
+                  top: BorderSide(
+                    color: colors.divider.withValues(alpha: 0.52),
+                    width: 0.7,
+                  ),
+                ),
+              ),
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  Gaps.xl,
+                  Gaps.sm,
+                  Gaps.xl,
+                  Gaps.md + media.padding.bottom,
+                ),
+                child: widget.footer,
+              ),
+            ),
         ],
       ),
     );

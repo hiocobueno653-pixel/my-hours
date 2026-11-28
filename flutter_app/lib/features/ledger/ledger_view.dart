@@ -592,7 +592,7 @@ class _LedgerViewState extends ConsumerState<LedgerView> {
               setState(() => _searchQuery = '');
             },
             idleActionCluster: GlassActionGroup(
-              height: 46,
+              height: 44,
               children: [
                 MonthSwitchPill(
                   month: month,
@@ -1819,7 +1819,7 @@ class _LedgerEditorSheetState extends ConsumerState<LedgerEditorSheet> {
     return SheetScaffold(
       title: widget.entry == null ? '记一笔' : '编辑账目',
       guard: () => _isDirty && !_submitted,
-      actions: [TextActionButton(label: '保存', onPressed: _save)],
+      footer: PrimaryButton(label: '保存', expand: true, onPressed: _save),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1956,7 +1956,6 @@ class _LedgerEditorSheetState extends ConsumerState<LedgerEditorSheet> {
               ),
             ),
           ),
-          PrimaryButton(label: '保存', expand: true, onPressed: _save),
         ],
       ),
     );

@@ -100,4 +100,68 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('编辑弹层'), findsOneWidget);
   });
+
+  testWidgets('Sheet 关闭键保留 44dp 触控区', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: Center(
+              child: TextButton(
+                onPressed: () => showAppSheet<void>(
+                  context: context,
+                  builder: (_) =>
+                      const SheetScaffold(title: '触控测试', child: Text('正文')),
+                ),
+                child: const Text('打开触控弹层'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('打开触控弹层'));
+    await tester.pumpAndSettle();
+
+    final close = find.byKey(const ValueKey('sheet-close-button'));
+    expect(tester.getSize(close).width, greaterThanOrEqualTo(44));
+    expect(tester.getSize(close).height, greaterThanOrEqualTo(44));
+  });
+
+  testWidgets('固定操作区在键盘上方保持可见', (tester) async {
+    tester.view.physicalSize = const Size(400, 800);
+    tester.view.devicePixelRatio = 1;
+    tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: Center(
+              child: TextButton(
+                onPressed: () => showAppSheet<void>(
+                  context: context,
+                  builder: (_) => SheetScaffold(
+                    title: '底栏测试',
+                    footer: const Text('固定操作'),
+                    child: const SizedBox(height: 1200),
+                  ),
+                ),
+                child: const Text('打开底栏弹层'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('打开底栏弹层'));
+    await tester.pumpAndSettle();
+
+    final footer = find.byKey(const ValueKey('sheet-footer'));
+    expect(footer, findsOneWidget);
+    expect(tester.getBottomLeft(footer).dy, lessThanOrEqualTo(500));
+  });
 }
