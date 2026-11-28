@@ -50,6 +50,29 @@ class _HeaderScrim extends StatelessWidget {
   }
 }
 
+/// 从页面主滚动控制器读取一个 0–1 的紧凑进度，供顶栏标题滚动态使用。
+class _HeaderScrollProgress extends StatelessWidget {
+  const _HeaderScrollProgress({required this.builder});
+
+  final Widget Function(BuildContext context, double progress) builder;
+
+  static double _resolve(ScrollController controller) {
+    if (!controller.hasClients) return 0;
+    final raw = (controller.offset / 72).clamp(0.0, 1.0);
+    return raw * raw * (3 - 2 * raw);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = PrimaryScrollController.maybeOf(context);
+    if (controller == null) return builder(context, 0);
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) => builder(context, _resolve(controller)),
+    );
+  }
+}
+
 class PinnedHeader extends StatelessWidget {
   const PinnedHeader({
     super.key,
@@ -120,13 +143,16 @@ class PinnedHeader extends StatelessWidget {
                     const SizedBox(width: Gaps.sm),
                   ],
                   Expanded(
-                    child: _HeaderTitle(
-                      title: title,
-                      compact: compact,
-                      animate: animateTitle,
-                      onLongPress: onTitleLongPress,
-                      hint: titleHint,
-                      color: colors.text,
+                    child: _HeaderScrollProgress(
+                      builder: (context, progress) => _HeaderTitle(
+                        title: title,
+                        compact: compact,
+                        compactProgress: progress,
+                        animate: animateTitle,
+                        onLongPress: onTitleLongPress,
+                        hint: titleHint,
+                        color: colors.text,
+                      ),
                     ),
                   ),
                   if (actions != null) ...[
@@ -159,6 +185,7 @@ class _HeaderTitle extends StatefulWidget {
   const _HeaderTitle({
     required this.title,
     required this.compact,
+    required this.compactProgress,
     required this.animate,
     required this.onLongPress,
     required this.hint,
@@ -167,6 +194,7 @@ class _HeaderTitle extends StatefulWidget {
 
   final String title;
   final bool compact;
+  final double compactProgress;
   final bool animate;
   final void Function(Offset globalPosition)? onLongPress;
   final String? hint;
@@ -182,11 +210,14 @@ class _HeaderTitleState extends State<_HeaderTitle> {
   @override
   Widget build(BuildContext context) {
     final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    final expandedSize = widget.compact ? 21.0 : 25.0;
+    final inlineSize = widget.compact ? 20.0 : 21.0;
+    final progress = widget.compactProgress.clamp(0.0, 1.0);
     final style = TextStyle(
-      fontSize: widget.compact ? 21 : 25,
+      fontSize: expandedSize + (inlineSize - expandedSize) * progress,
       height: 1.18,
       fontWeight: FontWeight.w700,
-      letterSpacing: 0,
+      letterSpacing: -0.2 * progress,
       color: widget.color,
     );
     final textWidget = widget.animate
@@ -198,28 +229,35 @@ class _HeaderTitleState extends State<_HeaderTitle> {
             style: style,
           );
     final onLongPress = widget.onLongPress;
-    if (onLongPress == null) return textWidget;
     return Semantics(
       header: true,
       hint: widget.hint,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTapDown: (_) => setState(() => _holding = true),
-        onTapUp: (_) => setState(() => _holding = false),
-        onTapCancel: () => setState(() => _holding = false),
-        onLongPressStart: (details) {
-          setState(() => _holding = false);
-          HapticFeedback.mediumImpact();
-          onLongPress(details.globalPosition);
-        },
-        child: AnimatedScale(
-          scale: _holding && !disable ? 0.95 : 1.0,
-          duration: motionDuration(Timings.press, disableAnimations: disable),
-          curve: LiquidSprings.snappyCurve,
-          alignment: Alignment.centerLeft,
-          child: Align(alignment: Alignment.centerLeft, child: textWidget),
-        ),
-      ),
+      child: onLongPress == null
+          ? Align(alignment: Alignment.centerLeft, child: textWidget)
+          : GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTapDown: (_) => setState(() => _holding = true),
+              onTapUp: (_) => setState(() => _holding = false),
+              onTapCancel: () => setState(() => _holding = false),
+              onLongPressStart: (details) {
+                setState(() => _holding = false);
+                HapticFeedback.mediumImpact();
+                onLongPress(details.globalPosition);
+              },
+              child: AnimatedScale(
+                scale: _holding && !disable ? 0.95 : 1.0,
+                duration: motionDuration(
+                  Timings.press,
+                  disableAnimations: disable,
+                ),
+                curve: LiquidSprings.snappyCurve,
+                alignment: Alignment.centerLeft,
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: textWidget,
+                ),
+              ),
+            ),
     );
   }
 }
@@ -270,16 +308,19 @@ class PinnedSubHeader extends StatelessWidget {
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Text(
-                      title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 20,
-                        height: 1.25,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0,
-                        color: colors.text,
+                    child: Semantics(
+                      header: true,
+                      child: Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 20,
+                          height: 1.25,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0,
+                          color: colors.text,
+                        ),
                       ),
                     ),
                   ),
@@ -496,16 +537,23 @@ class _MorphingSearchHeaderState extends State<MorphingSearchHeader> {
                         key: const ValueKey('header-search-idle'),
                         children: [
                           Expanded(
-                            child: Text(
-                              widget.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: compact ? 21 : 25,
-                                height: 1.18,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 0,
-                                color: colors.text,
+                            child: _HeaderScrollProgress(
+                              builder: (context, progress) => Semantics(
+                                header: true,
+                                child: Text(
+                                  widget.title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize:
+                                        (compact ? 21.0 : 25.0) -
+                                        (compact ? 1.0 : 4.0) * progress,
+                                    height: 1.18,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: -0.2 * progress,
+                                    color: colors.text,
+                                  ),
+                                ),
                               ),
                             ),
                           ),

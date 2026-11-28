@@ -92,4 +92,47 @@ void main() {
     await tester.pumpAndSettle();
     expect(month, '2026-10');
   });
+
+  testWidgets('顶栏标题随主内容滚动收紧，并始终保留标题语义', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final scroll = ScrollController();
+    addTearDown(scroll.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildAppTheme(AppColors.light, AppTokens.lightTokens),
+        home: PrimaryScrollController(
+          controller: scroll,
+          child: Scaffold(
+            body: Stack(
+              children: [
+                ListView(children: const [SizedBox(height: 1400)]),
+                const Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: PinnedHeader(title: '工时'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    Text title() => tester.widget<Text>(find.text('工时'));
+    final expandedSize = title().style!.fontSize!;
+    expect(
+      tester.getSemantics(find.text('工时')),
+      containsSemantics(isHeader: true, label: '工时'),
+    );
+
+    await tester.dragFrom(const Offset(195, 420), const Offset(0, -90));
+    await tester.pump();
+
+    expect(title().style!.fontSize, lessThan(expandedSize));
+    expect(scroll.offset, greaterThan(0));
+  });
 }
