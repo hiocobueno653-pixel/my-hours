@@ -245,10 +245,9 @@ class _BackupPageState extends ConsumerState<BackupPage> {
     final state = ref.watch(appControllerProvider);
     return Scaffold(
       backgroundColor: colors.page,
-      body: Stack(
-      children: [
-        Positioned.fill(
-          child: ListView(
+      body: AppPageBackground(
+        child: LiquidBackdropScaffold(
+          body: ListView(
             physics: const BouncingScrollPhysics(
               parent: AlwaysScrollableScrollPhysics(),
             ),
@@ -642,14 +641,15 @@ class _BackupPageState extends ConsumerState<BackupPage> {
               ),
             ],
           ),
+          overlays: [
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: PinnedSubHeader(title: '数据与备份', onBack: widget.onBack),
+            ),
+          ],
         ),
-        Positioned(
-          top: 0,
-          left: 0,
-          right: 0,
-          child: PinnedSubHeader(title: '数据与备份', onBack: widget.onBack),
-        ),
-      ],
       ),
     );
   }

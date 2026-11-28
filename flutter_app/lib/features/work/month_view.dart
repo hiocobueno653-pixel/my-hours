@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' show lerpDouble;
 
+import 'package:fluid_glass/fluid_glass.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -184,134 +185,144 @@ class _MonthViewState extends ConsumerState<MonthView> {
     final activeRecord = recordsByDate[activeDate];
     final activeEntries = entriesByDate[activeDate] ?? const <LedgerEntry>[];
 
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: ListView(
-            physics: const BouncingScrollPhysics(
-              parent: AlwaysScrollableScrollPhysics(),
-            ),
-            padding: EdgeInsets.only(
-              top: PinnedHeader.totalHeight(context) + 12,
-              bottom: pageBottomInset(context),
-            ),
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: Gaps.lg),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (month != currentMonthKey()) ...[
-                      _PastMonthBanner(
-                        month: month,
-                        onTap: () => _changeMonth(currentMonthKey()),
-                      ),
-                      const SizedBox(height: Gaps.sm),
-                    ],
-                    if (_editingLayout && settings != null)
-                      _DashboardLayoutEditor(
-                        cards: dashboardCards,
-                        labelOf: (id) => _dashboardCardLabel(context, id),
-                        onChanged: (next) {
-                          unawaited(settings.setDashboardCards(next));
-                          if (mounted) setState(() {});
-                        },
-                        onDone: () => setState(() => _editingLayout = false),
-                      )
-                    else
-                      RepaintBoundary(
-                        child: WorkBentoHeader(
-                          showToday: month == currentMonthKey(),
-                          date: today,
-                          record: todayRecord,
-                          profiles: profiles,
-                          income: todayIncome,
-                          expense: todayExpense,
-                          entryCount: todayEntries.length,
-                          summary: summary,
-                          ledgerSummary: ledgerSummary,
-                          cards: dashboardCards,
-                          todayEntries: todayEntries,
-                          monthPay: monthPay,
-                          settlement: settlement,
-                          workdays: workdays,
-                          onOpenLedger: kHoursOnly
-                              ? null
-                              : () => showLedgerEditor(
-                                  context,
-                                  presetDate: today,
-                                ),
-                          onOpenToday: () => _openDay(today),
-                          onQuickAmount: _quickSaveToday,
-                          onOpenMonthDetail: () =>
-                              showMonthDetail(context, month),
-                          onOpenWage: () => showWagePanel(context, month),
-                          onOpenWorkManager: () => showWorkManager(context),
-                          deltaText: deltaText,
-                          deltaColor:
-                              monthDelta != null && monthDelta.delta >= 0
-                              ? colors.income
-                              : colors.expense,
-                        ),
-                      ),
-                    if (!kHoursOnly && underpaidDays > 0) ...[
-                      const SizedBox(height: Gaps.cardGap),
-                      _MissingRateHint(
-                        days: underpaidDays,
-                        onTap: () => showWorkManager(context),
-                      ),
-                    ],
-                    const SizedBox(height: Gaps.cardGap),
-                    RepaintBoundary(
-                      child: _SwipeableCalendar(
-                        month: month,
-                        allRecords: records,
-                        allEntries: entries,
-                        today: today,
-                        selectedDate: activeDate,
-                        onTapDate: (date) {
-                          HapticFeedback.selectionClick();
-                          if (date == activeDate) {
-                            _openDay(date);
-                          } else {
-                            setState(() => _selectedDate = date);
-                          }
-                        },
-                        onLongPressDate: (date, globalPos) =>
-                            _showDayContextMenu(
-                              context,
-                              date: date,
-                              record: recordsByDate[date],
-                              globalPosition: globalPos,
-                            ),
-                        onOpenDetail: () => showMonthDetail(context, month),
-                        onSelectMonth: _changeMonth,
-                      ),
-                    ),
-                    const SizedBox(height: Gaps.cardGap),
-                    _SelectedDayCard(
-                      date: activeDate,
-                      isToday: activeDate == today,
-                      record: activeRecord,
-                      entries: activeEntries,
-                      profiles: profiles,
-                      onEdit: () => _openDay(activeDate, directEdit: true),
-                      onDetail: activeRecord == null
-                          ? null
-                          : () => _openDay(activeDate),
-                      onAddLedger: kHoursOnly
-                          ? null
-                          : () => showLedgerEditor(
-                              context,
-                              presetDate: activeDate,
-                            ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+    return LiquidBackdropScaffold(
+      body: ListView(
+        physics: const BouncingScrollPhysics(
+          parent: AlwaysScrollableScrollPhysics(),
         ),
+        padding: EdgeInsets.only(
+          top: PinnedHeader.totalHeight(context) + 12,
+          bottom: pageBottomInset(context),
+        ),
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: Gaps.lg),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (month != currentMonthKey()) ...[
+                  _PastMonthBanner(
+                    month: month,
+                    onTap: () => _changeMonth(currentMonthKey()),
+                  ),
+                  const SizedBox(height: Gaps.sm),
+                ],
+                if (_editingLayout && settings != null)
+                  _DashboardLayoutEditor(
+                    cards: dashboardCards,
+                    labelOf: (id) => _dashboardCardLabel(context, id),
+                    onChanged: (next) {
+                      unawaited(settings.setDashboardCards(next));
+                      if (mounted) setState(() {});
+                    },
+                    onDone: () => setState(() => _editingLayout = false),
+                  )
+                else
+                  RepaintBoundary(
+                    child: WorkBentoHeader(
+                      showToday: month == currentMonthKey(),
+                      date: today,
+                      record: todayRecord,
+                      profiles: profiles,
+                      income: todayIncome,
+                      expense: todayExpense,
+                      entryCount: todayEntries.length,
+                      summary: summary,
+                      ledgerSummary: ledgerSummary,
+                      cards: dashboardCards,
+                      todayEntries: todayEntries,
+                      monthPay: monthPay,
+                      settlement: settlement,
+                      workdays: workdays,
+                      onOpenLedger: kHoursOnly
+                          ? null
+                          : () => showLedgerEditor(context, presetDate: today),
+                      onOpenToday: () => _openDay(today),
+                      onQuickAmount: _quickSaveToday,
+                      onOpenMonthDetail: () => showMonthDetail(context, month),
+                      onOpenWage: () => showWagePanel(context, month),
+                      onOpenWorkManager: () => showWorkManager(context),
+                      deltaText: deltaText,
+                      deltaColor: monthDelta != null && monthDelta.delta >= 0
+                          ? colors.income
+                          : colors.expense,
+                    ),
+                  ),
+                if (!kHoursOnly && underpaidDays > 0) ...[
+                  const SizedBox(height: Gaps.cardGap),
+                  _MissingRateHint(
+                    days: underpaidDays,
+                    onTap: () => showWorkManager(context),
+                  ),
+                ],
+                const SizedBox(height: Gaps.cardGap),
+                RepaintBoundary(
+                  child: _SwipeableCalendar(
+                    month: month,
+                    allRecords: records,
+                    allEntries: entries,
+                    today: today,
+                    selectedDate: activeDate,
+                    onTapDate: (date) {
+                      HapticFeedback.selectionClick();
+                      if (date == activeDate) {
+                        _openDay(date);
+                      } else {
+                        setState(() => _selectedDate = date);
+                      }
+                    },
+                    onLongPressDate: (date, globalPos) => _showDayContextMenu(
+                      context,
+                      date: date,
+                      record: recordsByDate[date],
+                      globalPosition: globalPos,
+                    ),
+                    onOpenDetail: () => showMonthDetail(context, month),
+                    onSelectMonth: _changeMonth,
+                  ),
+                ),
+                const SizedBox(height: Gaps.cardGap),
+                AnimatedSwitcher(
+                  duration: motionDuration(
+                    Timings.fast,
+                    disableAnimations:
+                        MediaQuery.maybeDisableAnimationsOf(context) ?? false,
+                  ),
+                  switchInCurve: LiquidSprings.snappyCurve,
+                  switchOutCurve: Curves2.out,
+                  transitionBuilder: (child, animation) => FadeTransition(
+                    opacity: animation,
+                    child: SlideTransition(
+                      position: Tween<Offset>(
+                        begin: const Offset(0, 0.04),
+                        end: Offset.zero,
+                      ).animate(animation),
+                      child: child,
+                    ),
+                  ),
+                  child: _SelectedDayCard(
+                    key: ValueKey('selected-day-$activeDate'),
+                    date: activeDate,
+                    isToday: activeDate == today,
+                    record: activeRecord,
+                    entries: activeEntries,
+                    profiles: profiles,
+                    onEdit: () => _openDay(activeDate, directEdit: true),
+                    onDetail: activeRecord == null
+                        ? null
+                        : () => _openDay(activeDate),
+                    onAddLedger: kHoursOnly
+                        ? null
+                        : () =>
+                              showLedgerEditor(context, presetDate: activeDate),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      overlays: [
         Positioned(
           top: 0,
           left: 0,
@@ -668,6 +679,7 @@ class _MissingRateHint extends StatelessWidget {
 
 class _SelectedDayCard extends StatelessWidget {
   const _SelectedDayCard({
+    super.key,
     required this.date,
     required this.isToday,
     required this.record,
@@ -745,12 +757,12 @@ class _SelectedDayCard extends StatelessWidget {
                 const SizedBox(width: 6),
                 Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 2,
+                    horizontal: 8,
+                    vertical: 2.5,
                   ),
                   decoration: ShapeDecoration(
                     color: colors.incomeSoft,
-                    shape: Radii.shape(6),
+                    shape: Radii.pillShape,
                   ),
                   child: Text(
                     '已结算',
@@ -775,7 +787,7 @@ class _SelectedDayCard extends StatelessWidget {
                   label: record == null ? '记录' : '编辑',
                   icon: record == null
                       ? Icons.add_task_rounded
-                      : Icons.edit_outlined,
+                      : Icons.edit_rounded,
                   primary: record == null,
                   onTap: onEdit,
                 ),
@@ -869,11 +881,15 @@ class _InlineAction extends StatelessWidget {
     return Pressable(
       onTap: onTap,
       shape: shape,
-      pressedScale: 0.95,
+      pressedScale: 0.92,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6.5),
         decoration: ShapeDecoration(
-          color: primary ? colors.primaryContainer : colors.block,
+          color: primary
+              ? colors.primaryContainer
+              : (colors.isDark
+                    ? Colors.white.withValues(alpha: 0.08)
+                    : colors.block),
           shape: shape,
         ),
         child: Row(
@@ -882,7 +898,7 @@ class _InlineAction extends StatelessWidget {
             Icon(
               icon,
               size: 14,
-              color: primary ? colors.onPrimaryContainer : colors.text2,
+              color: primary ? colors.primary : colors.text2,
             ),
             const SizedBox(width: 3),
             Text(
@@ -890,7 +906,7 @@ class _InlineAction extends StatelessWidget {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: primary ? colors.onPrimaryContainer : colors.text,
+                color: primary ? colors.primary : colors.text,
               ),
             ),
           ],
@@ -1080,7 +1096,11 @@ class _SwipeableCalendarState extends State<_SwipeableCalendar> {
     _programmaticTarget = target;
     unawaited(
       _pageController
-          .animateToPage(target, duration: Timings.slow, curve: Curves2.out)
+          .animateToPage(
+            target,
+            duration: Timings.slow,
+            curve: LiquidSprings.smoothCurve,
+          )
           .whenComplete(() {
             if (mounted && token == _syncToken) {
               _programmaticTarget = null;
@@ -1116,7 +1136,7 @@ class _SwipeableCalendarState extends State<_SwipeableCalendar> {
 
     return GlassCard(
       radius: Radii.hero,
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 11),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
       child: Column(
         children: [
           Row(
@@ -1170,7 +1190,7 @@ class _SwipeableCalendarState extends State<_SwipeableCalendar> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           Row(
             children: [
               for (var i = 0; i < 7; i++)
@@ -1180,7 +1200,7 @@ class _SwipeableCalendarState extends State<_SwipeableCalendar> {
                       const ['一', '二', '三', '四', '五', '六', '日'][i],
                       style: TextStyle(
                         fontSize: 11.5,
-                        fontWeight: FontWeight.w500,
+                        fontWeight: FontWeight.w600,
                         color: i >= 5
                             ? colors.text3.withValues(alpha: 0.72)
                             : colors.text3,
@@ -1191,8 +1211,8 @@ class _SwipeableCalendarState extends State<_SwipeableCalendar> {
             ],
           ),
           const SizedBox(height: 6),
-          Divider(height: 1, thickness: 0.6, color: colors.divider),
-          const SizedBox(height: 7),
+          Divider(height: 1, thickness: 0.5, color: colors.divider),
+          const SizedBox(height: 6),
           ValueListenableBuilder<double>(
             valueListenable: _rowCountNotifier,
             builder: (context, rows, child) {
@@ -1394,11 +1414,11 @@ class _CalendarCell extends StatelessWidget {
           );
     final cellBg = isSelected
         ? colors.primary
+        : isToday
+        ? colors.primaryContainer
         : (heatTint ?? Colors.transparent);
 
-    final borderSide = isToday && !isSelected
-        ? BorderSide(color: colors.primary, width: 1.4)
-        : BorderSide.none;
+    const borderSide = BorderSide.none;
 
     final dayColor = isSelected
         ? colors.onPrimary
@@ -1420,6 +1440,7 @@ class _CalendarCell extends StatelessWidget {
         ? colors.warning
         : colors.text2;
 
+    final cellShape = Radii.shape(12);
     return Semantics(
       button: true,
       selected: isSelected,
@@ -1433,20 +1454,34 @@ class _CalendarCell extends StatelessWidget {
         child: Pressable(
           onTap: onTap,
           haptic: false,
-          shape: Radii.shape(11),
+          shape: cellShape,
           pressedScale: 0.92,
           child: _LazyDecoratedBox(
             decoration: ShapeDecoration(
-              color: cellBg,
-              shape: Radii.shape(11).copyWith(side: borderSide),
+              color: isSelected ? null : cellBg,
+              gradient: isSelected
+                  ? LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Color.lerp(
+                          colors.primary,
+                          Colors.white,
+                          colors.isDark ? 0.08 : 0.12,
+                        )!,
+                        colors.primary,
+                      ],
+                    )
+                  : null,
+              shape: cellShape.copyWith(side: borderSide),
               shadows: isSelected
                   ? [
                       BoxShadow(
                         color: colors.primary.withValues(
-                          alpha: colors.isDark ? 0.28 : 0.20,
+                          alpha: colors.isDark ? 0.28 : 0.22,
                         ),
-                        blurRadius: 10,
-                        offset: const Offset(0, 3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
                       ),
                     ]
                   : null,
@@ -1862,7 +1897,10 @@ class _LazyDecoratedBoxState extends State<_LazyDecoratedBox>
       vsync: this,
       duration: Timings.micro,
     );
-    _curved ??= CurvedAnimation(parent: controller, curve: Curves2.out);
+    _curved ??= CurvedAnimation(
+      parent: controller,
+      curve: LiquidSprings.snappyCurve,
+    );
     _animation = DecorationTween(
       begin: from,
       end: widget.decoration,
@@ -2252,9 +2290,11 @@ class _DayEditorSheetState extends ConsumerState<DayEditorSheet> {
                     ],
                   ),
                 ),
-                Switch(
-                  value: _settled && _previewPay > 0,
-                  onChanged: _previewPay <= 0
+                LiquidToggle(
+                  selected: _settled && _previewPay > 0,
+                  backdrop: AppBackdropScope.of(context),
+                  semanticLabel: '已结算',
+                  onSelect: _previewPay <= 0
                       ? null
                       : (value) => setState(() => _settled = value),
                 ),
@@ -2440,7 +2480,7 @@ class DayDetailSheet extends ConsumerWidget {
                                 fontSize: 28,
                                 height: 1.0,
                                 fontWeight: FontWeight.w700,
-                                letterSpacing: -0.9,
+                                letterSpacing: 0,
                                 color: colors.text,
                                 fontFeatures: tabularFigures,
                               ),
@@ -2483,7 +2523,7 @@ class DayDetailSheet extends ConsumerWidget {
                               fontSize: 28,
                               height: 1.0,
                               fontWeight: FontWeight.w700,
-                              letterSpacing: -0.9,
+                              letterSpacing: 0,
                               color: colors.income,
                               fontFeatures: tabularFigures,
                             ),

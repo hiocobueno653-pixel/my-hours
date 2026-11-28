@@ -64,188 +64,188 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
         final bottomSafe = MediaQuery.paddingOf(context).bottom;
         return Scaffold(
           backgroundColor: colors.page,
-          body: Stack(
-            children: [
-              Positioned.fill(
-                child: ListView(
-                  physics: const BouncingScrollPhysics(
-                    parent: AlwaysScrollableScrollPhysics(),
-                  ),
-                  padding: EdgeInsets.only(
-                    top: PinnedSubHeader.totalHeight(context) + 12,
-                    bottom: bottomSafe + 28,
-                  ),
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: Gaps.lg),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          const SectionHeading(title: '记录与通知'),
-                          GlassCard(
-                            padding: const EdgeInsets.symmetric(vertical: 4),
-                            child: Column(
-                              children: [
-                                ListRow(
-                                  title: '计量单位',
-                                  subtitle:
-                                      '决定「${context.unit.quantity}」与短单位显示方式',
-                                  leading: AppIconBadge(
-                                    icon: Icons.straighten_rounded,
-                                    color: colors.primary,
-                                  ),
-                                  trailing: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 10,
-                                      vertical: 4,
-                                    ),
-                                    decoration: ShapeDecoration(
-                                      color: colors.block,
-                                      shape: Radii.pillShape,
-                                    ),
-                                    child: Text(
-                                      context.unit.name,
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                        color: colors.text2,
-                                      ),
-                                    ),
-                                  ),
-                                  showChevron: true,
-                                  onTap: () => _pickUnit(context),
-                                ),
-                                Divider(
-                                  height: 1,
-                                  color: colors.divider,
-                                  indent: 64,
-                                  endIndent: 16,
-                                ),
-                                ListRow(
-                                  title: '实况通知',
-                                  subtitle: liveUpdate.maybeWhen(
-                                    data: (cap) => cap.summary,
-                                    orElse: () => '检测中…',
-                                  ),
-                                  showChevron: canOpenNotificationSettings,
-                                  leading: AppIconBadge(
-                                    icon: Icons.notifications_active_outlined,
-                                    color: colors.warning,
-                                  ),
-                                  onTap: canOpenNotificationSettings
-                                      ? () => unawaited(
-                                          openAppNotificationSettings(),
-                                        )
-                                      : null,
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: Gaps.lg),
-                          const SectionHeading(title: '显示与交互'),
-                          GlassCard(
-                            padding: const EdgeInsets.symmetric(vertical: 4),
-                            child: Column(
-                              children: [
-                                LiquidSwitchRow(
-                                  title: '大字模式',
-                                  subtitle: '整体字号放大约 12%',
-                                  leading: const AppIconBadge(
-                                    icon: Icons.format_size_rounded,
-                                    color: Color(0xFF5856D6),
-                                  ),
-                                  value: settings.largeText,
-                                  onChanged: settings.setLargeText,
-                                ),
-                                Divider(
-                                  height: 1,
-                                  color: colors.divider,
-                                  indent: 64,
-                                  endIndent: 16,
-                                ),
-                                LiquidSwitchRow(
-                                  title: '减少动效',
-                                  subtitle: '关闭过渡位移动画，页面响应更直接',
-                                  leading: const AppIconBadge(
-                                    icon: Icons.motion_photos_off_outlined,
-                                    color: Color(0xFF0EA5E9),
-                                  ),
-                                  value: settings.reduceMotion,
-                                  onChanged: (value) =>
-                                      settings.setReduceMotion(value),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: Gaps.lg),
-                          const SectionHeading(title: '数据管理'),
-                          GlassCard(
-                            padding: const EdgeInsets.symmetric(vertical: 4),
-                            child: ListRow(
-                              title: '清空全部数据',
-                              subtitle:
-                                  '删除全部${context.unit.quantity}、账目、分类、工作与预算，不可恢复',
-                              leading: AppIconBadge(
-                                icon: Icons.delete_outline_rounded,
-                                color: colors.expense,
-                              ),
-                              danger: true,
-                              onTap: () async {
-                                final confirmed = await showConfirmDialog(
-                                  context,
-                                  title: '清空全部数据？',
-                                  description:
-                                      '将删除全部${context.unit.quantity}与账目，'
-                                      '并结束进行中的计时。\n建议先导出备份。',
-                                  confirmLabel: '清空',
-                                  danger: true,
-                                );
-                                if (confirmed != true) return;
-                                if (!context.mounted) return;
-                                ref.read(timerProvider.notifier).discard();
-                                final cleared = ref
-                                    .read(appControllerProvider.notifier)
-                                    .clearAll();
-                                ref
-                                    .read(selectedMonthProvider.notifier)
-                                    .setMonth(currentMonthKey());
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        cleared
-                                            ? '已清空全部数据，进行中的计时已结束'
-                                            : '本地文件已清空，但新存档写入失败，请重试',
-                                      ),
-                                    ),
-                                  );
-                                }
-                              },
-                            ),
-                          ),
-                          const SizedBox(height: Gaps.xl),
-                          Center(
-                            child: Text(
-                              '时页 TIMEPAGE · 1.7.9 · 数据全部保存在本机',
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                color: colors.text3,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+          body: AppPageBackground(
+            child: LiquidBackdropScaffold(
+              body: ListView(
+                physics: const BouncingScrollPhysics(
+                  parent: AlwaysScrollableScrollPhysics(),
                 ),
+                padding: EdgeInsets.only(
+                  top: PinnedSubHeader.totalHeight(context) + 12,
+                  bottom: bottomSafe + 28,
+                ),
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: Gaps.lg),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const SectionHeading(title: '记录与通知'),
+                        GlassCard(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Column(
+                            children: [
+                              ListRow(
+                                title: '计量单位',
+                                subtitle:
+                                    '决定「${context.unit.quantity}」与短单位显示方式',
+                                leading: AppIconBadge(
+                                  icon: Icons.straighten_rounded,
+                                  color: colors.primary,
+                                ),
+                                trailing: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 4,
+                                  ),
+                                  decoration: ShapeDecoration(
+                                    color: colors.block,
+                                    shape: Radii.pillShape,
+                                  ),
+                                  child: Text(
+                                    context.unit.name,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: colors.text2,
+                                    ),
+                                  ),
+                                ),
+                                showChevron: true,
+                                onTap: () => _pickUnit(context),
+                              ),
+                              Divider(
+                                height: 1,
+                                color: colors.divider,
+                                indent: 64,
+                                endIndent: 16,
+                              ),
+                              ListRow(
+                                title: '实况通知',
+                                subtitle: liveUpdate.maybeWhen(
+                                  data: (cap) => cap.summary,
+                                  orElse: () => '检测中…',
+                                ),
+                                showChevron: canOpenNotificationSettings,
+                                leading: AppIconBadge(
+                                  icon: Icons.notifications_active_outlined,
+                                  color: colors.warning,
+                                ),
+                                onTap: canOpenNotificationSettings
+                                    ? () => unawaited(
+                                        openAppNotificationSettings(),
+                                      )
+                                    : null,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: Gaps.lg),
+                        const SectionHeading(title: '显示与交互'),
+                        GlassCard(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Column(
+                            children: [
+                              LiquidSwitchRow(
+                                title: '大字模式',
+                                subtitle: '整体字号放大约 12%',
+                                leading: const AppIconBadge(
+                                  icon: Icons.format_size_rounded,
+                                  color: Color(0xFF5856D6),
+                                ),
+                                value: settings.largeText,
+                                onChanged: settings.setLargeText,
+                              ),
+                              Divider(
+                                height: 1,
+                                color: colors.divider,
+                                indent: 64,
+                                endIndent: 16,
+                              ),
+                              LiquidSwitchRow(
+                                title: '减少动效',
+                                subtitle: '关闭过渡位移动画，页面响应更直接',
+                                leading: const AppIconBadge(
+                                  icon: Icons.motion_photos_off_outlined,
+                                  color: Color(0xFF0EA5E9),
+                                ),
+                                value: settings.reduceMotion,
+                                onChanged: (value) =>
+                                    settings.setReduceMotion(value),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: Gaps.lg),
+                        const SectionHeading(title: '数据管理'),
+                        GlassCard(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: ListRow(
+                            title: '清空全部数据',
+                            subtitle:
+                                '删除全部${context.unit.quantity}、账目、分类、工作与预算，不可恢复',
+                            leading: AppIconBadge(
+                              icon: Icons.delete_outline_rounded,
+                              color: colors.expense,
+                            ),
+                            danger: true,
+                            onTap: () async {
+                              final confirmed = await showConfirmDialog(
+                                context,
+                                title: '清空全部数据？',
+                                description:
+                                    '将删除全部${context.unit.quantity}与账目，'
+                                    '并结束进行中的计时。\n建议先导出备份。',
+                                confirmLabel: '清空',
+                                danger: true,
+                              );
+                              if (confirmed != true) return;
+                              if (!context.mounted) return;
+                              ref.read(timerProvider.notifier).discard();
+                              final cleared = ref
+                                  .read(appControllerProvider.notifier)
+                                  .clearAll();
+                              ref
+                                  .read(selectedMonthProvider.notifier)
+                                  .setMonth(currentMonthKey());
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      cleared
+                                          ? '已清空全部数据，进行中的计时已结束'
+                                          : '本地文件已清空，但新存档写入失败，请重试',
+                                    ),
+                                  ),
+                                );
+                              }
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: Gaps.xl),
+                        Center(
+                          child: Text(
+                            '时页 TIMEPAGE · 1.8.0 · 数据全部保存在本机',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              color: colors.text3,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                child: PinnedSubHeader(title: '使用设置', onBack: widget.onBack),
-              ),
-            ],
+              overlays: [
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: PinnedSubHeader(title: '使用设置', onBack: widget.onBack),
+                ),
+              ],
+            ),
           ),
         );
       },

@@ -1,6 +1,7 @@
-/// 吸顶顶栏：FlClash 悬浮液态玻璃岛 + 顶部柔和渐隐遮罩 + 胶囊变形搜索。
+/// 液态玻璃吸顶顶栏：渐进模糊、悬浮折射操作与水滴胶囊搜索。
 library;
 
+import 'package:fluid_glass/fluid_glass.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -8,7 +9,8 @@ import '../core/motion.dart';
 import '../core/theme_tokens.dart';
 import 'widgets.dart';
 
-/// 顶部羽化渐隐遮罩：压住状态栏文字对比度，向下化开，让下方卡片自然滑入玻璃岛背后。
+/// 顶部渐进式可变模糊遮罩：
+/// 状态栏区域保持 Apple 标准 20px 可变模糊，向下自然化清，下方卡片丝滑流过玻璃岛背后。
 class _HeaderScrim extends StatelessWidget {
   const _HeaderScrim();
 
@@ -17,21 +19,33 @@ class _HeaderScrim extends StatelessWidget {
     final colors = context.colors;
     final highContrast = MediaQuery.maybeOf(context)?.highContrast ?? false;
     if (highContrast) return ColoredBox(color: colors.page);
+    final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    final backdrop = AppBackdropScope.of(context);
     final base = colors.page;
-    return DecoratedBox(
+    final hasLiveBackdrop = backdrop != nativeBackdrop && !disable;
+    final tintOverlay = DecoratedBox(
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            base.withValues(alpha: 0.92),
-            base.withValues(alpha: 0.78),
-            base.withValues(alpha: 0.36),
+            base.withValues(alpha: hasLiveBackdrop ? 0.62 : 0.90),
+            base.withValues(alpha: hasLiveBackdrop ? 0.36 : 0.74),
+            base.withValues(alpha: hasLiveBackdrop ? 0.12 : 0.32),
             base.withValues(alpha: 0.0),
           ],
-          stops: const [0.0, 0.56, 0.82, 1.0],
+          stops: const [0.0, 0.52, 0.82, 1.0],
         ),
       ),
+    );
+    if (!hasLiveBackdrop) return tintOverlay;
+    return ProgressiveBlur(
+      maxBlurRadius: 18,
+      direction: ProgressiveBlurDirection.blurredTopClearBottom,
+      startOffset: 0.30,
+      bands: 3,
+      backdrop: backdrop,
+      child: tintOverlay,
     );
   }
 }
@@ -169,10 +183,10 @@ class _HeaderTitleState extends State<_HeaderTitle> {
   Widget build(BuildContext context) {
     final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     final style = TextStyle(
-      fontSize: widget.compact ? 20 : 22,
-      height: 1.22,
+      fontSize: widget.compact ? 21 : 25,
+      height: 1.18,
       fontWeight: FontWeight.w700,
-      letterSpacing: -0.4,
+      letterSpacing: 0,
       color: widget.color,
     );
     final textWidget = widget.animate
@@ -199,9 +213,9 @@ class _HeaderTitleState extends State<_HeaderTitle> {
           onLongPress(details.globalPosition);
         },
         child: AnimatedScale(
-          scale: _holding && !disable ? 0.96 : 1.0,
+          scale: _holding && !disable ? 0.95 : 1.0,
           duration: motionDuration(Timings.press, disableAnimations: disable),
-          curve: Curves2.out,
+          curve: LiquidSprings.snappyCurve,
           alignment: Alignment.centerLeft,
           child: Align(alignment: Alignment.centerLeft, child: textWidget),
         ),
@@ -247,10 +261,11 @@ class PinnedSubHeader extends StatelessWidget {
               child: Row(
                 children: [
                   GlassIconButton(
-                    icon: Icons.arrow_back_rounded,
+                    icon: Icons.arrow_back_ios_new_rounded,
                     onTap: onBack,
                     tooltip: '返回',
-                    iconSize: 20,
+                    iconSize: 16.5,
+                    iconOffset: const Offset(-1.0, 0),
                     bright: true,
                   ),
                   const SizedBox(width: 12),
@@ -263,7 +278,7 @@ class PinnedSubHeader extends StatelessWidget {
                         fontSize: 20,
                         height: 1.25,
                         fontWeight: FontWeight.w700,
-                        letterSpacing: -0.2,
+                        letterSpacing: 0,
                         color: colors.text,
                       ),
                     ),
@@ -387,13 +402,13 @@ class _MorphingSearchHeaderState extends State<MorphingSearchHeader> {
                   Timings.base,
                   disableAnimations: disable,
                 ),
-                switchInCurve: FlClashSprings.searchOpenCurve,
-                switchOutCurve: FlClashSprings.searchCloseCurve,
+                switchInCurve: LiquidSprings.bouncyCurve,
+                switchOutCurve: LiquidSprings.snappyCurve,
                 transitionBuilder: (child, animation) {
                   if (disable) return child;
                   final fade = animation.drive(CurveTween(curve: Curves2.out));
                   final scale = Tween<double>(
-                    begin: 0.94,
+                    begin: 0.92,
                     end: 1.0,
                   ).animate(animation);
                   return FadeTransition(
@@ -411,8 +426,9 @@ class _MorphingSearchHeaderState extends State<MorphingSearchHeader> {
                         children: [
                           Expanded(
                             child: LiquidGlassSurface(
-                              height: 44,
+                              height: 42,
                               radius: Radii.pill,
+                              interactive: true,
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 14,
                               ),
@@ -483,10 +499,10 @@ class _MorphingSearchHeaderState extends State<MorphingSearchHeader> {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                fontSize: compact ? 20 : 22,
-                                height: 1.22,
+                                fontSize: compact ? 21 : 25,
+                                height: 1.18,
                                 fontWeight: FontWeight.w700,
-                                letterSpacing: -0.4,
+                                letterSpacing: 0,
                                 color: colors.text,
                               ),
                             ),

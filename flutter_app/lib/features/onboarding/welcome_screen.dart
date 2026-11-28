@@ -87,131 +87,148 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       child: Scaffold(
         backgroundColor: background,
         resizeToAvoidBottomInset: false,
-        body: Stack(
-          fit: StackFit.expand,
-          children: [
-            SafeArea(
-              child: Column(
-                children: [
-                  Expanded(
-                    child: LayoutBuilder(
-                      builder: (context, constraints) => SingleChildScrollView(
-                        physics: const BouncingScrollPhysics(
-                          parent: AlwaysScrollableScrollPhysics(),
-                        ),
-                        padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
-                        child: ConstrainedBox(
-                          constraints: BoxConstraints(
-                            minHeight: math.max(0, constraints.maxHeight - 40),
-                          ),
-                          child: Center(
-                            child: ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 430),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  _StaggerReveal(
-                                    controller: _entryController,
-                                    begin: 0,
-                                    end: 0.38,
-                                    offset: 0.06,
-                                    child: const _WelcomeHeading(),
+        body: AppPageBackground(
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              SafeArea(
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: LayoutBuilder(
+                        builder: (context, constraints) =>
+                            SingleChildScrollView(
+                              physics: const BouncingScrollPhysics(
+                                parent: AlwaysScrollableScrollPhysics(),
+                              ),
+                              padding: const EdgeInsets.fromLTRB(
+                                24,
+                                20,
+                                24,
+                                20,
+                              ),
+                              child: ConstrainedBox(
+                                constraints: BoxConstraints(
+                                  minHeight: math.max(
+                                    0,
+                                    constraints.maxHeight - 40,
                                   ),
-                                  const SizedBox(height: 22),
-                                  _StaggerReveal(
-                                    controller: _entryController,
-                                    begin: 0.10,
-                                    end: 0.48,
-                                    offset: 0.12,
-                                    child: const _BentoPreview(),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  IntrinsicHeight(
-                                    child: Row(
+                                ),
+                                child: Center(
+                                  child: ConstrainedBox(
+                                    constraints: const BoxConstraints(
+                                      maxWidth: 430,
+                                    ),
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
                                       crossAxisAlignment:
                                           CrossAxisAlignment.stretch,
                                       children: [
-                                        Expanded(
-                                          child: _StaggerReveal(
-                                            controller: _entryController,
-                                            begin: 0.20,
-                                            end: 0.58,
-                                            offset: 0.12,
-                                            child: const _LocalFirstCard(),
+                                        _StaggerReveal(
+                                          controller: _entryController,
+                                          begin: 0,
+                                          end: 0.38,
+                                          offset: 0.06,
+                                          child: const _WelcomeHeading(),
+                                        ),
+                                        const SizedBox(height: 22),
+                                        _StaggerReveal(
+                                          controller: _entryController,
+                                          begin: 0.10,
+                                          end: 0.48,
+                                          offset: 0.12,
+                                          child: const _BentoPreview(),
+                                        ),
+                                        const SizedBox(height: 12),
+                                        IntrinsicHeight(
+                                          child: Row(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.stretch,
+                                            children: [
+                                              Expanded(
+                                                child: _StaggerReveal(
+                                                  controller: _entryController,
+                                                  begin: 0.20,
+                                                  end: 0.58,
+                                                  offset: 0.12,
+                                                  child:
+                                                      const _LocalFirstCard(),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 12),
+                                              Expanded(
+                                                child: _StaggerReveal(
+                                                  controller: _entryController,
+                                                  begin: 0.26,
+                                                  end: 0.64,
+                                                  offset: 0.12,
+                                                  child:
+                                                      const _HoursPresetCard(),
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                         ),
-                                        const SizedBox(width: 12),
-                                        Expanded(
-                                          child: _StaggerReveal(
-                                            controller: _entryController,
-                                            begin: 0.26,
-                                            end: 0.64,
-                                            offset: 0.12,
-                                            child: const _HoursPresetCard(),
+                                        const SizedBox(height: 14),
+                                        _StaggerReveal(
+                                          controller: _entryController,
+                                          begin: 0.34,
+                                          end: 0.72,
+                                          offset: 0.06,
+                                          child: Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              Icon(
+                                                Icons.lock_outline_rounded,
+                                                size: 13,
+                                                color: colors.text3,
+                                              ),
+                                              const SizedBox(width: 5),
+                                              Flexible(
+                                                child: Text(
+                                                  '数据只保存在本机 · 无需账号',
+                                                  style: TextStyle(
+                                                    color: colors.text3,
+                                                    fontSize: 11.5,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                         ),
                                       ],
                                     ),
                                   ),
-                                  const SizedBox(height: 14),
-                                  _StaggerReveal(
-                                    controller: _entryController,
-                                    begin: 0.34,
-                                    end: 0.72,
-                                    offset: 0.06,
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          Icons.lock_outline_rounded,
-                                          size: 13,
-                                          color: colors.text3,
-                                        ),
-                                        const SizedBox(width: 5),
-                                        Flexible(
-                                          child: Text(
-                                            '数据只保存在本机 · 无需账号',
-                                            style: TextStyle(
-                                              color: colors.text3,
-                                              fontSize: 11.5,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
+                                ),
                               ),
+                            ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 430),
+                          child: _StaggerReveal(
+                            controller: _entryController,
+                            begin: 0.42,
+                            end: 0.90,
+                            offset: 0.18,
+                            child: _StartButton(
+                              busy: _starting,
+                              onPressed: _starting ? null : _start,
                             ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
-                    child: Center(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 430),
-                        child: _StaggerReveal(
-                          controller: _entryController,
-                          begin: 0.42,
-                          end: 0.90,
-                          offset: 0.18,
-                          child: _StartButton(
-                            busy: _starting,
-                            onPressed: _starting ? null : _start,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -326,7 +343,7 @@ class _WelcomeHeading extends StatelessWidget {
                   color: colors.text2,
                   fontSize: 11.5,
                   fontWeight: FontWeight.w500,
-                  letterSpacing: 0.1,
+                  letterSpacing: 0,
                 ),
               ),
             ],
@@ -341,7 +358,7 @@ class _WelcomeHeading extends StatelessWidget {
             fontSize: 22,
             fontWeight: FontWeight.w700,
             height: 1.28,
-            letterSpacing: -0.02,
+            letterSpacing: 0,
           ),
         ),
         const SizedBox(height: 7),
@@ -503,7 +520,7 @@ class _PreviewMetric extends StatelessWidget {
                       fontSize: 23,
                       height: 1,
                       fontWeight: FontWeight.w700,
-                      letterSpacing: -0.04,
+                      letterSpacing: 0,
                       fontFeatures: tabularFigures,
                     ),
                   ),
@@ -678,9 +695,13 @@ class _StartButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final shape = Radii.shape(Radii.lg);
-    final gradStart = colors.primary;
-    final gradEnd = Color.lerp(colors.primary, const Color(0xFF0F172A), 0.24)!;
+    final shape = Radii.pillShape;
+    final gradStart = Color.lerp(
+      colors.primary,
+      Colors.white,
+      colors.isDark ? 0.12 : 0.16,
+    )!;
+    final gradEnd = colors.primary;
     return SizedBox(
       width: double.infinity,
       child: Opacity(
@@ -688,49 +709,57 @@ class _StartButton extends StatelessWidget {
         child: Pressable(
           onTap: onPressed,
           shape: shape,
-          pressedScale: 0.97,
-          child: Container(
-            height: 48,
-            padding: const EdgeInsets.symmetric(horizontal: Gaps.xl),
-            decoration: ShapeDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [gradStart, gradEnd],
-              ),
+          pressedScale: 0.94,
+          child: CustomPaint(
+            foregroundPainter: LiquidSpecularRimPainter(
               shape: shape,
-              shadows: onPressed == null
-                  ? null
-                  : [
-                      BoxShadow(
-                        color: colors.primary.withValues(
-                          alpha: colors.isDark ? 0.38 : 0.32,
-                        ),
-                        blurRadius: 18,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
+              isDark: true,
+              strokeWidth: 1.05,
+              intensity: 0.78,
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                if (!busy) ...[
-                  Icon(
-                    Icons.arrow_forward_rounded,
-                    size: 18,
-                    color: colors.onPrimary,
-                  ),
-                  const SizedBox(width: Gaps.sm),
-                ],
-                Text(
-                  busy ? '正在进入…' : '开始使用',
-                  style: TextStyle(
-                    color: colors.onPrimary,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                  ),
+            child: Container(
+              height: 52,
+              padding: const EdgeInsets.symmetric(horizontal: Gaps.xl),
+              decoration: ShapeDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [gradStart, gradEnd],
                 ),
-              ],
+                shape: shape,
+                shadows: onPressed == null
+                    ? null
+                    : [
+                        BoxShadow(
+                          color: colors.primary.withValues(
+                            alpha: colors.isDark ? 0.40 : 0.32,
+                          ),
+                          blurRadius: 22,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (!busy) ...[
+                    Icon(
+                      Icons.arrow_forward_rounded,
+                      size: 18,
+                      color: colors.onPrimary,
+                    ),
+                    const SizedBox(width: Gaps.sm),
+                  ],
+                  Text(
+                    busy ? '正在进入…' : '开始使用',
+                    style: TextStyle(
+                      color: colors.onPrimary,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

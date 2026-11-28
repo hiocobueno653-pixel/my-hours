@@ -233,11 +233,11 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                 children: [
                   BackdropLayer(
                     backdrop: _backdrop,
-                    motionPixelRatio: 1.0,
+                    motionPixelRatio: 0.55,
                     changeMargin: 24.0,
                     child: AppBackdropScope(
                       backdrop: nativeBackdrop,
-                      child: AmbientPageGlow(child: tabView),
+                      child: AppPageBackground(child: tabView),
                     ),
                   ),
                   if (!showSidebar)
@@ -434,7 +434,9 @@ class _FlClashTabViewState extends State<_FlClashTabView> {
     await _pageController.animateToPage(
       target,
       duration: widget.slide ? Timings.slow : Timings.fast,
-      curve: widget.slide ? Curves2.out : Curves2.inOut,
+      curve: widget.slide
+          ? LiquidSprings.smoothCurve
+          : LiquidSprings.snappyCurve,
     );
     if (mounted && token == _transitionToken && _order != null) {
       setState(() => _order = null);
@@ -642,11 +644,11 @@ class _BottomNavBar extends StatelessWidget {
     required this.onReselect,
   });
 
-  static const double dockHeight = 56;
-  static const double _maxWidth = 340;
+  static const double dockHeight = 60;
+  static const double _maxWidth = 352;
   static final ImageFilter _fixedBarBlur = ImageFilter.blur(
-    sigmaX: 14,
-    sigmaY: 14,
+    sigmaX: 22,
+    sigmaY: 22,
   );
 
   final List<AppTab> tabs;
@@ -667,15 +669,15 @@ class _BottomNavBar extends StatelessWidget {
   static const _icons = {
     AppTab.work: Icons.schedule_outlined,
     AppTab.ledger: Icons.account_balance_wallet_outlined,
-    AppTab.stats: Icons.insights_outlined,
-    AppTab.mine: Icons.person_outline_rounded,
+    AppTab.stats: Icons.pie_chart_outline_rounded,
+    AppTab.mine: Icons.account_circle_outlined,
   };
 
   static const _activeIcons = {
     AppTab.work: Icons.schedule_rounded,
     AppTab.ledger: Icons.account_balance_wallet_rounded,
-    AppTab.stats: Icons.insights_rounded,
-    AppTab.mine: Icons.person_rounded,
+    AppTab.stats: Icons.pie_chart_rounded,
+    AppTab.mine: Icons.account_circle_rounded,
   };
 
   @override
@@ -689,8 +691,8 @@ class _BottomNavBar extends StatelessWidget {
       final barColor = highContrast
           ? colors.card
           : (colors.isDark
-                ? colors.card.withValues(alpha: 0.78)
-                : Colors.white.withValues(alpha: 0.80));
+                ? const Color(0xFF1A1C24).withValues(alpha: 0.72)
+                : Colors.white.withValues(alpha: 0.72));
       final barSurface = DecoratedBox(
         decoration: BoxDecoration(
           color: barColor,
@@ -740,57 +742,89 @@ class _BottomNavBar extends StatelessWidget {
     }
 
     final bottomPad = MediaQuery.paddingOf(context).bottom;
-    final bottomOffset = math.max(14.0, bottomPad + 6.0);
+    final bottomOffset = math.max(14.0, bottomPad + 8.0);
 
-    return Padding(
-      padding: EdgeInsets.fromLTRB(20, 0, 20, bottomOffset),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: _maxWidth),
-          child: GlassQualityScope(
-            quality: highContrast ? GlassQuality.plain : glassQuality,
-            child: LiquidGlassTheme(
-              colors: LiquidGlassTheme.of(context).copyWith(
-                accent: colors.primary,
-                content: colors.text,
-                container: colors.isDark
-                    ? Color.lerp(
-                        colors.card,
-                        Colors.white,
-                        0.045,
-                      )!.withValues(alpha: highContrast ? 1.0 : 0.88)
-                    : colors.card.withValues(alpha: highContrast ? 1.0 : 0.92),
+    return Stack(
+      alignment: Alignment.bottomCenter,
+      clipBehavior: Clip.none,
+      children: [
+        if (!highContrast)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: dockHeight + bottomOffset + 44,
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      colors.page.withValues(alpha: 0.0),
+                      colors.page.withValues(
+                        alpha: colors.isDark ? 0.54 : 0.42,
+                      ),
+                      colors.page.withValues(
+                        alpha: colors.isDark ? 0.96 : 0.94,
+                      ),
+                    ],
+                    stops: const [0.0, 0.44, 1.0],
+                  ),
+                ),
               ),
-              child: LiquidBottomTabs(
-                selectedTabIndex: activeIndex,
-                onTabSelected: (index) {
-                  if (index >= 0 && index < tabs.length) {
-                    onSelect(tabs[index]);
-                  }
-                },
-                onTabReselected: (_) => onReselect(),
-                backdrop: backdrop,
-                tabsCount: tabs.length,
-                height: dockHeight,
-                isInteractive: !disable,
-                children: [
-                  for (final tab in tabs)
-                    LiquidBottomTab(
-                      onPressed: () {
-                        if (tab == active) {
-                          onReselect();
-                        } else {
-                          onSelect(tab);
-                        }
-                      },
-                      children: [_LiquidTabFace(tab: tab)],
-                    ),
-                ],
+            ),
+          ),
+        Padding(
+          padding: EdgeInsets.fromLTRB(20, 0, 20, bottomOffset),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: _maxWidth),
+              child: GlassQualityScope(
+                quality: highContrast ? GlassQuality.plain : glassQuality,
+                child: LiquidGlassTheme(
+                  colors: LiquidGlassTheme.of(context).copyWith(
+                    accent: colors.primary,
+                    content: colors.text,
+                    container: colors.isDark
+                        ? const Color(0xFF1A1C26)
+                              .withValues(alpha: highContrast ? 1.0 : 0.82)
+                        : Colors.white.withValues(
+                            alpha: highContrast ? 1.0 : 0.82,
+                          ),
+                  ),
+                  child: LiquidBottomTabs(
+                    selectedTabIndex: activeIndex,
+                    onTabSelected: (index) {
+                      if (index >= 0 && index < tabs.length) {
+                        onSelect(tabs[index]);
+                      }
+                    },
+                    onTabReselected: (_) => onReselect(),
+                    backdrop: backdrop,
+                    tabsCount: tabs.length,
+                    height: dockHeight,
+                    isInteractive: !disable,
+                    children: [
+                      for (final tab in tabs)
+                        LiquidBottomTab(
+                          onPressed: () {
+                            if (tab == active) {
+                              onReselect();
+                            } else {
+                              onSelect(tab);
+                            }
+                          },
+                          children: [_LiquidTabFace(tab: tab)],
+                        ),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),
         ),
-      ),
+      ],
     );
   }
 }
@@ -1064,7 +1098,7 @@ class _AppSidebar extends StatelessWidget {
                                   fontSize: 21,
                                   height: 1.08,
                                   fontWeight: FontWeight.w700,
-                                  letterSpacing: -0.02,
+                                  letterSpacing: 0,
                                   color: colors.text,
                                 ),
                               ),
@@ -1075,7 +1109,7 @@ class _AppSidebar extends StatelessWidget {
                                   fontSize: TypeScale.micro,
                                   height: 1.1,
                                   fontWeight: FontWeight.w700,
-                                  letterSpacing: 1.5,
+                                  letterSpacing: 0,
                                   color: colors.primary,
                                 ),
                               ),

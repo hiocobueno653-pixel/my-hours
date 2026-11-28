@@ -77,86 +77,125 @@ class MonthDetailSheet extends ConsumerWidget {
               ),
             )
           else
-            for (final record in records)
-              Pressable(
-                onTap: () async {
-                  final edit = await showDayDetail(context, record);
-                  if (edit == true && context.mounted) {
-                    await showDayEditor(context, record.date, record: record);
-                  }
-                },
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  child: Row(
-                    children: [
-                      SizedBox(
-                        width: 62,
-                        child: Text(
-                          formatDateLabel(record.date),
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: colors.text2,
-                            fontFeatures: tabularFigures,
-                          ),
-                        ),
-                      ),
-                      SizedBox(
-                        width: 62,
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            '${formatHoursValue(record.hours)}'
-                            '${context.unit.short}',
-                            style: TextStyle(
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.w600,
-                              color: colors.text,
-                              fontFeatures: tabularFigures,
-                            ),
-                          ),
-                        ),
-                      ),
-                      Expanded(
-                        child: Text(
-                          record.remark.isEmpty ? '—' : record.remark,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: 12.5, color: colors.text2),
-                        ),
-                      ),
-                      if (!kHoursOnly)
-                        ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 110),
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            alignment: Alignment.centerRight,
-                            child: Text(
-                              formatAmount(
-                                recordPay(record, state.workProfiles),
-                                withSymbol: true,
-                              ),
-                              style: TextStyle(
-                                fontSize: 13.5,
-                                fontWeight: FontWeight.w600,
-                                color: colors.income,
-                                fontFeatures: tabularFigures,
-                              ),
-                            ),
-                          ),
-                        ),
-                      if (record.settled) ...[
-                        const SizedBox(width: 6),
-                        Icon(
-                          Icons.check_circle_rounded,
-                          size: 14,
-                          color: colors.income,
-                        ),
-                      ],
-                    ],
-                  ),
+            Container(
+              decoration: ShapeDecoration(
+                color: colors.block.withValues(
+                  alpha: colors.isDark ? 0.56 : 0.62,
                 ),
+                shape: Radii.shape(Radii.lg),
               ),
+              child: Column(
+                children: [
+                  for (var i = 0; i < records.length; i++) ...[
+                    if (i > 0)
+                      Divider(
+                        height: 1,
+                        indent: 14,
+                        endIndent: 14,
+                        color: colors.divider,
+                      ),
+                    Pressable(
+                      onTap: () async {
+                        final edit = await showDayDetail(context, records[i]);
+                        if (edit == true && context.mounted) {
+                          await showDayEditor(
+                            context,
+                            records[i].date,
+                            record: records[i],
+                          );
+                        }
+                      },
+                      shape: Radii.shape(Radii.md),
+                      pressedScale: 0.985,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 11,
+                        ),
+                        child: Row(
+                          children: [
+                            SizedBox(
+                              width: 58,
+                              child: Text(
+                                formatDateLabel(records[i].date),
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                  color: colors.text2,
+                                  fontFeatures: tabularFigures,
+                                ),
+                              ),
+                            ),
+                            SizedBox(
+                              width: 58,
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  '${formatHoursValue(records[i].hours)}'
+                                  '${context.unit.short}',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    color: records[i].hours > 8
+                                        ? colors.warning
+                                        : colors.text,
+                                    fontFeatures: tabularFigures,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: Text(
+                                records[i].remark.isEmpty
+                                    ? '—'
+                                    : records[i].remark,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  color: colors.text2,
+                                ),
+                              ),
+                            ),
+                            if (!kHoursOnly)
+                              ConstrainedBox(
+                                constraints: const BoxConstraints(
+                                  maxWidth: 108,
+                                ),
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  alignment: Alignment.centerRight,
+                                  child: Text(
+                                    formatAmount(
+                                      recordPay(records[i], state.workProfiles),
+                                      withSymbol: true,
+                                    ),
+                                    style: TextStyle(
+                                      fontSize: 13.5,
+                                      fontWeight: FontWeight.w600,
+                                      color: colors.income,
+                                      fontFeatures: tabularFigures,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            if (records[i].settled) ...[
+                              const SizedBox(width: 6),
+                              Icon(
+                                Icons.check_circle_rounded,
+                                size: 14.5,
+                                color: colors.income,
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
         ],
       ),
     );
@@ -184,7 +223,7 @@ class _Metric extends StatelessWidget {
               fontSize: 17,
               fontWeight: FontWeight.w700,
               color: colors.text,
-              letterSpacing: -0.02,
+              letterSpacing: 0,
               fontFeatures: tabularFigures,
             ),
           ),

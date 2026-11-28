@@ -123,11 +123,21 @@ class _BudgetPanelSheetState extends ConsumerState<BudgetPanelSheet> {
           FormRow(
             label: '每月支出预算',
             hint: '留空 = 不设置',
-            child: NumberField(
-              controller: _budget,
-              hintText: '0',
-              suffixText: '元',
-              fontSize: 18,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                NumberField(
+                  controller: _budget,
+                  hintText: '0',
+                  suffixText: '元',
+                  fontSize: 18,
+                ),
+                const SizedBox(height: Gaps.sm),
+                QuickChips(
+                  values: const [1500, 3000, 5000, 8000],
+                  onSelect: (value) => _budget.text = formatAmountInput(value),
+                ),
+              ],
             ),
           ),
           FormRow(

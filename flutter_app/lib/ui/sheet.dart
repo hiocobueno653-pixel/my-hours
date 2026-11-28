@@ -8,14 +8,19 @@
 library;
 
 import 'dart:async';
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/physics.dart';
+import 'package:flutter/services.dart';
 
 import '../core/motion.dart';
 import '../core/theme_tokens.dart';
 import '../platform/back_navigation.dart';
 import 'dialog.dart';
 import 'widgets.dart';
+
+final ImageFilter _sheetBlurFilter = ImageFilter.blur(sigmaX: 26, sigmaY: 26);
 
 Future<T?> showAppSheet<T>({
   required BuildContext context,
@@ -39,10 +44,16 @@ Future<T?> showAppSheet<T>({
       // drive(CurveTween) 而不是 CurvedAnimation：后者构造时会给 parent
       // 注册 statusListener，在 pageBuilder 里每次重建都留下一个，
       // 直到路由销毁才回收。
-      final curved = animation.drive(CurveTween(curve: Curves2.drawer));
-      final panelFade = animation.drive(
-        CurveTween(curve: const Interval(0, 0.72, curve: Curves2.out)),
+      final curved = animation.drive(
+        CurveTween(curve: LiquidSprings.smoothCurve),
       );
+      final panelFade = animation.drive(
+        CurveTween(curve: const Interval(0, 0.55, curve: Curves2.out)),
+      );
+      final panelScale = Tween<double>(
+        begin: 0.98,
+        end: 1.0,
+      ).animate(animation.drive(CurveTween(curve: LiquidSprings.smoothCurve)));
       return Stack(
         children: [
           Positioned.fill(
@@ -69,22 +80,28 @@ Future<T?> showAppSheet<T>({
             alignment: Alignment.bottomCenter,
             child: FadeTransition(
               opacity: panelFade,
-              child: SlideTransition(
-                position: Tween<Offset>(
-                  begin: const Offset(0, 0.08),
-                  end: Offset.zero,
-                ).animate(curved),
-                // MaterialApp 的 fallback text style 会在缺少 Material 祖先时
-                // 给文字加黄色双下划线；弹层必须自己提供一层透明 Material。
-                child: RepaintBoundary(
-                  child: Material(
-                    type: MaterialType.transparency,
-                    // 键盘弹出时弹层会接近满屏；必须保留顶部系统栏安全区，
-                    // 否则标题和关闭键会钻到状态栏下面。
-                    child: SafeArea(
-                      top: true,
-                      bottom: false,
-                      child: builder(sheetContext),
+              child: ScaleTransition(
+                scale: disable
+                    ? const AlwaysStoppedAnimation<double>(1.0)
+                    : panelScale,
+                alignment: Alignment.bottomCenter,
+                child: SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(0, 0.24),
+                    end: Offset.zero,
+                  ).animate(curved),
+                  // MaterialApp 的 fallback text style 会在缺少 Material 祖先时
+                  // 给文字加黄色双下划线；弹层必须自己提供一层透明 Material。
+                  child: RepaintBoundary(
+                    child: Material(
+                      type: MaterialType.transparency,
+                      // 键盘弹出时弹层会接近满屏；必须保留顶部系统栏安全区，
+                      // 否则标题和关闭键会钻到状态栏下面。
+                      child: SafeArea(
+                        top: true,
+                        bottom: false,
+                        child: builder(sheetContext),
+                      ),
                     ),
                   ),
                 ),
@@ -132,12 +149,13 @@ class _SheetScaffoldState extends State<SheetScaffold>
   final Object _backToken = Object();
   final ValueNotifier<double> _dragOffset = ValueNotifier<double>(0.0);
   AnimationController? _resetController;
-  double _resetStartOffset = 0.0;
+  double _rawDragOffset = 0.0;
 
   /// 用户已确认放弃修改，允许本次 pop 通过。
   bool _allowPop = false;
   bool _confirming = false;
   bool _dragging = false;
+  bool _crossedDismissDetent = false;
 
   bool get _dirty => widget.guard?.call() ?? false;
 
@@ -189,57 +207,83 @@ class _SheetScaffoldState extends State<SheetScaffold>
   void _startDrag(DragStartDetails details) {
     if (_dirty) return;
     _resetController?.stop();
-    _dragging = true;
+    _rawDragOffset = _dragOffset.value;
+    _crossedDismissDetent = _dragOffset.value > 84;
+    setState(() => _dragging = true);
   }
 
   void _updateDrag(DragUpdateDetails details) {
     if (!_dragging) return;
-    _dragOffset.value = (_dragOffset.value + details.delta.dy).clamp(
-      0.0,
-      220.0,
-    );
+    _rawDragOffset = (_rawDragOffset + details.delta.dy).clamp(-120.0, 260.0);
+    if (_rawDragOffset < 0) {
+      _dragOffset.value = LiquidSprings.rubberBandOffset(_rawDragOffset, 180.0);
+    } else {
+      _dragOffset.value = _rawDragOffset;
+    }
+    final crossed = _dragOffset.value > 84;
+    if (crossed != _crossedDismissDetent) {
+      _crossedDismissDetent = crossed;
+      if (crossed) {
+        HapticFeedback.lightImpact();
+      }
+    }
   }
 
-  void _animateOffsetToZero() {
-    if (_dragOffset.value <= 0.01) {
+  void _animateOffsetToZero({double velocity = 0.0}) {
+    if (_dragOffset.value.abs() <= 0.05) {
       _dragOffset.value = 0.0;
+      _rawDragOffset = 0.0;
       return;
     }
     final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     if (disable) {
       _dragOffset.value = 0.0;
+      _rawDragOffset = 0.0;
       return;
     }
-    _resetStartOffset = _dragOffset.value;
-    final controller = _resetController ??= AnimationController(
+    final controller = _resetController ??= AnimationController.unbounded(
       vsync: this,
-      duration: Timings.micro,
+      value: _dragOffset.value,
     )..addListener(_onResetTick);
-    unawaited(controller.forward(from: 0.0));
+    controller.value = _dragOffset.value;
+    unawaited(
+      controller.animateWith(
+        SpringSimulation(
+          LiquidSprings.fluid,
+          _dragOffset.value,
+          0.0,
+          velocity.clamp(-1600.0, 1600.0),
+        ),
+      ),
+    );
   }
 
   void _onResetTick() {
     final controller = _resetController;
     if (controller == null) return;
-    final t = Curves2.out.transform(controller.value);
-    _dragOffset.value = _resetStartOffset * (1.0 - t);
+    _dragOffset.value = controller.value;
+    _rawDragOffset = controller.value;
   }
 
   void _endDrag(DragEndDetails details) {
     if (!_dragging) return;
-    _dragging = false;
+    setState(() => _dragging = false);
+    final vy = details.velocity.pixelsPerSecond.dy;
+    final projected = _dragOffset.value + LiquidSprings.projectMomentum(vy);
     final shouldClose =
-        _dragOffset.value > 84 || details.velocity.pixelsPerSecond.dy > 650;
+        _dragOffset.value > 84 ||
+        vy > 620 ||
+        (_dragOffset.value > 18 && projected > 110);
     if (shouldClose) {
       _requestClose();
     } else {
-      _animateOffsetToZero();
+      _animateOffsetToZero(velocity: vy);
     }
   }
 
   void _cancelDrag() {
     if (!_dragging) return;
-    _dragging = false;
+    setState(() => _dragging = false);
     _animateOffsetToZero();
   }
 
@@ -247,6 +291,129 @@ class _SheetScaffoldState extends State<SheetScaffold>
   Widget build(BuildContext context) {
     final colors = context.colors;
     final media = MediaQuery.of(context);
+    final highContrast = media.highContrast;
+    final disable = media.disableAnimations;
+    final sheetShape = RoundedSuperellipseBorder(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+    );
+    final surfaceColor = highContrast
+        ? colors.card
+        : (colors.isDark
+              ? const Color(0xFF1A1C24).withValues(alpha: 0.84)
+              : Colors.white.withValues(alpha: 0.84));
+    final sheetBody = DecoratedBox(
+      decoration: ShapeDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color.lerp(
+              surfaceColor,
+              Colors.white,
+              colors.isDark ? 0.04 : 0.14,
+            )!,
+            surfaceColor,
+          ],
+        ),
+        shape: sheetShape,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onVerticalDragStart: _startDrag,
+            onVerticalDragUpdate: _updateDrag,
+            onVerticalDragEnd: _endDrag,
+            onVerticalDragCancel: _cancelDrag,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: Gaps.sm),
+                AnimatedContainer(
+                  duration: motionDuration(
+                    Timings.press,
+                    disableAnimations: disable,
+                  ),
+                  curve: LiquidSprings.snappyCurve,
+                  width: _dragging ? 46 : 36,
+                  height: 4.5,
+                  decoration: BoxDecoration(
+                    color: colors.outline.withValues(
+                      alpha: _dragging ? 0.62 : 0.38,
+                    ),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    Gaps.xl,
+                    Gaps.md,
+                    Gaps.md,
+                    Gaps.sm,
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child:
+                            widget.titleWidget ??
+                            Text(
+                              widget.title,
+                              style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 0,
+                                color: colors.text,
+                              ),
+                            ),
+                      ),
+                      ...?widget.actions,
+                      Semantics(
+                        button: true,
+                        label: '关闭',
+                        onTap: _requestClose,
+                        excludeSemantics: true,
+                        child: Pressable(
+                          onTap: _requestClose,
+                          shape: Radii.pillShape,
+                          pressedScale: 0.90,
+                          child: Container(
+                            width: 32,
+                            height: 32,
+                            decoration: ShapeDecoration(
+                              color: colors.isDark
+                                  ? Colors.white.withValues(alpha: 0.11)
+                                  : colors.block,
+                              shape: Radii.pillShape,
+                            ),
+                            child: Icon(
+                              Icons.close_rounded,
+                              size: 17,
+                              color: colors.text2,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Flexible(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.fromLTRB(
+                Gaps.xl,
+                0,
+                Gaps.xl,
+                Gaps.xl + media.padding.bottom,
+              ),
+              child: widget.child,
+            ),
+          ),
+        ],
+      ),
+    );
     return PopScope(
       canPop: _allowPop || !_dirty,
       onPopInvokedWithResult: (didPop, _) async {
@@ -263,7 +430,7 @@ class _SheetScaffoldState extends State<SheetScaffold>
         child: ValueListenableBuilder<double>(
           valueListenable: _dragOffset,
           builder: (context, offset, child) => Transform.translate(
-            offset: offset <= 0.01 ? Offset.zero : Offset(0, offset),
+            offset: offset.abs() <= 0.01 ? Offset.zero : Offset(0, offset),
             child: child,
           ),
           child: RepaintBoundary(
@@ -272,90 +439,33 @@ class _SheetScaffoldState extends State<SheetScaffold>
                 maxHeight: media.size.height * widget.maxHeightFactor,
               ),
               decoration: ShapeDecoration(
-                color: colors.card,
-                shape: RoundedSuperellipseBorder(
-                  borderRadius: BorderRadius.vertical(
-                    top: Radius.circular(Radii.alert),
-                  ),
+                shape: sheetShape.copyWith(
                   side: BorderSide(
                     color: colors.isDark
-                        ? Colors.white.withValues(alpha: 0.09)
-                        : const Color(0xFF0F172A).withValues(alpha: 0.06),
-                    width: 0.75,
+                        ? Colors.white.withValues(alpha: 0.14)
+                        : Colors.white.withValues(alpha: 0.85),
+                    width: 0.9,
                   ),
                 ),
                 shadows: context.floatingShadows,
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onVerticalDragStart: _startDrag,
-                    onVerticalDragUpdate: _updateDrag,
-                    onVerticalDragEnd: _endDrag,
-                    onVerticalDragCancel: _cancelDrag,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const SizedBox(height: Gaps.sm),
-                        Container(
-                          width: 32,
-                          height: 3.5,
-                          decoration: BoxDecoration(
-                            color: colors.outline.withValues(alpha: 0.32),
-                            borderRadius: BorderRadius.circular(2),
-                          ),
+              child: ClipPath(
+                clipper: ShapeBorderClipper(shape: sheetShape),
+                child: CustomPaint(
+                  foregroundPainter: highContrast
+                      ? null
+                      : LiquidSpecularRimPainter(
+                          shape: sheetShape,
+                          isDark: colors.isDark,
+                          strokeWidth: 1.05,
                         ),
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(
-                            Gaps.xl,
-                            Gaps.md,
-                            Gaps.md,
-                            Gaps.sm,
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child:
-                                    widget.titleWidget ??
-                                    Text(
-                                      widget.title,
-                                      style: TextStyle(
-                                        fontSize: 17,
-                                        fontWeight: FontWeight.w600,
-                                        letterSpacing: 0,
-                                        color: colors.text,
-                                      ),
-                                    ),
-                              ),
-                              ...?widget.actions,
-                              GlassIconButton(
-                                icon: Icons.close_rounded,
-                                onTap: _requestClose,
-                                tooltip: '关闭',
-                                iconSize: 17,
-                                size: 34,
-                                radius: Radii.pill,
-                              ),
-                            ],
-                          ),
+                  child: (highContrast || disable)
+                      ? sheetBody
+                      : BackdropFilter(
+                          filter: _sheetBlurFilter,
+                          child: sheetBody,
                         ),
-                      ],
-                    ),
-                  ),
-                  Flexible(
-                    child: SingleChildScrollView(
-                      padding: EdgeInsets.fromLTRB(
-                        Gaps.xl,
-                        0,
-                        Gaps.xl,
-                        Gaps.xl + media.padding.bottom,
-                      ),
-                      child: widget.child,
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
           ),

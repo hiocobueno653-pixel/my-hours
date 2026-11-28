@@ -39,11 +39,11 @@ Future<bool?> showConfirmDialog(
       final confirmForeground = danger ? Colors.white : colors.onPrimary;
       final dialogShape = Radii.shape(Radii.alert);
       final outerStroke = isDark
-          ? Colors.white.withValues(alpha: 0.12)
-          : const Color(0xFF0F172A).withValues(alpha: 0.08);
+          ? Colors.white.withValues(alpha: 0.16)
+          : Colors.white.withValues(alpha: 0.88);
       final surfaceColor = isDark
-          ? colors.card.withValues(alpha: highContrast ? 1.0 : 0.94)
-          : colors.card.withValues(alpha: highContrast ? 1.0 : 0.96);
+          ? const Color(0xFF1C1E27).withValues(alpha: highContrast ? 1.0 : 0.80)
+          : Colors.white.withValues(alpha: highContrast ? 1.0 : 0.80);
       final enableBlur = !highContrast && !disable;
       final scrimOpacity = animation.drive(
         CurveTween(curve: const Interval(0, 0.45, curve: Curves2.out)),
@@ -103,7 +103,7 @@ Future<bool?> showConfirmDialog(
                       type: MaterialType.transparency,
                       child: ConstrainedBox(
                         constraints: BoxConstraints(
-                          maxWidth: 282,
+                          maxWidth: 294,
                           maxHeight: screen.height * 0.72,
                         ),
                         child: DecoratedBox(
@@ -115,75 +115,95 @@ Future<bool?> showConfirmDialog(
                           ),
                           child: ClipPath(
                             clipper: ShapeBorderClipper(shape: dialogShape),
-                            child: _maybeBlur(
-                              enabled: enableBlur,
-                              child: DecoratedBox(
-                                decoration: ShapeDecoration(
-                                  color: surfaceColor,
-                                  shape: dialogShape,
-                                ),
-                                child: SingleChildScrollView(
-                                  padding: const EdgeInsets.fromLTRB(
-                                    20,
-                                    19,
-                                    20,
-                                    15,
+                            child: CustomPaint(
+                              foregroundPainter: highContrast
+                                  ? null
+                                  : LiquidSpecularRimPainter(
+                                      shape: dialogShape,
+                                      isDark: isDark,
+                                      strokeWidth: 1.1,
+                                    ),
+                              child: _maybeBlur(
+                                enabled: enableBlur,
+                                child: DecoratedBox(
+                                  decoration: ShapeDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                      colors: [
+                                        Color.lerp(
+                                          surfaceColor,
+                                          Colors.white,
+                                          isDark ? 0.06 : 0.18,
+                                        )!,
+                                        surfaceColor,
+                                      ],
+                                    ),
+                                    shape: dialogShape,
                                   ),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        title,
-                                        textAlign: TextAlign.left,
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          height: 1.32,
-                                          fontWeight: FontWeight.w600,
-                                          letterSpacing: -0.2,
-                                          color: colors.text,
-                                        ),
-                                      ),
-                                      if (description != null) ...[
-                                        const SizedBox(height: 6),
+                                  child: SingleChildScrollView(
+                                    padding: const EdgeInsets.fromLTRB(
+                                      22,
+                                      22,
+                                      22,
+                                      18,
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
                                         Text(
-                                          description,
+                                          title,
                                           textAlign: TextAlign.left,
                                           style: TextStyle(
-                                            fontSize: 13,
-                                            height: 1.48,
-                                            color: colors.text2,
+                                            fontSize: 17,
+                                            height: 1.32,
+                                            fontWeight: FontWeight.w600,
+                                            letterSpacing: 0,
+                                            color: colors.text,
                                           ),
                                         ),
-                                      ],
-                                      const SizedBox(height: 16),
-                                      Row(
-                                        children: [
-                                          Expanded(
-                                            child: _DialogButton(
-                                              label: cancelLabel,
-                                              background: colors.block,
-                                              foreground: colors.text,
-                                              onTap: () =>
-                                                  Navigator.of(dialogContext)
-                                                      .pop(false),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: _DialogButton(
-                                              label: confirmLabel,
-                                              background: confirmBackground,
-                                              foreground: confirmForeground,
-                                              bold: true,
-                                              onTap: () =>
-                                                  Navigator.of(dialogContext)
-                                                      .pop(true),
+                                        if (description != null) ...[
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            description,
+                                            textAlign: TextAlign.left,
+                                            style: TextStyle(
+                                              fontSize: 13.5,
+                                              height: 1.46,
+                                              color: colors.text2,
                                             ),
                                           ),
                                         ],
-                                      ),
-                                    ],
+                                        const SizedBox(height: 20),
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: _DialogButton(
+                                                label: cancelLabel,
+                                                background: colors.block,
+                                                foreground: colors.text,
+                                                onTap: () =>
+                                                    Navigator.of(dialogContext)
+                                                        .pop(false),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 10),
+                                            Expanded(
+                                              child: _DialogButton(
+                                                label: confirmLabel,
+                                                background: confirmBackground,
+                                                foreground: confirmForeground,
+                                                bold: true,
+                                                onTap: () =>
+                                                    Navigator.of(dialogContext)
+                                                        .pop(true),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ),
@@ -223,7 +243,7 @@ class _DialogButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final shape = Radii.shape(Radii.md);
+    final shape = Radii.pillShape;
     return Semantics(
       button: true,
       label: label,
@@ -232,16 +252,16 @@ class _DialogButton extends StatelessWidget {
       child: Pressable(
         onTap: onTap,
         shape: shape,
-        pressedScale: 0.96,
+        pressedScale: 0.94,
         child: Container(
           width: double.infinity,
-          height: 40,
+          height: 44,
           decoration: ShapeDecoration(color: background, shape: shape),
           child: Center(
             child: Text(
               label,
               style: TextStyle(
-                fontSize: 13.5,
+                fontSize: 14.5,
                 fontWeight: bold ? FontWeight.w600 : FontWeight.w500,
                 color: foreground,
               ),
@@ -253,7 +273,7 @@ class _DialogButton extends StatelessWidget {
   }
 }
 
-final ImageFilter _dialogBlurFilter = ImageFilter.blur(sigmaX: 12, sigmaY: 12);
+final ImageFilter _dialogBlurFilter = ImageFilter.blur(sigmaX: 26, sigmaY: 26);
 
 Widget _maybeBlur({required bool enabled, required Widget child}) {
   if (!enabled) return child;

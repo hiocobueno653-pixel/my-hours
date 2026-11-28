@@ -193,7 +193,7 @@ class _BarPairChartState extends State<BarPairChart>
     final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     if (!listEquals(oldWidget.seriesA, widget.seriesA) ||
         !listEquals(oldWidget.seriesB, widget.seriesB)) {
-      final t = Curves2.out.transform(_dataController.value);
+      final t = LiquidSprings.smoothCurve.transform(_dataController.value);
       _fromA = _lerpSeries(_fromA, oldWidget.seriesA, t);
       _fromB = _lerpSeries(_fromB, oldWidget.seriesB, t);
       if (disable) {
@@ -223,7 +223,7 @@ class _BarPairChartState extends State<BarPairChart>
     final target = _toSelected;
     if (target == null) return null;
     final start = _fromSelected ?? target;
-    final t = Curves2.out.transform(_selectController.value);
+    final t = LiquidSprings.snappyCurve.transform(_selectController.value);
     return start + (target - start) * t;
   }
 
@@ -287,6 +287,36 @@ class _BarPairChartState extends State<BarPairChart>
                         .toInt();
                     HapticFeedback.selectionClick();
                     widget.onSelected!(index);
+                  },
+            onHorizontalDragStart:
+                widget.onSelected == null || widget.labels.isEmpty
+                ? null
+                : (details) {
+                    final slot = constraints.maxWidth / widget.labels.length;
+                    if (slot <= 0) return;
+                    final index = (details.localPosition.dx / slot)
+                        .floor()
+                        .clamp(0, widget.labels.length - 1)
+                        .toInt();
+                    if (index != widget.selectedIndex) {
+                      HapticFeedback.selectionClick();
+                      widget.onSelected!(index);
+                    }
+                  },
+            onHorizontalDragUpdate:
+                widget.onSelected == null || widget.labels.isEmpty
+                ? null
+                : (details) {
+                    final slot = constraints.maxWidth / widget.labels.length;
+                    if (slot <= 0) return;
+                    final index = (details.localPosition.dx / slot)
+                        .floor()
+                        .clamp(0, widget.labels.length - 1)
+                        .toInt();
+                    if (index != widget.selectedIndex) {
+                      HapticFeedback.selectionClick();
+                      widget.onSelected!(index);
+                    }
                   },
             child: RepaintBoundary(
               child: CustomPaint(
@@ -388,7 +418,7 @@ class _BarPairPainter extends CustomPainter {
     if (labels.isEmpty) return;
     const bottomInset = 20.0;
     final chartHeight = size.height - bottomInset;
-    final t = Curves2.out.transform(dataAnimation.value);
+    final t = LiquidSprings.smoothCurve.transform(dataAnimation.value);
     var scaleMax = targetMax;
     final countA = toA.length;
     for (var i = 0; i < countA; i++) {
@@ -433,11 +463,12 @@ class _BarPairPainter extends CustomPainter {
       selectedSlot = null;
     } else {
       final start = fromSelected ?? toSelected!;
-      final st = Curves2.out.transform(selectAnimation.value);
+      final st = LiquidSprings.snappyCurve.transform(selectAnimation.value);
       selectedSlot = start + (toSelected! - start) * st;
     }
 
-    if (selectedSlot != null &&
+    if (targetMax > 0 &&
+        selectedSlot != null &&
         selectedSlot >= -0.5 &&
         selectedSlot <= labels.length - 0.5) {
       final clampedSlot = selectedSlot.clamp(
@@ -586,7 +617,7 @@ class _DonutChartState extends State<DonutChart>
         _fromValues = List<double>.of(widget.values);
         _controller.value = 1;
       } else {
-        final t = Curves2.out.transform(_controller.value);
+        final t = LiquidSprings.smoothCurve.transform(_controller.value);
         _fromValues = _lerpSeries(_fromValues, oldWidget.values, t);
         _controller.forward(from: 0);
       }
@@ -649,7 +680,7 @@ class _DonutChartState extends State<DonutChart>
                         Timings.fast,
                         disableAnimations: disable,
                       ),
-                      switchInCurve: Curves2.out,
+                      switchInCurve: LiquidSprings.snappyCurve,
                       switchOutCurve: Curves2.out,
                       child: Text(
                         widget.centerValue!,
@@ -658,7 +689,7 @@ class _DonutChartState extends State<DonutChart>
                           fontSize: 16,
                           fontWeight: FontWeight.w700,
                           color: tokens.text,
-                          letterSpacing: -0.02,
+                          letterSpacing: 0,
                           fontFeatures: tabularFigures,
                         ),
                       ),
@@ -700,7 +731,7 @@ class _DonutPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final t = Curves2.out.transform(animation.value);
+    final t = LiquidSprings.smoothCurve.transform(animation.value);
     final sweepProgress = fromTotal <= 0 ? t : 1.0;
     final count = toValues.length;
     var total = 0.0;
@@ -790,7 +821,7 @@ class ProgressBar extends StatelessWidget {
                   Timings.slow,
                   disableAnimations: disable,
                 ),
-                curve: Curves2.out,
+                curve: LiquidSprings.smoothCurve,
                 alignment: Alignment.centerLeft,
                 widthFactor: clamped,
                 child: AnimatedContainer(
@@ -847,6 +878,19 @@ class _TrendChartState extends State<TrendChart>
   List<TextPainter> _yLabelPainters = const [];
   int? _peakCacheKey;
   TextPainter? _peakLabelPainter;
+  int? _scrubIndex;
+
+  void _updateScrub(double localX, double width) {
+    if (widget.values.isEmpty || width <= 0) return;
+    final count = widget.values.length;
+    final index = count == 1
+        ? 0
+        : ((localX / width) * (count - 1)).round().clamp(0, count - 1).toInt();
+    if (_scrubIndex != index) {
+      HapticFeedback.selectionClick();
+      setState(() => _scrubIndex = index);
+    }
+  }
 
   void _syncLabelCaches({
     required double targetMax,
@@ -933,12 +977,13 @@ class _TrendChartState extends State<TrendChart>
   void didUpdateWidget(covariant TrendChart oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!listEquals(oldWidget.values, widget.values)) {
+      _scrubIndex = null;
       final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
       if (disable) {
         _fromValues = List<double>.of(widget.values);
         _controller.value = 1;
       } else {
-        final t = Curves2.out.transform(_controller.value);
+        final t = LiquidSprings.smoothCurve.transform(_controller.value);
         _fromValues = _lerpSeries(_fromValues, oldWidget.values, t);
         _controller.forward(from: 0);
       }
@@ -985,28 +1030,52 @@ class _TrendChartState extends State<TrendChart>
       label: _semanticText,
       child: SizedBox(
         height: widget.height,
-        child: RepaintBoundary(
-          child: CustomPaint(
-            isComplex: true,
-            willChange: _controller.isAnimating,
-            painter: _TrendPainter(
-              animation: _controller,
-              fromValues: _fromValues,
-              toValues: widget.values,
-              labelMax: targetMax,
-              labels: widget.labels,
-              color: widget.color,
-              onColor: colors.onPrimary,
-              surfaceColor: colors.card,
-              gridColor: colors.divider,
-              fontFamily: fontFamily,
-              xLabelPainters: _xLabelPainters,
-              yLabelPainters: _yLabelPainters,
-              peakLabelPainter: _peakLabelPainter,
-              xCacheKey: _xCacheKey ?? 0,
-              yCacheKey: _yCacheKey ?? 0,
+        child: LayoutBuilder(
+          builder: (context, constraints) => GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTapDown: widget.values.isEmpty
+                ? null
+                : (details) => _updateScrub(
+                    details.localPosition.dx,
+                    constraints.maxWidth,
+                  ),
+            onHorizontalDragStart: widget.values.isEmpty
+                ? null
+                : (details) => _updateScrub(
+                    details.localPosition.dx,
+                    constraints.maxWidth,
+                  ),
+            onHorizontalDragUpdate: widget.values.isEmpty
+                ? null
+                : (details) => _updateScrub(
+                    details.localPosition.dx,
+                    constraints.maxWidth,
+                  ),
+            child: RepaintBoundary(
+              child: CustomPaint(
+                isComplex: true,
+                willChange: _controller.isAnimating || _scrubIndex != null,
+                painter: _TrendPainter(
+                  animation: _controller,
+                  fromValues: _fromValues,
+                  toValues: widget.values,
+                  labelMax: targetMax,
+                  labels: widget.labels,
+                  color: widget.color,
+                  onColor: colors.onPrimary,
+                  surfaceColor: colors.card,
+                  gridColor: colors.divider,
+                  fontFamily: fontFamily,
+                  xLabelPainters: _xLabelPainters,
+                  yLabelPainters: _yLabelPainters,
+                  peakLabelPainter: _peakLabelPainter,
+                  xCacheKey: _xCacheKey ?? 0,
+                  yCacheKey: _yCacheKey ?? 0,
+                  activeIndex: _scrubIndex,
+                ),
+                child: const SizedBox.expand(),
+              ),
             ),
-            child: const SizedBox.expand(),
           ),
         ),
       ),
@@ -1031,6 +1100,7 @@ class _TrendPainter extends CustomPainter {
     required this.peakLabelPainter,
     required this.xCacheKey,
     required this.yCacheKey,
+    this.activeIndex,
   }) : super(repaint: animation);
 
   final Animation<double> animation;
@@ -1048,12 +1118,13 @@ class _TrendPainter extends CustomPainter {
   final TextPainter? peakLabelPainter;
   final int xCacheKey;
   final int yCacheKey;
+  final int? activeIndex;
 
   @override
   void paint(Canvas canvas, Size size) {
     final count = toValues.length;
     if (count == 0) return;
-    final t = Curves2.out.transform(animation.value);
+    final t = LiquidSprings.smoothCurve.transform(animation.value);
     final values = List<double>.generate(count, (i) {
       final start = i < fromValues.length ? fromValues[i] : 0.0;
       return start + (toValues[i] - start) * t;
@@ -1164,12 +1235,23 @@ class _TrendPainter extends CustomPainter {
       }
     }
 
-    if (labelMax > 0) {
-      var peakIndex = 0;
-      for (var i = 1; i < values.length; i++) {
-        if (values[i] > values[peakIndex]) peakIndex = i;
+    if (labelMax > 0 || activeIndex != null) {
+      final int focusIndex;
+      final requested = activeIndex;
+      if (requested != null && requested >= 0 && requested < values.length) {
+        focusIndex = requested;
+      } else {
+        var peakIdx = 0;
+        for (var i = 1; i < values.length; i++) {
+          if (values[i] > values[peakIdx]) peakIdx = i;
+        }
+        focusIndex = peakIdx;
       }
-      final peak = points[peakIndex];
+      final peak = points[focusIndex];
+      final focusValue = toValues[focusIndex];
+      final focusPrefix = activeIndex != null && focusIndex < labels.length
+          ? '${labels[focusIndex]}月 · '
+          : '';
       final alpha = t.clamp(0.0, 1.0);
       final peakDash = Path();
       _addDashedLine(
@@ -1199,11 +1281,12 @@ class _TrendPainter extends CustomPainter {
         2.0,
         Paint()..color = surfaceColor.withValues(alpha: alpha),
       );
-      final useCachedPeak = alpha >= 0.99 && peakLabelPainter != null;
+      final useCachedPeak =
+          activeIndex == null && alpha >= 0.99 && peakLabelPainter != null;
       final peakTp = useCachedPeak
           ? peakLabelPainter!
           : _layoutTextPainter(
-              _compactNumber(labelMax),
+              '$focusPrefix${_compactNumber(focusValue)}',
               TextStyle(
                 fontSize: 10.5,
                 fontWeight: FontWeight.w700,
@@ -1248,7 +1331,8 @@ class _TrendPainter extends CustomPainter {
       old.gridColor != gridColor ||
       old.fontFamily != fontFamily ||
       old.xCacheKey != xCacheKey ||
-      old.yCacheKey != yCacheKey;
+      old.yCacheKey != yCacheKey ||
+      old.activeIndex != activeIndex;
 }
 
 void _addDashedLine(

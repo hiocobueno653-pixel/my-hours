@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../core/formatters.dart';
 import '../core/motion.dart';
@@ -48,6 +49,7 @@ class _MonthPickerSheetState extends State<_MonthPickerSheet> {
   }
 
   void _shiftYear(int delta) {
+    HapticFeedback.selectionClick();
     setState(() => _year = (_year + delta).clamp(_minYear, _maxYear).toInt());
   }
 
@@ -58,6 +60,7 @@ class _MonthPickerSheetState extends State<_MonthPickerSheet> {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final now = DateTime.now();
+    final currentMonth = currentMonthKey();
     final colorDuration = motionDuration(
       Timings.micro,
       disableAnimations: MediaQuery.maybeDisableAnimationsOf(context) ?? false,
@@ -69,6 +72,16 @@ class _MonthPickerSheetState extends State<_MonthPickerSheet> {
     return SheetScaffold(
       title: '选择月份',
       maxHeightFactor: 0.68,
+      actions: [
+        if (widget.initialMonth != currentMonth)
+          TextActionButton(
+            label: '本月',
+            onPressed: () {
+              HapticFeedback.selectionClick();
+              Navigator.of(context).pop(currentMonth);
+            },
+          ),
+      ],
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -113,8 +126,12 @@ class _MonthPickerSheetState extends State<_MonthPickerSheet> {
             children: [
               for (var month = 1; month <= 12; month++)
                 Pressable(
-                  onTap: () => Navigator.of(context).pop(_key(month)),
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    Navigator.of(context).pop(_key(month));
+                  },
                   shape: Radii.shape(Radii.md),
+                  pressedScale: 0.94,
                   child: AnimatedContainer(
                     duration: colorDuration,
                     curve: Curves2.out,

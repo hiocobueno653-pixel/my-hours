@@ -128,11 +128,7 @@ class _DropletGlassMenuRoute extends PopupRoute<void> {
   Simulation? createSimulation({required bool forward}) {
     if (disableAnimations) return null;
     if (forward) {
-      final spring = SpringDescription.withDampingRatio(
-        mass: 1.0,
-        stiffness: 235.0,
-        ratio: 0.72,
-      );
+      final spring = LiquidSprings.dropletBloom;
       return SpringSimulation(spring, 0.0, 1.0, 0.45);
     }
     final spring = SpringDescription.withDampingRatio(
@@ -420,7 +416,7 @@ class _DropletMenuSurface extends StatelessWidget {
     required this.child,
   });
 
-  static final ImageFilter _menuBlur = ImageFilter.blur(sigmaX: 14, sigmaY: 14);
+  static final ImageFilter _menuBlur = ImageFilter.blur(sigmaX: 26, sigmaY: 26);
 
   final double rawProgress;
   final bool anchorOnTop;
@@ -434,8 +430,8 @@ class _DropletMenuSurface extends StatelessWidget {
     final isDark = colors.isDark;
     final highContrast = MediaQuery.maybeOf(context)?.highContrast ?? false;
     final surface = isDark
-        ? colors.card.withValues(alpha: highContrast ? 1.0 : 0.92)
-        : colors.card.withValues(alpha: highContrast ? 1.0 : 0.94);
+        ? const Color(0xFF1C1E28).withValues(alpha: highContrast ? 1.0 : 0.76)
+        : Colors.white.withValues(alpha: highContrast ? 1.0 : 0.76);
     final t = rawProgress.clamp(0.0, 1.0);
     final overshoot = math.max(0.0, rawProgress - 1.0);
     final widthEase = (Curves.easeOutCubic.transform(t) + overshoot * 0.48)
@@ -1069,7 +1065,7 @@ class GlassMenuButton extends StatelessWidget {
   const GlassMenuButton({
     super.key,
     required this.items,
-    this.icon = Icons.more_vert_rounded,
+    this.icon = Icons.more_horiz_rounded,
     this.tooltip = '更多操作',
     this.panelWidth = 188,
   });

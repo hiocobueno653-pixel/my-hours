@@ -1,6 +1,6 @@
-/// 设计令牌：FlClash 液态玻璃（Liquid Glass & Soft Surface）视觉系统。
+/// 设计令牌：系统分组背景、清晰内容表面与克制的 Liquid Glass 控件。
 ///
-/// 冷灰呼吸画布、高洁净度大连续圆角卡片、电光钴蓝鲜明主色与真实液态玻璃折射。
+/// 以语义色构建内容层，用蓝色强调交互，再由悬浮导航建立玻璃层级。
 library;
 
 import 'package:fluid_glass/fluid_glass.dart';
@@ -67,19 +67,19 @@ class AppColors {
   Color get accentStrong => primary;
   Color get accentSoft => primaryContainer;
 
-  /// 轻盈描边：暗色纯黑与玻璃浮层上提供微弱轮廓，亮色卡片靠面差呼吸。
+  /// 分组卡片边界，在浅色与深色外观下保持细微区分。
   Color get cardBorder =>
-      isDark ? const Color(0xFF272A33) : const Color(0xFFE5E3DB);
+      isDark ? const Color(0xFF2B2E3B) : const Color(0xFFE2E4EC);
 
   /// 英雄卡片基底色：与当前明暗界面同色系，仅融入极轻的主题色光感。
-  Color get heroBase => Color.lerp(card, primary, isDark ? 0.036 : 0.012)!;
+  Color get heroBase => Color.lerp(card, primary, isDark ? 0.045 : 0.018)!;
 
   /// 英雄卡片高光端色。
   Color get heroHighlight =>
-      Color.lerp(card, isDark ? Colors.white : primary, isDark ? 0.035 : 0.0)!;
+      Color.lerp(card, Colors.white, isDark ? 0.05 : 0.0)!;
 
   /// 英雄卡片下沉底座色：用于今日主卡操作盘、预算条与统计底栏，建立「上读数 / 下操作」两段式仪器质感。
-  Color get heroWell => Color.lerp(card, block, isDark ? 0.68 : 0.56)!;
+  Color get heroWell => Color.lerp(card, block, isDark ? 0.56 : 0.44)!;
 
   AppColors copyWith({
     Color? page,
@@ -216,94 +216,94 @@ class AppColors {
   }
 
   static const AppColors light = AppColors(
-    page: Color(0xFFF4F3EF),
+    page: Color(0xFFF2F2F7),
     card: Color(0xFFFFFFFF),
-    block: Color(0xFFECEBE5),
-    inset: Color(0xFFE2E0D8),
-    text: Color(0xFF141519),
-    text2: Color(0xFF5B5E68),
-    text3: Color(0xFF8E929E),
-    divider: Color(0xFFEAE9E3),
-    outline: Color(0xFFB6B8C0),
-    primary: Color(0xFF2A57C4),
+    block: Color(0xFFE7E8F0),
+    inset: Color(0xFFDBDDE8),
+    text: Color(0xFF111216),
+    text2: Color(0xFF565966),
+    text3: Color(0xFF868996),
+    divider: Color(0xFFE5E5EA),
+    outline: Color(0xFFAEAEB2),
+    primary: Color(0xFF007AFF),
     onPrimary: Color(0xFFFFFFFF),
-    primaryContainer: Color(0xFFEEF2FB),
-    onPrimaryContainer: Color(0xFF1E419B),
-    income: Color(0xFF1B7A58),
-    incomeSoft: Color(0xFFEAF4F0),
-    expense: Color(0xFFC04244),
-    expenseSoft: Color(0xFFF9EFEF),
-    warning: Color(0xFFBC6E18),
-    warningSoft: Color(0xFFFAF2E6),
+    primaryContainer: Color(0xFFE5F1FF),
+    onPrimaryContainer: Color(0xFF004FA6),
+    income: Color(0xFF1B9A58),
+    incomeSoft: Color(0xFFE6F7EE),
+    expense: Color(0xFFE5352B),
+    expenseSoft: Color(0xFFFEECEB),
+    warning: Color(0xFFDC7E00),
+    warningSoft: Color(0xFFFFF3E0),
     chart: [
-      Color(0xFF2A57C4),
-      Color(0xFF1B7A58),
-      Color(0xFF6250B8),
-      Color(0xFFBE6F1D),
-      Color(0xFFC4454B),
-      Color(0xFF6F7480),
+      Color(0xFF007AFF),
+      Color(0xFF1B9A58),
+      Color(0xFF5856D6),
+      Color(0xFFFF9500),
+      Color(0xFFFF2D55),
+      Color(0xFF8E8E93),
     ],
     isDark: false,
   );
 
   static const AppColors dark = AppColors(
-    page: Color(0xFF0C0D10),
-    card: Color(0xFF15161B),
-    block: Color(0xFF1E2027),
-    inset: Color(0xFF292C35),
-    text: Color(0xFFF3F3F5),
-    text2: Color(0xFF9EA3B0),
-    text3: Color(0xFF6B707E),
-    divider: Color(0xFF23252E),
-    outline: Color(0xFF5B6170),
-    primary: Color(0xFF6D97F5),
+    page: Color(0xFF090A0F),
+    card: Color(0xFF171820),
+    block: Color(0xFF232530),
+    inset: Color(0xFF303341),
+    text: Color(0xFFF5F5F7),
+    text2: Color(0xFFA0A4B2),
+    text3: Color(0xFF6E7280),
+    divider: Color(0xFF262834),
+    outline: Color(0xFF636776),
+    primary: Color(0xFF3A9BFF),
     onPrimary: Color(0xFF081226),
-    primaryContainer: Color(0xFF1B2740),
-    onPrimaryContainer: Color(0xFFD6E8FF),
-    income: Color(0xFF3CC48E),
-    incomeSoft: Color(0xFF132B22),
-    expense: Color(0xFFEA7272),
-    expenseSoft: Color(0xFF321B1D),
-    warning: Color(0xFFE8AD4E),
-    warningSoft: Color(0xFF302313),
+    primaryContainer: Color(0xFF142A48),
+    onPrimaryContainer: Color(0xFFD6EAFF),
+    income: Color(0xFF30D158),
+    incomeSoft: Color(0xFF102E1D),
+    expense: Color(0xFFFF453A),
+    expenseSoft: Color(0xFF351819),
+    warning: Color(0xFFFF9F0A),
+    warningSoft: Color(0xFF33230E),
     chart: [
-      Color(0xFF6D97F5),
-      Color(0xFF3CC48E),
-      Color(0xFFA08BF4),
-      Color(0xFFE8AD4E),
-      Color(0xFFEA7272),
-      Color(0xFF9CA3AF),
+      Color(0xFF3A9BFF),
+      Color(0xFF30D158),
+      Color(0xFF7D7AFF),
+      Color(0xFFFF9F0A),
+      Color(0xFFFF375F),
+      Color(0xFF98989D),
     ],
     isDark: true,
   );
 
   static const AppColors darkPureBlack = AppColors(
     page: Color(0xFF000000),
-    card: Color(0xFF111216),
-    block: Color(0xFF1B1D22),
-    inset: Color(0xFF272A32),
-    text: Color(0xFFF4F4F6),
-    text2: Color(0xFFA5AAB7),
-    text3: Color(0xFF727785),
-    divider: Color(0xFF1F222A),
-    outline: Color(0xFF636A7A),
-    primary: Color(0xFF6D97F5),
+    card: Color(0xFF14151B),
+    block: Color(0xFF20222B),
+    inset: Color(0xFF2D303B),
+    text: Color(0xFFF5F5F7),
+    text2: Color(0xFFA5A9B8),
+    text3: Color(0xFF747888),
+    divider: Color(0xFF22242E),
+    outline: Color(0xFF686D7D),
+    primary: Color(0xFF3A9BFF),
     onPrimary: Color(0xFF081226),
-    primaryContainer: Color(0xFF1B2740),
-    onPrimaryContainer: Color(0xFFD6E8FF),
-    income: Color(0xFF3CC48E),
-    incomeSoft: Color(0xFF132B22),
-    expense: Color(0xFFEA7272),
-    expenseSoft: Color(0xFF321B1D),
-    warning: Color(0xFFE8AD4E),
-    warningSoft: Color(0xFF302313),
+    primaryContainer: Color(0xFF142A48),
+    onPrimaryContainer: Color(0xFFD6EAFF),
+    income: Color(0xFF30D158),
+    incomeSoft: Color(0xFF102E1D),
+    expense: Color(0xFFFF453A),
+    expenseSoft: Color(0xFF351819),
+    warning: Color(0xFFFF9F0A),
+    warningSoft: Color(0xFF33230E),
     chart: [
-      Color(0xFF6D97F5),
-      Color(0xFF3CC48E),
-      Color(0xFFA08BF4),
-      Color(0xFFE8AD4E),
-      Color(0xFFEA7272),
-      Color(0xFF9CA3AF),
+      Color(0xFF3A9BFF),
+      Color(0xFF30D158),
+      Color(0xFF7D7AFF),
+      Color(0xFFFF9F0A),
+      Color(0xFFFF375F),
+      Color(0xFF98989D),
     ],
     isDark: true,
   );
@@ -312,40 +312,39 @@ class AppColors {
 /// 内置几何数字与英文品牌字族（拉丁与数字走 Outfit，中文自动回退系统字体）。
 const String kDisplayFont = 'Outfit';
 
-/// 润玉瓷面 / 曜石主卡统一装饰：与当前明暗界面同属一个明度家族，
-/// 靠细腻瓷釉细边与克制中性漫射阴影建立视觉主次，杜绝突兀大色块。
+/// 内容层主卡：不透明语义表面、轻微色调过渡与柔和层级阴影。
 ShapeDecoration studioHeroDecoration(
   AppColors colors, {
   double radius = Radii.hero,
 }) {
-  final borderColor = colors.isDark
-      ? Colors.white.withValues(alpha: 0.085)
-      : colors.cardBorder.withValues(alpha: 0.80);
+  final borderColor = colors.cardBorder;
   final shape = Radii.shape(radius)
-      .copyWith(side: BorderSide(color: borderColor, width: 0.75));
+      .copyWith(side: BorderSide(color: borderColor, width: 0.8));
   return ShapeDecoration(
     shape: shape,
     gradient: LinearGradient(
       begin: Alignment.topLeft,
       end: Alignment.bottomRight,
-      colors: [colors.heroHighlight, colors.heroBase],
+      colors: colors.isDark
+          ? [colors.heroHighlight, colors.heroBase]
+          : [colors.card, colors.heroBase],
     ),
     shadows: colors.isDark
         ? [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.36),
+              color: Colors.black.withValues(alpha: 0.34),
               blurRadius: 20,
-              offset: const Offset(0, 7),
+              offset: const Offset(0, 8),
             ),
           ]
         : [
             BoxShadow(
-              color: const Color(0xFF141519).withValues(alpha: 0.05),
-              blurRadius: 22,
-              offset: const Offset(0, 7),
+              color: const Color(0xFF0A1633).withValues(alpha: 0.048),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
             ),
             BoxShadow(
-              color: const Color(0xFF141519).withValues(alpha: 0.022),
+              color: const Color(0xFF0A1633).withValues(alpha: 0.022),
               blurRadius: 3,
               offset: const Offset(0, 1),
             ),
@@ -361,17 +360,17 @@ double _contrastRatio(Color a, Color b) {
   return (lighter + 0.05) / (darker + 0.05);
 }
 
-/// FlClash 风格连续曲率超椭圆圆角刻度。
+/// 连续曲率同心超椭圆圆角刻度。
 abstract final class Radii {
-  static const double xs = 6;
-  static const double sm = 8;
-  static const double md = 12;
-  static const double lg = 14;
-  static const double xl = 16;
-  static const double xxl = 20;
-  static const double hero = 20;
-  static const double alert = 22;
-  static const double card = 18;
+  static const double xs = 8;
+  static const double sm = 10;
+  static const double md = 14;
+  static const double lg = 16;
+  static const double xl = 20;
+  static const double xxl = 24;
+  static const double hero = 26;
+  static const double alert = 28;
+  static const double card = 22;
   static const double pill = 999;
 
   static const BorderRadius cardRadius = BorderRadius.all(
@@ -471,27 +470,31 @@ class AppTokens extends ThemeExtension<AppTokens> {
   static const AppTokens lightTokens = AppTokens(
     colors: AppColors.light,
     shadows: [
-      BoxShadow(color: Color(0x0A0F172A), blurRadius: 16, offset: Offset(0, 4)),
-      BoxShadow(color: Color(0x050F172A), blurRadius: 2, offset: Offset(0, 1)),
+      BoxShadow(color: Color(0x0C0A1633), blurRadius: 22, offset: Offset(0, 8)),
+      BoxShadow(color: Color(0x060A1633), blurRadius: 4, offset: Offset(0, 1)),
     ],
     floatingShadows: [
       BoxShadow(
-        color: Color(0x1A0F172A),
-        blurRadius: 24,
-        offset: Offset(0, 10),
+        color: Color(0x1F0A1633),
+        blurRadius: 30,
+        offset: Offset(0, 14),
       ),
-      BoxShadow(color: Color(0x0A0F172A), blurRadius: 5, offset: Offset(0, 2)),
+      BoxShadow(color: Color(0x0B0A1633), blurRadius: 6, offset: Offset(0, 2)),
     ],
   );
 
   static const AppTokens darkTokens = AppTokens(
     colors: AppColors.dark,
     shadows: [
-      BoxShadow(color: Color(0x22000000), blurRadius: 8, offset: Offset(0, 2)),
+      BoxShadow(color: Color(0x36000000), blurRadius: 18, offset: Offset(0, 6)),
     ],
     floatingShadows: [
-      BoxShadow(color: Color(0x48000000), blurRadius: 22, offset: Offset(0, 8)),
-      BoxShadow(color: Color(0x22000000), blurRadius: 4, offset: Offset(0, 1)),
+      BoxShadow(
+        color: Color(0x5A000000),
+        blurRadius: 28,
+        offset: Offset(0, 12),
+      ),
+      BoxShadow(color: Color(0x28000000), blurRadius: 5, offset: Offset(0, 2)),
     ],
   );
 
@@ -558,6 +561,7 @@ ThemeData buildAppTheme(
   final base = ThemeData(
     brightness: colors.isDark ? Brightness.dark : Brightness.light,
     useMaterial3: true,
+    platform: TargetPlatform.iOS,
     fontFamily: kDisplayFont,
     fontFamilyFallback: fallbackFonts.isEmpty ? null : fallbackFonts,
     scaffoldBackgroundColor: colors.page,
@@ -607,7 +611,7 @@ ThemeData buildAppTheme(
       fontSize: 28,
       height: 1.21,
       fontWeight: FontWeight.w700,
-      letterSpacing: -0.01,
+      letterSpacing: 0,
       color: colors.text,
     ),
     headlineMedium: TextStyle(
@@ -621,7 +625,7 @@ ThemeData buildAppTheme(
       fontSize: 22,
       height: 1.27,
       fontWeight: FontWeight.w600,
-      letterSpacing: -0.01,
+      letterSpacing: 0,
       color: colors.text,
     ),
     titleLarge: TextStyle(
@@ -795,10 +799,23 @@ ThemeData buildAppTheme(
       circularTrackColor: colors.inset,
     ),
     snackBarTheme: SnackBarThemeData(
-      backgroundColor: colors.isDark ? colors.block : const Color(0xE6141416),
-      contentTextStyle: const TextStyle(fontSize: 13, color: Colors.white),
+      backgroundColor: colors.isDark
+          ? const Color(0xF0252732)
+          : const Color(0xEB1C1C1E),
+      contentTextStyle: const TextStyle(
+        fontSize: 13.5,
+        fontWeight: FontWeight.w500,
+        color: Colors.white,
+      ),
       behavior: SnackBarBehavior.floating,
-      shape: Radii.shape(Radii.md),
+      elevation: 0,
+      insetPadding: const EdgeInsets.fromLTRB(18, 0, 18, 88),
+      shape: Radii.shape(18).copyWith(
+        side: BorderSide(
+          color: Colors.white.withValues(alpha: colors.isDark ? 0.12 : 0.10),
+          width: 0.75,
+        ),
+      ),
     ),
   );
 }

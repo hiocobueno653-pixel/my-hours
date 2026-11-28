@@ -299,13 +299,21 @@ class _LedgerViewState extends ConsumerState<LedgerView> {
     // 按日期分组（保留原本的倒序）
     final groupedDates = <String>[];
     final entriesByDate = <String, List<LedgerEntry>>{};
+    var filteredIncome = 0.0;
+    var filteredExpense = 0.0;
     for (final entry in monthEntries) {
+      if (entry.type == LedgerType.income) {
+        filteredIncome += entry.amount;
+      } else {
+        filteredExpense += entry.amount;
+      }
       if (!entriesByDate.containsKey(entry.date)) {
         groupedDates.add(entry.date);
         entriesByDate[entry.date] = [];
       }
       entriesByDate[entry.date]!.add(entry);
     }
+    final hasActiveFilter = _categoryFilter.isNotEmpty || keyword.isNotEmpty;
 
     final wide = MediaQuery.sizeOf(context).width >= 720;
     final bottomPad = MediaQuery.paddingOf(context).bottom;
@@ -314,176 +322,203 @@ class _LedgerViewState extends ConsumerState<LedgerView> {
         ? bottomPad + 20.0
         : math.max(86.0, bottomPad + 82.0);
 
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: NotificationListener<UserScrollNotification>(
-            onNotification: (notification) {
-              if (notification.metrics.axis != Axis.vertical) return false;
-              if (notification.direction == ScrollDirection.reverse &&
-                  _fabExpanded.value) {
-                _fabExpanded.value = false;
-              } else if (notification.direction == ScrollDirection.forward &&
-                  !_fabExpanded.value) {
-                _fabExpanded.value = true;
-              }
-              return false;
-            },
-            child: CustomScrollView(
-              physics: const BouncingScrollPhysics(
-                parent: AlwaysScrollableScrollPhysics(),
+    return LiquidBackdropScaffold(
+      body: NotificationListener<UserScrollNotification>(
+        onNotification: (notification) {
+          if (notification.metrics.axis != Axis.vertical) return false;
+          if (notification.direction == ScrollDirection.reverse &&
+              _fabExpanded.value) {
+            _fabExpanded.value = false;
+          } else if (notification.direction == ScrollDirection.forward &&
+              !_fabExpanded.value) {
+            _fabExpanded.value = true;
+          }
+          return false;
+        },
+        child: CustomScrollView(
+          physics: const BouncingScrollPhysics(
+            parent: AlwaysScrollableScrollPhysics(),
+          ),
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          slivers: [
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(
+                0,
+                MorphingSearchHeader.totalHeight(context) + 12,
+                0,
+                Gaps.md,
               ),
-              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              slivers: [
-                SliverPadding(
-                  padding: EdgeInsets.fromLTRB(
-                    0,
-                    MorphingSearchHeader.totalHeight(context) + 12,
-                    0,
-                    Gaps.md,
-                  ),
-                  sliver: SliverToBoxAdapter(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: Gaps.lg,
-                          ),
-                          child: RepaintBoundary(
-                            child: _BalanceSummaryCard(
-                              month: month,
-                              summary: summary,
-                              budget: budget,
-                              entryCount: baseEntries.length,
-                              todayCount: todayEntries.length,
-                              todayIncome: todayIncome,
-                              todayExpense: todayExpense,
-                              onOpenBudget: () => showBudgetPanel(context),
-                            ),
-                          ),
+              sliver: SliverToBoxAdapter(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (month != currentMonthKey()) ...[
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: Gaps.lg,
                         ),
-                        const SizedBox(height: Gaps.cardGap),
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          physics: const BouncingScrollPhysics(),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: Gaps.lg,
-                          ),
-                          child: Row(
-                            children: [
-                              for (
-                                var index = 0;
-                                index < filterChips.length;
-                                index++
-                              ) ...[
-                                if (index == 3)
-                                  Container(
-                                    width: 1,
-                                    height: 16,
-                                    margin: const EdgeInsets.only(right: 8),
-                                    color: context.colors.divider,
-                                  ),
-                                Padding(
-                                  padding: EdgeInsets.only(
-                                    right: index == filterChips.length - 1
-                                        ? 0
-                                        : 6,
-                                  ),
-                                  child: _FilterChipPill(
-                                    label: filterChips[index].label,
-                                    icon: filterChips[index].type == null
-                                        ? null
-                                        : _categoryVisual(
-                                            filterChips[index].label,
-                                            filterChips[index].type ==
-                                                LedgerType.income,
-                                            context.colors,
-                                          ).icon,
-                                    selected:
-                                        _categoryFilter ==
-                                        filterChips[index].key,
-                                    onTap: () => setState(
-                                      () => _categoryFilter =
-                                          filterChips[index].key,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
+                        child: _LedgerPastMonthBanner(
+                          month: month,
+                          onTap: () => ref
+                              .read(selectedMonthProvider.notifier)
+                              .setMonth(currentMonthKey()),
                         ),
-                      ],
-                    ),
-                  ),
-                ),
-                if (monthEntries.isEmpty)
-                  SliverPadding(
-                    padding: EdgeInsets.fromLTRB(
-                      Gaps.lg,
-                      0,
-                      Gaps.lg,
-                      pageBottomInset(context) + 76,
-                    ),
-                    sliver: SliverToBoxAdapter(
-                      child: GlassCard(
-                        child: EmptyState(
-                          title: baseEntries.isEmpty
-                              ? '${formatMonthLabel(month)} 还没有账目'
-                              : '没有匹配的账目',
-                          description: baseEntries.isEmpty
-                              ? '记录日常开销、外快或从${context.unit.quantity}页结算工资。'
-                              : '换个关键词或筛选条件试试。',
-                          action: baseEntries.isEmpty
-                              ? PrimaryButton(
-                                  label: '记一笔',
-                                  icon: Icons.add_rounded,
-                                  onPressed: () => showLedgerEditor(context),
-                                )
-                              : GhostButton(
-                                  label: '清除筛选',
-                                  onPressed: () {
-                                    _searchTimer?.cancel();
-                                    _search.clear();
-                                    setState(() {
-                                      _categoryFilter = '';
-                                      _searchQuery = '';
-                                      _searching = false;
-                                    });
-                                  },
-                                ),
+                      ),
+                      const SizedBox(height: Gaps.sm),
+                    ],
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: Gaps.lg),
+                      child: RepaintBoundary(
+                        child: _BalanceSummaryCard(
+                          month: month,
+                          summary: summary,
+                          budget: budget,
+                          entryCount: baseEntries.length,
+                          todayCount: todayEntries.length,
+                          todayIncome: todayIncome,
+                          todayExpense: todayExpense,
+                          onOpenBudget: () => showBudgetPanel(context),
                         ),
                       ),
                     ),
-                  )
-                else
-                  SliverPadding(
-                    padding: EdgeInsets.fromLTRB(
-                      Gaps.lg,
-                      0,
-                      Gaps.lg,
-                      pageBottomInset(context) + 76,
+                    const SizedBox(height: Gaps.cardGap),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      physics: const BouncingScrollPhysics(),
+                      padding: const EdgeInsets.symmetric(horizontal: Gaps.lg),
+                      child: Row(
+                        children: [
+                          for (
+                            var index = 0;
+                            index < filterChips.length;
+                            index++
+                          ) ...[
+                            if (index == 3)
+                              Container(
+                                width: 1,
+                                height: 16,
+                                margin: const EdgeInsets.only(right: 8),
+                                color: context.colors.divider,
+                              ),
+                            Padding(
+                              padding: EdgeInsets.only(
+                                right: index == filterChips.length - 1 ? 0 : 6,
+                              ),
+                              child: _FilterChipPill(
+                                label: filterChips[index].label,
+                                icon: filterChips[index].type == null
+                                    ? null
+                                    : _categoryVisual(
+                                        filterChips[index].label,
+                                        filterChips[index].type ==
+                                            LedgerType.income,
+                                        context.colors,
+                                      ).icon,
+                                selected:
+                                    _categoryFilter == filterChips[index].key,
+                                onTap: () => setState(
+                                  () =>
+                                      _categoryFilter = filterChips[index].key,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
                     ),
-                    sliver: SliverList.builder(
-                      itemCount: groupedDates.length,
-                      itemBuilder: (context, index) {
-                        final date = groupedDates[index];
-                        return _DateGroupSection(
-                          date: date,
-                          today: today,
-                          yesterday: yesterday,
-                          entries: entriesByDate[date]!,
-                          isFirst: index == 0,
-                          isLast: index == groupedDates.length - 1,
-                          buildRow: (entry) => _entryRow(entry, recordsByDate),
-                        );
-                      },
+                    if (hasActiveFilter && monthEntries.isNotEmpty) ...[
+                      const SizedBox(height: Gaps.sm),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: Gaps.lg,
+                        ),
+                        child: _FilteredSubtotalBar(
+                          count: monthEntries.length,
+                          income: filteredIncome,
+                          expense: filteredExpense,
+                          onClear: () {
+                            _searchTimer?.cancel();
+                            _search.clear();
+                            setState(() {
+                              _categoryFilter = '';
+                              _searchQuery = '';
+                              _searching = false;
+                            });
+                          },
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            if (monthEntries.isEmpty)
+              SliverPadding(
+                padding: EdgeInsets.fromLTRB(
+                  Gaps.lg,
+                  0,
+                  Gaps.lg,
+                  pageBottomInset(context) + 76,
+                ),
+                sliver: SliverToBoxAdapter(
+                  child: GlassCard(
+                    child: EmptyState(
+                      title: baseEntries.isEmpty
+                          ? '${formatMonthLabel(month)} 还没有账目'
+                          : '没有匹配的账目',
+                      description: baseEntries.isEmpty
+                          ? '记录日常开销、外快或从${context.unit.quantity}页结算工资。'
+                          : '换个关键词或筛选条件试试。',
+                      action: baseEntries.isEmpty
+                          ? PrimaryButton(
+                              label: '记一笔',
+                              icon: Icons.add_rounded,
+                              onPressed: () => showLedgerEditor(context),
+                            )
+                          : GhostButton(
+                              label: '清除筛选',
+                              onPressed: () {
+                                _searchTimer?.cancel();
+                                _search.clear();
+                                setState(() {
+                                  _categoryFilter = '';
+                                  _searchQuery = '';
+                                  _searching = false;
+                                });
+                              },
+                            ),
                     ),
                   ),
-              ],
-            ),
-          ),
+                ),
+              )
+            else
+              SliverPadding(
+                padding: EdgeInsets.fromLTRB(
+                  Gaps.lg,
+                  0,
+                  Gaps.lg,
+                  pageBottomInset(context) + 76,
+                ),
+                sliver: SliverList.builder(
+                  itemCount: groupedDates.length,
+                  itemBuilder: (context, index) {
+                    final date = groupedDates[index];
+                    return _DateGroupSection(
+                      date: date,
+                      today: today,
+                      yesterday: yesterday,
+                      entries: entriesByDate[date]!,
+                      isFirst: index == 0,
+                      isLast: index == groupedDates.length - 1,
+                      buildRow: (entry) => _entryRow(entry, recordsByDate),
+                    );
+                  },
+                ),
+              ),
+          ],
         ),
+      ),
+      overlays: [
         Positioned(
           left: 0,
           right: 0,
@@ -528,17 +563,18 @@ class _LedgerViewState extends ConsumerState<LedgerView> {
             ),
           ),
         ),
-        Positioned(
-          right: 16,
-          bottom: fabBottom,
-          child: ValueListenableBuilder<bool>(
-            valueListenable: _fabExpanded,
-            builder: (context, expanded, _) => _AddLedgerFab(
-              expanded: expanded,
-              onTap: () => showLedgerEditor(context),
+        if (baseEntries.isNotEmpty)
+          Positioned(
+            right: 16,
+            bottom: fabBottom,
+            child: ValueListenableBuilder<bool>(
+              valueListenable: _fabExpanded,
+              builder: (context, expanded, _) => _AddLedgerFab(
+                expanded: expanded,
+                onTap: () => showLedgerEditor(context),
+              ),
             ),
           ),
-        ),
         Positioned(
           top: 0,
           left: 0,
@@ -664,10 +700,11 @@ class _BalanceSummaryCard extends StatelessWidget {
                     '${todayExpense > 0 ? ' · -${formatAmount(todayExpense, withSymbol: true)}' : ''}')
         : '共 $entryCount 笔账目';
 
+    final heroShape = Radii.shape(Radii.hero);
     return Container(
       decoration: studioHeroDecoration(colors, radius: Radii.hero),
       child: ClipPath(
-        clipper: ShapeBorderClipper(shape: Radii.shape(Radii.hero)),
+        clipper: ShapeBorderClipper(shape: heroShape),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -731,7 +768,7 @@ class _BalanceSummaryCard extends StatelessWidget {
                             fontSize: 42,
                             height: 1.0,
                             fontWeight: FontWeight.w700,
-                            letterSpacing: -1.6,
+                            letterSpacing: 0,
                             color: summary.balance >= 0
                                 ? colors.text
                                 : colors.expense,
@@ -957,7 +994,7 @@ class _SideMetric extends StatelessWidget {
               fontSize: 17.5,
               height: 1.15,
               fontWeight: FontWeight.w600,
-              letterSpacing: -0.35,
+              letterSpacing: 0,
               color: valueColor,
             ),
           ),
@@ -992,27 +1029,33 @@ class _FilterChipPill extends StatelessWidget {
       child: Pressable(
         onTap: onTap,
         shape: Radii.pillShape,
-        pressedScale: 0.96,
+        pressedScale: 0.93,
         child: AnimatedContainer(
           duration: motionDuration(
             Timings.micro,
             disableAnimations:
                 MediaQuery.maybeDisableAnimationsOf(context) ?? false,
           ),
-          curve: Curves2.out,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6.5),
+          curve: LiquidSprings.snappyCurve,
+          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
           decoration: ShapeDecoration(
-            color: selected ? colors.text : colors.card,
+            color: selected ? colors.primary : colors.card,
             shape: Radii.pillShape.copyWith(
               side: selected
                   ? BorderSide.none
-                  : BorderSide(
-                      color: colors.isDark
-                          ? Colors.white.withValues(alpha: 0.08)
-                          : colors.cardBorder,
-                      width: 0.75,
-                    ),
+                  : BorderSide(color: colors.cardBorder, width: 0.8),
             ),
+            shadows: selected
+                ? [
+                    BoxShadow(
+                      color: colors.primary.withValues(
+                        alpha: colors.isDark ? 0.26 : 0.20,
+                      ),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -1021,7 +1064,7 @@ class _FilterChipPill extends StatelessWidget {
                 Icon(
                   icon,
                   size: 14,
-                  color: selected ? colors.card : colors.text2,
+                  color: selected ? colors.onPrimary : colors.text2,
                 ),
                 const SizedBox(width: 5),
               ],
@@ -1030,12 +1073,128 @@ class _FilterChipPill extends StatelessWidget {
                 style: TextStyle(
                   fontSize: TypeScale.label,
                   fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-                  color: selected ? colors.card : colors.text2,
+                  color: selected ? colors.onPrimary : colors.text2,
                 ),
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _LedgerPastMonthBanner extends StatelessWidget {
+  const _LedgerPastMonthBanner({required this.month, required this.onTap});
+
+  final String month;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return Pressable(
+      onTap: onTap,
+      shape: Radii.shape(Radii.md),
+      pressedScale: 0.985,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: ShapeDecoration(
+          color: colors.primaryContainer,
+          shape: Radii.shape(Radii.md),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.history_rounded, size: 16, color: colors.primary),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                '正在查看 ${formatMonthLabel(month)} 账本',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w500,
+                  color: colors.onPrimaryContainer,
+                ),
+              ),
+            ),
+            Text(
+              '回到本月',
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: colors.primary,
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded, size: 16, color: colors.primary),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FilteredSubtotalBar extends StatelessWidget {
+  const _FilteredSubtotalBar({
+    required this.count,
+    required this.income,
+    required this.expense,
+    required this.onClear,
+  });
+
+  final int count;
+  final double income;
+  final double expense;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final parts = <String>[
+      '共 $count 笔',
+      if (income > 0) '收 ${formatAmount(income, withSymbol: true)}',
+      if (expense > 0) '支 ${formatAmount(expense, withSymbol: true)}',
+    ];
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: ShapeDecoration(
+        color: colors.card,
+        shape: Radii.shape(Radii.md)
+            .copyWith(side: BorderSide(color: colors.cardBorder, width: 0.75)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.filter_list_rounded, size: 15, color: colors.primary),
+          const SizedBox(width: 7),
+          Expanded(
+            child: Text(
+              parts.join(' · '),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w500,
+                color: colors.text2,
+                fontFeatures: tabularFigures,
+              ),
+            ),
+          ),
+          Pressable(
+            onTap: onClear,
+            shape: Radii.pillShape,
+            pressedScale: 0.92,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              child: Text(
+                '清除',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: colors.primary,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1120,7 +1279,7 @@ class _DateGroupSection extends StatelessWidget {
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                     color: colors.text2,
-                    letterSpacing: 0.1,
+                    letterSpacing: 0,
                   ),
                 ),
                 const Spacer(),
@@ -1270,10 +1429,32 @@ class _EntryRow extends StatelessWidget {
       },
       background: Container(
         alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: Gaps.md),
-        child: Icon(
-          managed ? Icons.undo_rounded : Icons.delete_outline_rounded,
-          color: managed ? colors.text2 : colors.expense,
+        padding: const EdgeInsets.only(right: Gaps.sm),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: ShapeDecoration(
+            color: managed ? colors.primary : colors.expense,
+            shape: Radii.pillShape,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                managed ? Icons.undo_rounded : Icons.delete_outline_rounded,
+                size: 16,
+                color: Colors.white,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                deleteLabel,
+                style: const TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
       child: Semantics(
@@ -1293,20 +1474,17 @@ class _EntryRow extends StatelessWidget {
           child: Pressable(
             onTap: onTap,
             shape: Radii.shape(Radii.md),
+            pressedScale: 0.985,
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 10),
               child: Row(
                 children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: ShapeDecoration(
-                      color: visual.color.withValues(
-                        alpha: colors.isDark ? 0.18 : 0.10,
-                      ),
-                      shape: Radii.shape(10),
-                    ),
-                    child: Icon(visual.icon, size: 18, color: visual.color),
+                  AppIconBadge(
+                    icon: visual.icon,
+                    color: visual.color,
+                    size: 38,
+                    iconSize: 18,
+                    tinted: true,
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -1423,46 +1601,32 @@ class _AddLedgerFab extends StatelessWidget {
       child: Pressable(
         onTap: onTap,
         shape: Radii.pillShape,
-        pressedScale: 0.94,
-        child: Container(
-          height: 44,
-          padding: EdgeInsets.only(
-            left: expanded ? 13 : 12,
-            right: expanded ? 16 : 12,
+        pressedScale: 0.96,
+        child: LiquidGlassSurface(
+          height: 48,
+          radius: Radii.pill,
+          interactive: true,
+          tintColor: colors.primary.withValues(
+            alpha: colors.isDark ? 0.80 : 0.84,
           ),
-          decoration: ShapeDecoration(
-            color: colors.primary,
-            shape: Radii.pillShape,
-            shadows: [
-              BoxShadow(
-                color: colors.primary.withValues(
-                  alpha: colors.isDark ? 0.32 : 0.22,
-                ),
-                blurRadius: 14,
-                offset: const Offset(0, 5),
-              ),
-              BoxShadow(
-                color: const Color(0xFF141519)
-                    .withValues(alpha: colors.isDark ? 0.24 : 0.07),
-                blurRadius: 3,
-                offset: const Offset(0, 1),
-              ),
-            ],
+          padding: EdgeInsets.only(
+            left: expanded ? 15 : 14,
+            right: expanded ? 18 : 14,
           ),
           child: AnimatedSize(
-            duration: motionDuration(Timings.fast, disableAnimations: disable),
-            curve: Curves2.out,
+            duration: motionDuration(Timings.base, disableAnimations: disable),
+            curve: LiquidSprings.bouncyCurve,
             alignment: Alignment.centerRight,
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.add_rounded, size: 19.5, color: colors.onPrimary),
+                Icon(Icons.add_rounded, size: 20, color: colors.onPrimary),
                 AnimatedSwitcher(
                   duration: motionDuration(
                     Timings.fast,
                     disableAnimations: disable,
                   ),
-                  switchInCurve: Curves2.out,
+                  switchInCurve: LiquidSprings.snappyCurve,
                   switchOutCurve: Curves2.out,
                   transitionBuilder: (child, animation) =>
                       FadeTransition(opacity: animation, child: child),
@@ -1684,51 +1848,65 @@ class _LedgerEditorSheetState extends ConsumerState<LedgerEditorSheet> {
               runSpacing: Gaps.sm,
               children: [
                 for (final category in categories) ...[
-                  Pressable(
-                    onTap: () => setState(() => _category = category),
-                    shape: Radii.pillShape,
-                    pressedScale: 0.96,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 7,
-                      ),
-                      decoration: ShapeDecoration(
-                        color: _category == category
-                            ? colors.primary
-                            : colors.block,
+                  Builder(
+                    builder: (context) {
+                      final selected = _category == category;
+                      final visual = _categoryVisual(
+                        category,
+                        _type == LedgerType.income,
+                        colors,
+                      );
+                      return Pressable(
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          setState(() => _category = category);
+                        },
                         shape: Radii.pillShape,
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            _categoryVisual(
-                              category,
-                              _type == LedgerType.income,
-                              colors,
-                            ).icon,
-                            size: 14,
-                            color: _category == category
-                                ? colors.onPrimary
-                                : colors.text2,
+                        pressedScale: 0.94,
+                        child: AnimatedContainer(
+                          duration: motionDuration(
+                            Timings.micro,
+                            disableAnimations:
+                                MediaQuery.maybeDisableAnimationsOf(context) ??
+                                false,
                           ),
-                          const SizedBox(width: 5),
-                          Text(
-                            category,
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: _category == category
-                                  ? FontWeight.w600
-                                  : FontWeight.w500,
-                              color: _category == category
-                                  ? colors.onPrimary
-                                  : colors.text2,
-                            ),
+                          curve: LiquidSprings.snappyCurve,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 7.5,
                           ),
-                        ],
-                      ),
-                    ),
+                          decoration: ShapeDecoration(
+                            color: selected ? colors.primary : colors.block,
+                            shape: Radii.pillShape,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                visual.icon,
+                                size: 14.5,
+                                color: selected
+                                    ? colors.onPrimary
+                                    : visual.color,
+                              ),
+                              const SizedBox(width: 5),
+                              Text(
+                                category,
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: selected
+                                      ? FontWeight.w600
+                                      : FontWeight.w500,
+                                  color: selected
+                                      ? colors.onPrimary
+                                      : colors.text,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ],
               ],

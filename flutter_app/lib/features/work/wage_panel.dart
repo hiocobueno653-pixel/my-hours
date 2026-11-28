@@ -61,7 +61,7 @@ class WagePanelSheet extends ConsumerWidget {
                   fontSize: 34,
                   height: 1,
                   fontWeight: FontWeight.w700,
-                  letterSpacing: -0.04,
+                  letterSpacing: 0,
                   color: colors.income,
                   fontFeatures: tabularFigures,
                 ),

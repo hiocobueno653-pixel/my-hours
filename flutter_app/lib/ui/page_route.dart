@@ -1,5 +1,4 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
 
 import '../core/motion.dart';
 
@@ -44,12 +43,11 @@ class AppCardPageRoute<T> extends PageRoute<T>
     Widget child,
   ) {
     if (disableAnimations) return child;
-    final isLight = Theme.of(context).brightness == Brightness.light;
     final linear = navigator?.userGestureInProgress ?? false;
     return _AppCardTransition(
       primaryAnimation: animation,
       secondaryAnimation: secondaryAnimation,
-      showLeadingEdgeShadow: isLight,
+      showLeadingEdgeShadow: true,
       linearTransition: linear,
       child: CupertinoRouteTransitionMixin.buildPageTransitions<T>(
         this,
@@ -100,13 +98,13 @@ class _AppCardTransitionState extends State<_AppCardTransition> {
 
   late final CurvedAnimation _primaryCurved = CurvedAnimation(
     parent: widget.primaryAnimation,
-    curve: FlClashSprings.pushCurve,
-    reverseCurve: FlClashSprings.pushCurve.flipped,
+    curve: LiquidSprings.smoothCurve,
+    reverseCurve: LiquidSprings.smoothCurve.flipped,
   );
   late final CurvedAnimation _secondaryCurved = CurvedAnimation(
     parent: widget.secondaryAnimation,
-    curve: FlClashSprings.pushCurve,
-    reverseCurve: FlClashSprings.pushCurve.flipped,
+    curve: LiquidSprings.smoothCurve,
+    reverseCurve: LiquidSprings.smoothCurve.flipped,
   );
   late final Animation<Offset> _curvedPrimarySlide = _primarySlideTween.animate(
     _primaryCurved,

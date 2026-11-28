@@ -504,7 +504,7 @@ class _HexColorInputState extends State<_HexColorInput> {
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
-                    letterSpacing: 0.8,
+                    letterSpacing: 0,
                     color: colors.text,
                     fontFeatures: tabularFigures,
                   ),

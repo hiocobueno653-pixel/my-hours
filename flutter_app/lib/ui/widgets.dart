@@ -1,7 +1,9 @@
-/// 基础 UI 原语：液态玻璃表面、卡片、按压面、按钮、列表行、分段控件、开关、空态与数字输入。
+/// 基础 UI 原语：液态玻璃控件、折射脚手架、水滴弹簧按压、按钮、列表行、
+/// 可拖拽液态分段控件、开关、空态与数字输入。
 ///
-/// FlClash 液态玻璃体系：内容卡依靠大连续圆角与面差呼吸；顶栏、浮钮、弹窗与菜单
-/// 采用真实毛玻璃/液态折射 + 镜面高光描边 + 轻悬浮投影。
+/// Liquid Glass 仅用于导航和交互控件；内容表面使用稳定、不遮字的语义色。
+/// 独立可采样 BackdropLayer 驱动真实折射与色散、
+/// 指向性镜面高光棱边、跟随手指膨胀倾斜的水滴形变与弹簧回弹。
 library;
 
 import 'dart:async';
@@ -9,6 +11,7 @@ import 'dart:ui' show ImageFilter;
 
 import 'package:fluid_glass/fluid_glass.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
 
 import '../core/formatters.dart';
@@ -41,11 +44,119 @@ class AppBackdropScope extends InheritedWidget {
       oldWidget.backdrop != backdrop;
 }
 
+/// 为带有吸顶液态玻璃顶栏或悬浮胶囊的页面建立独立可采样 [LayerBackdrop]。
+///
+/// 下层滚动内容由 [BackdropLayer] 实时采集，上层浮岛通过 [AppBackdropScope]
+/// 获取像素纹理，实现滚过顶栏/浮钮时的真实光学折射与色散。
+class LiquidBackdropScaffold extends StatefulWidget {
+  const LiquidBackdropScaffold({
+    super.key,
+    required this.body,
+    required this.overlays,
+  });
+
+  final Widget body;
+  final List<Widget> overlays;
+
+  @override
+  State<LiquidBackdropScaffold> createState() => _LiquidBackdropScaffoldState();
+}
+
+class _LiquidBackdropScaffoldState extends State<LiquidBackdropScaffold> {
+  final LayerBackdrop _backdrop = LayerBackdrop();
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Positioned.fill(
+          child: BackdropLayer(
+            backdrop: _backdrop,
+            motionPixelRatio: 0.5,
+            changeMargin: 24.0,
+            child: widget.body,
+          ),
+        ),
+        Positioned.fill(
+          child: AppBackdropScope(
+            backdrop: _backdrop,
+            child: Stack(clipBehavior: Clip.none, children: widget.overlays),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 指向性镜面高光棱边：左上迎光面呈柔和晶白反光，
+/// 沿连续曲率圆角渐隐过渡至右下微弱回光，赋予玻璃表面真实的厚度与折光感。
+class LiquidSpecularRimPainter extends CustomPainter {
+  const LiquidSpecularRimPainter({
+    required this.shape,
+    required this.isDark,
+    this.strokeWidth = 1.0,
+    this.accentTint,
+    this.intensity = 1.0,
+  });
+
+  final ShapeBorder shape;
+  final bool isDark;
+  final double strokeWidth;
+  final Color? accentTint;
+  final double intensity;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.isEmpty || intensity <= 0) return;
+    final rect = Offset.zero & size;
+    final path = shape.getOuterPath(rect.deflate(strokeWidth * 0.5));
+    final tint = accentTint;
+    final colors = isDark
+        ? <Color>[
+            Colors.white.withValues(alpha: (0.16 * intensity).clamp(0.0, 1.0)),
+            (tint ?? Colors.white).withValues(
+              alpha: (0.05 * intensity).clamp(0.0, 1.0),
+            ),
+            Colors.white.withValues(alpha: (0.015 * intensity).clamp(0.0, 1.0)),
+            Colors.white.withValues(alpha: (0.09 * intensity).clamp(0.0, 1.0)),
+          ]
+        : <Color>[
+            Colors.white.withValues(alpha: (0.90 * intensity).clamp(0.0, 1.0)),
+            (tint ?? const Color(0xFFD8E6FF)).withValues(
+              alpha: (0.34 * intensity).clamp(0.0, 1.0),
+            ),
+            const Color(0xFF0A1633)
+                .withValues(alpha: (0.045 * intensity).clamp(0.0, 1.0)),
+            Colors.white.withValues(alpha: (0.56 * intensity).clamp(0.0, 1.0)),
+          ];
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..shader = LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: colors,
+        stops: const [0.0, 0.34, 0.68, 1.0],
+      ).createShader(rect);
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(LiquidSpecularRimPainter oldDelegate) =>
+      oldDelegate.shape != shape ||
+      oldDelegate.isDark != isDark ||
+      oldDelegate.strokeWidth != strokeWidth ||
+      oldDelegate.accentTint != accentTint ||
+      oldDelegate.intensity != intensity;
+}
+
 /// 通用液态玻璃浮层表面：用于顶栏岛、胶囊按钮、悬浮工具条和独立浮标。
 ///
-/// 极致档位且提供可采样 [LayerBackdrop] 时走 `fluid_glass` 真实折射着色器；
-/// 其余环境使用高透 `BackdropFilter` + 定向镜面高光描边 + 悬浮软投影。
-class LiquidGlassSurface extends StatelessWidget {
+/// 极致档位且提供可采样 [LayerBackdrop] 时走 `fluid_glass` 真实折射与色散着色器；
+/// 其余环境使用高透 `BackdropFilter` + 指向性镜面高光棱边 + 悬浮软投影；
+/// 开启 [interactive] 后随手指轻按膨胀倾斜并投射可跨控件传递的交互式镜面光晕。
+class LiquidGlassSurface extends StatefulWidget {
   const LiquidGlassSurface({
     super.key,
     required this.child,
@@ -55,10 +166,13 @@ class LiquidGlassSurface extends StatelessWidget {
     this.width,
     this.selected = false,
     this.bright = true,
-    this.blurSigma = 12,
+    this.blurSigma = 18,
     this.tintColor,
     this.refract = true,
     this.showShadow = true,
+    this.interactive = false,
+    this.chromaticAberration = true,
+    this.depthEffect = true,
   });
 
   static final Map<double, ImageFilter> _blurCache = <double, ImageFilter>{};
@@ -82,6 +196,66 @@ class LiquidGlassSurface extends StatelessWidget {
   final Color? tintColor;
   final bool refract;
   final bool showShadow;
+  final bool interactive;
+  final bool chromaticAberration;
+  final bool depthEffect;
+
+  @override
+  State<LiquidGlassSurface> createState() => _LiquidGlassSurfaceState();
+}
+
+class _LiquidGlassSurfaceState extends State<LiquidGlassSurface>
+    with TickerProviderStateMixin {
+  InteractiveHighlight? _highlight;
+
+  InteractiveHighlight _ensureHighlight() =>
+      _highlight ??= InteractiveHighlight(vsync: this);
+
+  @override
+  void dispose() {
+    _highlight?.dispose();
+    super.dispose();
+  }
+
+  void _applyLayerDeformation(GlassLayer layer) {
+    final highlight = _highlight;
+    if (highlight == null) return;
+    final press = LiquidPressDeformation.resolve(
+      layer.size,
+      offset: highlight.offset,
+      pressProgress: highlight.pressProgress,
+    );
+    layer
+      ..scaleX = press.scaleX
+      ..scaleY = press.scaleY
+      ..translationX = press.translationX
+      ..translationY = press.translationY;
+  }
+
+  void _paintGlaze(
+    Canvas canvas,
+    Size size,
+    Color baseFill,
+    bool isDark,
+    bool selected,
+    Color primary,
+  ) {
+    final rect = Offset.zero & size;
+    canvas.drawRect(rect, Paint()..color = baseFill);
+    final topGlint = selected
+        ? primary.withValues(alpha: isDark ? 0.16 : 0.08)
+        : Colors.white.withValues(alpha: isDark ? 0.09 : 0.34);
+    canvas.drawRect(
+      rect,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [topGlint, Colors.transparent],
+          stops: const [0.0, 0.52],
+        ).createShader(rect),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -93,85 +267,135 @@ class LiquidGlassSurface extends StatelessWidget {
         GlassQualityScope.maybeOf(context) ?? GlassDeviceTier.instance.quality;
     final backdrop = AppBackdropScope.of(context);
     final useLiquidShader =
-        refract &&
+        widget.refract &&
         !highContrast &&
         !reduceEffects &&
         quality == GlassQuality.liquid &&
         backdrop != nativeBackdrop;
+    final enableInteractive = widget.interactive && !reduceEffects;
+    final highlight = enableInteractive ? _ensureHighlight() : null;
 
-    final baseFill =
-        tintColor ??
-        (selected
+    final liquidFill =
+        widget.tintColor ??
+        (widget.selected
             ? colors.primaryContainer.withValues(
-                alpha: colors.isDark ? 0.88 : 0.94,
+                alpha: colors.isDark ? 0.62 : 0.68,
               )
             : colors.isDark
-            ? Color.lerp(
-                colors.card,
-                Colors.white,
-                bright ? 0.05 : 0.02,
-              )!.withValues(alpha: highContrast ? 1.0 : (bright ? 0.88 : 0.80))
-            : colors.card.withValues(
-                alpha: highContrast ? 1.0 : (bright ? 0.92 : 0.86),
+            ? const Color(0xFF1D202A)
+                  .withValues(alpha: widget.bright ? 0.50 : 0.42)
+            : Colors.white.withValues(alpha: widget.bright ? 0.50 : 0.40));
+
+    final plainFill =
+        widget.tintColor ??
+        (widget.selected
+            ? colors.primaryContainer.withValues(
+                alpha: highContrast ? 1.0 : (colors.isDark ? 0.80 : 0.86),
+              )
+            : colors.isDark
+            ? const Color(0xFF1E212B).withValues(
+                alpha: highContrast ? 1.0 : (widget.bright ? 0.78 : 0.70),
+              )
+            : Colors.white.withValues(
+                alpha: highContrast ? 1.0 : (widget.bright ? 0.84 : 0.76),
               ));
 
-    final outerBorder = selected
-        ? colors.primary.withValues(alpha: 0.30)
-        : colors.isDark
-        ? Colors.white.withValues(alpha: 0.09)
-        : const Color(0xFF1C160C).withValues(alpha: bright ? 0.075 : 0.085);
+    final shape = widget.radius >= Radii.pill
+        ? Radii.pillShape
+        : Radii.shape(widget.radius);
 
-    final shape = radius >= Radii.pill ? Radii.pillShape : Radii.shape(radius);
-
-    final shadows = !showShadow
+    final shadows = !widget.showShadow
         ? null
         : <BoxShadow>[
             BoxShadow(
-              color: const Color(0xFF141519)
-                  .withValues(alpha: colors.isDark ? 0.24 : 0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+              color: (colors.isDark ? Colors.black : const Color(0xFF0A1633))
+                  .withValues(alpha: colors.isDark ? 0.28 : 0.055),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
             ),
             BoxShadow(
-              color: const Color(0xFF141519)
-                  .withValues(alpha: colors.isDark ? 0.14 : 0.03),
-              blurRadius: 1.5,
+              color: (colors.isDark ? Colors.black : const Color(0xFF0A1633))
+                  .withValues(alpha: colors.isDark ? 0.14 : 0.025),
+              blurRadius: 2,
               offset: const Offset(0, 1),
             ),
           ];
 
-    Widget inner = Padding(padding: padding, child: child);
-    if (height != null || width != null) {
-      inner = SizedBox(width: width, height: height, child: inner);
+    Widget inner = Padding(padding: widget.padding, child: widget.child);
+    if (widget.height != null || widget.width != null) {
+      inner = SizedBox(
+        width: widget.width,
+        height: widget.height,
+        child: inner,
+      );
     }
 
     if (useLiquidShader) {
-      final glassShape = radius >= Radii.pill
+      final glassShape = widget.radius >= Radii.pill
           ? const Capsule()
-          : RoundedRectangle(radius);
+          : RoundedRectangle(widget.radius);
+      Widget body = inner;
+      if (highlight != null) {
+        body = highlight.wrapOverlay(
+          child: highlight.wrapGestures(child: body),
+        );
+      }
       return DrawBackdrop(
         backdrop: backdrop,
         shape: () => glassShape,
         effects: (scope) => scope
           ..vibrancy()
-          ..blur(blurSigma * 0.45)
-          ..lens(10, 18),
+          ..blur(widget.blurSigma * 0.36)
+          ..lens(
+            12,
+            24,
+            depthEffect: widget.depthEffect,
+            chromaticAberration: widget.chromaticAberration,
+          ),
         highlight: () => Highlight.standard,
-        shadow: showShadow ? () => GlassShadow.standard : null,
-        onDrawSurface: (canvas, size) {
-          canvas.drawRect(Offset.zero & size, Paint()..color = baseFill);
-        },
+        shadow: widget.showShadow ? () => GlassShadow.standard : null,
+        layerBlock: highlight != null ? _applyLayerDeformation : null,
+        repaint: highlight,
+        onDrawSurface: (canvas, size) => _paintGlaze(
+          canvas,
+          size,
+          liquidFill,
+          colors.isDark,
+          widget.selected,
+          colors.primary,
+        ),
         isolateSurface: false,
-        child: inner,
+        child: body,
       );
     }
 
-    final sigma = (highContrast || reduceEffects) ? 0.0 : blurSigma;
+    final sigma = (highContrast || reduceEffects) ? 0.0 : widget.blurSigma;
+    Widget surfaceContent = inner;
+    if (highlight != null) {
+      surfaceContent = highlight.wrapOverlay(
+        child: highlight.wrapGestures(child: surfaceContent),
+      );
+    }
     final surface = DecoratedBox(
-      decoration: ShapeDecoration(color: baseFill, shape: shape),
-      child: inner,
+      decoration: ShapeDecoration(
+        shape: shape,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color.lerp(plainFill, Colors.white, colors.isDark ? 0.07 : 0.24)!,
+            plainFill,
+          ],
+        ),
+      ),
+      child: surfaceContent,
     );
-    return DecoratedBox(
+    final outerBorder = widget.selected
+        ? colors.primary.withValues(alpha: 0.34)
+        : colors.isDark
+        ? Colors.white.withValues(alpha: 0.10)
+        : const Color(0xFF0A1633).withValues(alpha: 0.055);
+    final Widget glassBox = DecoratedBox(
       decoration: ShapeDecoration(
         shape: shape.copyWith(
           side: BorderSide(color: outerBorder, width: 0.75),
@@ -180,15 +404,70 @@ class LiquidGlassSurface extends StatelessWidget {
       ),
       child: ClipPath(
         clipper: ShapeBorderClipper(shape: shape),
-        child: sigma <= 0.1
-            ? surface
-            : BackdropFilter(filter: _blurFilter(sigma), child: surface),
+        child: CustomPaint(
+          foregroundPainter: highContrast
+              ? null
+              : LiquidSpecularRimPainter(
+                  shape: shape,
+                  isDark: colors.isDark,
+                  strokeWidth: 0.85,
+                  accentTint: widget.selected ? colors.primary : null,
+                ),
+          child: sigma <= 0.1
+              ? surface
+              : BackdropFilter(
+                  filter: LiquidGlassSurface._blurFilter(sigma),
+                  child: surface,
+                ),
+        ),
       ),
+    );
+    if (highlight == null) return glassBox;
+    return _InteractiveLiquidTransform(highlight: highlight, child: glassBox);
+  }
+}
+
+/// 在降级磨砂路径上复用 `fluid_glass` 同一套水滴膨胀倾斜形变律。
+class _InteractiveLiquidTransform extends StatelessWidget {
+  const _InteractiveLiquidTransform({
+    required this.highlight,
+    required this.child,
+  });
+
+  final InteractiveHighlight highlight;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: highlight,
+      child: child,
+      builder: (context, child) {
+        final progress = highlight.pressProgress;
+        final offset = highlight.offset;
+        if (progress <= 0.0005 && offset.distanceSquared <= 0.01) {
+          return child!;
+        }
+        final box = context.findRenderObject() as RenderBox?;
+        final size = (box != null && box.hasSize)
+            ? box.size
+            : const Size(44, 44);
+        final press = LiquidPressDeformation.resolve(
+          size,
+          offset: offset,
+          pressProgress: progress,
+        );
+        return Transform(
+          alignment: Alignment.center,
+          transform: press.transform,
+          child: child,
+        );
+      },
     );
   }
 }
 
-/// 内容卡：FlClash 纯净大连续圆角表面，默认无重描边，依靠面差与轻投影分层。
+/// 内容卡使用稳定语义色；Liquid Glass 仅用于悬浮导航与交互控件。
 class GlassCard extends StatelessWidget {
   const GlassCard({
     super.key,
@@ -214,22 +493,27 @@ class GlassCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    final highContrast = MediaQuery.maybeOf(context)?.highContrast ?? false;
     final base = Radii.shape(radius);
     final pureBlack = colors.isDark && colors.page.toARGB32() == 0xFF000000;
-    final borderColor = bordered
+    final borderColor = highContrast
+        ? colors.outline
+        : bordered
         ? colors.cardBorder
         : pureBlack
-        ? Colors.white.withValues(alpha: 0.10)
-        : colors.isDark
-        ? Colors.white.withValues(alpha: 0.075)
-        : colors.cardBorder.withValues(alpha: 0.72);
+        ? Colors.white.withValues(alpha: 0.12)
+        : colors.cardBorder;
     final shape = base.copyWith(
-      side: BorderSide(color: borderColor, width: bordered ? 0.9 : 0.75),
+      side: BorderSide(
+        color: borderColor,
+        width: highContrast ? 1.2 : (bordered ? 0.9 : 0.75),
+      ),
     );
+    final resolvedFill = color ?? colors.card;
     final content = Container(
       padding: padding,
       decoration: ShapeDecoration(
-        color: color ?? colors.card,
+        color: resolvedFill,
         shape: shape,
         shadows: flat ? null : context.shadows,
       ),
@@ -237,12 +521,17 @@ class GlassCard extends StatelessWidget {
     );
     final wrapped = onTap == null
         ? content
-        : Pressable(shape: shape, onTap: onTap!, child: content);
+        : Pressable(
+            shape: base,
+            pressedScale: 0.985,
+            onTap: onTap!,
+            child: content,
+          );
     return margin == null ? wrapped : Padding(padding: margin!, child: wrapped);
   }
 }
 
-/// 可按压面：按下覆盖 10% 内容色，200ms 淡入淡出；不缩放。
+/// 可按压面：水滴弹簧按压反馈，按下柔压、抬手由物理弹簧自然回弹。
 class Pressable extends StatefulWidget {
   const Pressable({
     super.key,
@@ -291,10 +580,10 @@ class _PressableState extends State<Pressable>
   AnimationController _ensureController() {
     final existing = _controller;
     if (existing != null) return existing;
-    final controller = AnimationController(
-      vsync: this,
-      duration: _usesScale ? Timings.press : Timings.fast,
-    )..addStatusListener(_handleAnimationStatus);
+    final controller = _usesScale
+        ? AnimationController.unbounded(vsync: this, value: 0.0)
+        : AnimationController(vsync: this, duration: Timings.fast);
+    controller.addStatusListener(_handleAnimationStatus);
     _controller = controller;
     _rebuildCurves();
     return controller;
@@ -303,22 +592,26 @@ class _PressableState extends State<Pressable>
   void _rebuildCurves() {
     final controller = _controller;
     if (controller == null) return;
-    controller.duration = _usesScale ? Timings.press : Timings.fast;
     _curved?.dispose();
     if (_usesScale) {
-      _curved = CurvedAnimation(parent: controller, curve: Curves2.out);
+      _curved = null;
       _scaleAnimation = Tween<double>(
         begin: 1.0,
         end: widget.pressedScale,
-      ).animate(_curved!);
+      ).animate(controller);
     } else {
+      controller.duration = Timings.fast;
       _curved = null;
       _scaleAnimation = null;
     }
   }
 
   void _handleAnimationStatus(AnimationStatus status) {
-    if (status == AnimationStatus.dismissed && !_pressed && mounted) {
+    if ((status == AnimationStatus.dismissed ||
+            status == AnimationStatus.completed) &&
+        !_pressed &&
+        (_controller?.value.abs() ?? 0) < 0.002 &&
+        mounted) {
       setState(() {});
     }
   }
@@ -327,18 +620,37 @@ class _PressableState extends State<Pressable>
     if (_pressed == next) return;
     _pressed = next;
     if (_disableAnimations) {
+      _controller?.value = next ? 1.0 : 0.0;
       if (mounted) setState(() {});
       return;
     }
     final firstCreate = _controller == null;
     final controller = _ensureController();
-    if (next) {
-      controller.forward();
-      if ((firstCreate || !_usesScale) && mounted) {
-        setState(() {});
+    if (_usesScale) {
+      if (next) {
+        controller.animateTo(
+          1.0,
+          duration: Timings.instant,
+          curve: Curves2.out,
+        );
+        if (firstCreate && mounted) setState(() {});
+      } else {
+        controller.animateWith(
+          SpringSimulation(
+            LiquidSprings.pressRelease,
+            controller.value,
+            0.0,
+            -1.2,
+          ),
+        );
       }
     } else {
-      controller.reverse();
+      if (next) {
+        controller.forward();
+        if (mounted) setState(() {});
+      } else {
+        controller.reverse();
+      }
     }
   }
 
@@ -489,8 +801,8 @@ class AnimatedNumericText extends StatelessWidget {
     this.textAlign,
     this.maxLines = 1,
     this.softWrap = false,
-    this.duration = Timings.fast,
-    this.curve = Curves2.out,
+    this.duration = Timings.slow,
+    this.curve,
   });
 
   final num value;
@@ -500,7 +812,7 @@ class AnimatedNumericText extends StatelessWidget {
   final int? maxLines;
   final bool softWrap;
   final Duration duration;
-  final Curve curve;
+  final Curve? curve;
 
   @override
   Widget build(BuildContext context) {
@@ -519,7 +831,7 @@ class AnimatedNumericText extends StatelessWidget {
     return TweenAnimationBuilder<double>(
       tween: Tween<double>(end: value.toDouble()),
       duration: motionDuration(duration, disableAnimations: disable),
-      curve: curve,
+      curve: curve ?? LiquidSprings.smoothCurve,
       builder: (context, current, _) => Text(
         formatter(current),
         textAlign: textAlign,
@@ -643,7 +955,7 @@ class _RollingDigitsTextState extends State<RollingDigitsText> {
   }
 }
 
-/// 主按钮：FlClash 全圆胶囊主操作按钮 + 柔光投影。
+/// 主按钮：液态全圆胶囊主操作钮 + 镜面高光棱边 + 水滴弹簧按压。
 class PrimaryButton extends StatelessWidget {
   const PrimaryButton({
     super.key,
@@ -666,45 +978,71 @@ class PrimaryButton extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final bg = danger ? colors.expense : colors.primary;
     final fg = danger ? scheme.onError : colors.onPrimary;
-    final shape = Radii.shape(Radii.lg);
+    final shape = Radii.pillShape;
     final button = Opacity(
       opacity: onPressed == null ? 0.42 : 1,
       child: Pressable(
         onTap: onPressed,
         shape: shape,
-        pressedScale: 0.96,
-        child: Container(
-          height: 46,
-          padding: const EdgeInsets.symmetric(horizontal: Gaps.xl),
-          decoration: ShapeDecoration(
-            color: bg,
+        pressedScale: 0.965,
+        child: CustomPaint(
+          foregroundPainter: LiquidSpecularRimPainter(
             shape: shape,
-            shadows: onPressed == null
-                ? null
-                : [
-                    BoxShadow(
-                      color: const Color(0xFF0F172A)
-                          .withValues(alpha: colors.isDark ? 0.28 : 0.12),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
+            isDark: true,
+            strokeWidth: 0.7,
+            intensity: 0.32,
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              if (icon != null) ...[
-                Icon(icon, size: 18, color: fg),
-                const SizedBox(width: Gaps.sm),
-              ],
-              if (expand)
-                Flexible(
-                  fit: FlexFit.loose,
-                  child: Text(
+          child: Container(
+            height: 48,
+            padding: const EdgeInsets.symmetric(horizontal: Gaps.xl),
+            decoration: ShapeDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color.lerp(bg, Colors.white, colors.isDark ? 0.07 : 0.08)!,
+                  bg,
+                ],
+              ),
+              shape: shape,
+              shadows: onPressed == null
+                  ? null
+                  : [
+                      BoxShadow(
+                        color: bg.withValues(
+                          alpha: colors.isDark ? 0.20 : 0.14,
+                        ),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (icon != null) ...[
+                  Icon(icon, size: 18, color: fg),
+                  const SizedBox(width: Gaps.sm),
+                ],
+                if (expand)
+                  Flexible(
+                    fit: FlexFit.loose,
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: fg,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0,
+                      ),
+                    ),
+                  )
+                else
+                  Text(
                     label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: fg,
                       fontSize: 15,
@@ -712,18 +1050,8 @@ class PrimaryButton extends StatelessWidget {
                       letterSpacing: 0,
                     ),
                   ),
-                )
-              else
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: fg,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0,
-                  ),
-                ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -732,7 +1060,7 @@ class PrimaryButton extends StatelessWidget {
   }
 }
 
-/// 次级按钮：FlClash 轻填充胶囊按钮。
+/// 次级按钮：轻透磨砂全圆胶囊按钮 + 镜面高光棱边。
 class GhostButton extends StatelessWidget {
   const GhostButton({
     super.key,
@@ -754,17 +1082,27 @@ class GhostButton extends StatelessWidget {
     final colors = context.colors;
     final fg = danger ? colors.expense : colors.text;
     final bg = danger ? colors.expenseSoft : colors.block;
-    final shape = Radii.shape(Radii.lg);
+    final shape = Radii.pillShape;
     final button = Opacity(
       opacity: onPressed == null ? 0.42 : 1,
       child: Pressable(
         onTap: onPressed,
         shape: shape,
-        pressedScale: 0.96,
+        pressedScale: 0.97,
         child: Container(
-          height: 44,
+          height: 46,
           padding: const EdgeInsets.symmetric(horizontal: Gaps.lg),
-          decoration: ShapeDecoration(color: bg, shape: shape),
+          decoration: ShapeDecoration(
+            color: bg,
+            shape: shape.copyWith(
+              side: BorderSide(
+                color: danger
+                    ? colors.expense.withValues(alpha: 0.18)
+                    : colors.cardBorder,
+                width: 0.75,
+              ),
+            ),
+          ),
           child: Row(
             mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
@@ -815,6 +1153,7 @@ class HeaderGlassSurface extends StatelessWidget {
     this.padding = EdgeInsets.zero,
     this.selected = false,
     this.bright = false,
+    this.interactive = false,
   });
 
   final Widget child;
@@ -823,6 +1162,7 @@ class HeaderGlassSurface extends StatelessWidget {
   final EdgeInsetsGeometry padding;
   final bool selected;
   final bool bright;
+  final bool interactive;
 
   @override
   Widget build(BuildContext context) {
@@ -832,12 +1172,13 @@ class HeaderGlassSurface extends StatelessWidget {
       padding: padding,
       selected: selected,
       bright: bright,
+      interactive: interactive,
       child: child,
     );
   }
 }
 
-/// 顶栏悬浮圆形液态玻璃按钮（参考 FlClash 顶栏独立玻璃圆钮）。
+/// 顶栏悬浮圆形液态玻璃按钮：支持水滴膨胀倾斜与手指光晕追踪。
 class GlassIconButton extends StatelessWidget {
   const GlassIconButton({
     super.key,
@@ -845,10 +1186,11 @@ class GlassIconButton extends StatelessWidget {
     this.onTap,
     this.tooltip,
     this.selected = false,
-    this.iconSize = 18.5,
+    this.iconSize = 18,
     this.size = 36,
     this.radius = Radii.pill,
     this.bright = true,
+    this.iconOffset = Offset.zero,
   });
 
   final IconData icon;
@@ -859,29 +1201,31 @@ class GlassIconButton extends StatelessWidget {
   final double size;
   final double radius;
   final bool bright;
+  final Offset iconOffset;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    Widget iconWidget = Icon(
+      icon,
+      size: iconSize,
+      color: selected ? colors.primary : colors.text,
+    );
+    if (iconOffset != Offset.zero) {
+      iconWidget = Transform.translate(offset: iconOffset, child: iconWidget);
+    }
     final content = HeaderGlassSurface(
       height: size,
       radius: radius,
       selected: selected,
       bright: bright,
-      child: SizedBox(
-        width: size,
-        height: size,
-        child: Icon(
-          icon,
-          size: iconSize,
-          color: selected ? colors.primary : colors.text,
-        ),
-      ),
+      interactive: onTap != null,
+      child: SizedBox(width: size, height: size, child: iconWidget),
     );
     final button = Pressable(
       onTap: onTap,
       shape: radius >= Radii.pill ? Radii.pillShape : Radii.shape(radius),
-      pressedScale: 0.92,
+      pressedScale: 0.96,
       child: content,
     );
     return tooltip == null ? button : Tooltip(message: tooltip!, child: button);
@@ -890,7 +1234,7 @@ class GlassIconButton extends StatelessWidget {
 
 /// 融合式液态玻璃按钮组：多枚图标共居一枚悬浮玻璃胶囊，如 `[🔍  ✓]`。
 class GlassActionGroup extends StatelessWidget {
-  const GlassActionGroup({super.key, required this.children, this.height = 36});
+  const GlassActionGroup({super.key, required this.children, this.height = 38});
 
   final List<Widget> children;
   final double height;
@@ -902,6 +1246,7 @@ class GlassActionGroup extends StatelessWidget {
       height: height,
       radius: Radii.pill,
       padding: const EdgeInsets.symmetric(horizontal: 4),
+      interactive: true,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -999,7 +1344,7 @@ class BarActionButton extends StatelessWidget {
   }
 }
 
-/// 撤销条：浮在内容上方的短提示，6 秒后自动消失。
+/// 撤销条：液态玻璃胶囊浮条，6 秒后自动消失。
 class UndoBar extends StatefulWidget {
   const UndoBar({
     super.key,
@@ -1061,17 +1406,104 @@ class _UndoBarState extends State<UndoBar> with SingleTickerProviderStateMixin {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
-    final shape = Radii.shape(Radii.md);
+    final highContrast = MediaQuery.maybeOf(context)?.highContrast ?? false;
+    final shape = Radii.pillShape;
+    final barContent = SizedBox(
+      height: 50,
+      child: Stack(
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(left: Gaps.lg, right: 6),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Semantics(
+                    liveRegion: true,
+                    child: Text(
+                      widget.message,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w500,
+                        color: colors.text,
+                      ),
+                    ),
+                  ),
+                ),
+                Pressable(
+                  onTap: widget.onUndo,
+                  shape: Radii.pillShape,
+                  pressedScale: 0.94,
+                  child: SizedBox(
+                    width: 64,
+                    height: 48,
+                    child: Center(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 7,
+                        ),
+                        decoration: ShapeDecoration(
+                          color: colors.primaryContainer,
+                          shape: Radii.pillShape,
+                        ),
+                        child: Text(
+                          '撤销',
+                          style: TextStyle(
+                            color: colors.onPrimaryContainer,
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (!disable && widget.seconds > 0)
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: 0,
+              height: 2.5,
+              child: RepaintBoundary(
+                child: AnimatedBuilder(
+                  animation: _countdown,
+                  builder: (context, child) {
+                    final remain = (1.0 - _countdown.value).clamp(0.0, 1.0);
+                    return FractionallySizedBox(
+                      alignment: Alignment.centerLeft,
+                      widthFactor: remain,
+                      child: child,
+                    );
+                  },
+                  child: DecoratedBox(
+                    decoration: ShapeDecoration(
+                      color: colors.primary.withValues(alpha: 0.80),
+                      shape: Radii.pillShape,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: Gaps.lg),
       child: DecoratedBox(
         decoration: ShapeDecoration(
-          color: colors.card,
+          color: highContrast
+              ? colors.card
+              : colors.card.withValues(alpha: colors.isDark ? 0.78 : 0.80),
           shape: shape.copyWith(
             side: BorderSide(
               color: colors.isDark
-                  ? Colors.white.withValues(alpha: 0.08)
-                  : Colors.black.withValues(alpha: 0.05),
+                  ? Colors.white.withValues(alpha: 0.14)
+                  : Colors.white.withValues(alpha: 0.86),
               width: 0.8,
             ),
           ),
@@ -1079,89 +1511,20 @@ class _UndoBarState extends State<UndoBar> with SingleTickerProviderStateMixin {
         ),
         child: ClipPath(
           clipper: ShapeBorderClipper(shape: shape),
-          child: SizedBox(
-            height: 50,
-            child: Stack(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(left: Gaps.lg, right: 6),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Semantics(
-                          liveRegion: true,
-                          child: Text(
-                            widget.message,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.w500,
-                              color: colors.text,
-                            ),
-                          ),
-                        ),
-                      ),
-                      Pressable(
-                        onTap: widget.onUndo,
-                        shape: Radii.pillShape,
-                        pressedScale: 0.94,
-                        child: SizedBox(
-                          width: 64,
-                          height: 48,
-                          child: Center(
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 7,
-                              ),
-                              decoration: ShapeDecoration(
-                                color: colors.primaryContainer,
-                                shape: Radii.pillShape,
-                              ),
-                              child: Text(
-                                '撤销',
-                                style: TextStyle(
-                                  color: colors.onPrimaryContainer,
-                                  fontSize: 13.5,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+          child: CustomPaint(
+            foregroundPainter: highContrast
+                ? null
+                : LiquidSpecularRimPainter(
+                    shape: shape,
+                    isDark: colors.isDark,
+                    strokeWidth: 1.0,
                   ),
-                ),
-                if (!disable && widget.seconds > 0)
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    height: 2.5,
-                    child: RepaintBoundary(
-                      child: AnimatedBuilder(
-                        animation: _countdown,
-                        builder: (context, child) {
-                          final remain = (1.0 - _countdown.value).clamp(
-                            0.0,
-                            1.0,
-                          );
-                          return FractionallySizedBox(
-                            alignment: Alignment.centerLeft,
-                            widthFactor: remain,
-                            child: child,
-                          );
-                        },
-                        child: ColoredBox(
-                          color: colors.primary.withValues(alpha: 0.72),
-                        ),
-                      ),
-                    ),
+            child: (highContrast || disable)
+                ? barContent
+                : BackdropFilter(
+                    filter: LiquidGlassSurface._blurFilter(20),
+                    child: barContent,
                   ),
-              ],
-            ),
           ),
         ),
       ),
@@ -1229,7 +1592,11 @@ class ListRow extends StatelessWidget {
           ),
           ?trailing,
           if (showChevron)
-            Icon(Icons.chevron_right_rounded, size: 20, color: colors.text3),
+            Icon(
+              Icons.chevron_right_rounded,
+              size: 19,
+              color: colors.text3.withValues(alpha: 0.72),
+            ),
         ],
       ),
     );
@@ -1271,7 +1638,7 @@ class TextActionButton extends StatelessWidget {
   }
 }
 
-/// 分段控件：FlClash 胶囊轨道 + 弹性浮块，支持高对比主题高亮。
+/// 液态玻璃分段控件：可点可滑，滑块随手势带速度拉伸与色散折射。
 class Segmented<T> extends StatelessWidget {
   const Segmented({
     super.key,
@@ -1292,99 +1659,63 @@ class Segmented<T> extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
-    final outerShape = Radii.shape(11);
-    final thumbShape = Radii.shape(8.5);
-    return Container(
-      height: 36,
-      padding: const EdgeInsets.all(3),
-      decoration: ShapeDecoration(color: colors.block, shape: outerShape),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final segmentWidth = constraints.maxWidth / values.length;
-          final selectedIndex = values
-              .indexOf(selected)
-              .clamp(0, values.length - 1);
-          return Stack(
-            children: [
-              AnimatedPositioned(
-                duration: motionDuration(
-                  Timings.fast,
-                  disableAnimations: disable,
-                ),
-                curve: Curves2.out,
-                left: selectedIndex * segmentWidth,
-                top: 0,
-                width: segmentWidth,
-                height: 30,
-                child: DecoratedBox(
-                  decoration: ShapeDecoration(
-                    color: accentActive
-                        ? colors.primary
-                        : (colors.isDark ? colors.inset : colors.card),
-                    shape: thumbShape,
-                    shadows: [
-                      BoxShadow(
-                        color: const Color(0xFF0F172A)
-                            .withValues(alpha: colors.isDark ? 0.24 : 0.07),
-                        blurRadius: 4,
-                        offset: const Offset(0, 1),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              Row(
-                children: [
-                  for (final value in values)
-                    Expanded(
-                      child: Semantics(
-                        button: true,
-                        selected: value == selected,
-                        label: labelOf(value),
-                        onTap: () => onChanged(value),
-                        excludeSemantics: true,
-                        child: Pressable(
-                          onTap: () => onChanged(value),
-                          shape: thumbShape,
-                          child: SizedBox(
-                            height: 30,
-                            child: Center(
-                              child: AnimatedDefaultTextStyle(
-                                duration: motionDuration(
-                                  Timings.fast,
-                                  disableAnimations: disable,
-                                ),
-                                curve: Curves2.inOut,
-                                style: DefaultTextStyle.of(context).style
-                                    .copyWith(
-                                      fontSize: 13,
-                                      fontWeight: value == selected
-                                          ? FontWeight.w600
-                                          : FontWeight.w500,
-                                      color: value == selected
-                                          ? (accentActive
-                                                ? colors.onPrimary
-                                                : colors.text)
-                                          : colors.text2,
-                                    ),
-                                child: Text(labelOf(value)),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ],
-          );
+    final selectedIndex = values.indexOf(selected).clamp(0, values.length - 1);
+    final backdrop = AppBackdropScope.of(context);
+    final trackColor = colors.isDark
+        ? Colors.white.withValues(alpha: 0.08)
+        : const Color(0xFF767680).withValues(alpha: 0.11);
+    final thumbColor = accentActive
+        ? colors.primary.withValues(alpha: 0.92)
+        : (colors.isDark ? const Color(0xFF393B47) : Colors.white);
+
+    return LiquidGlassTheme(
+      colors: LiquidGlassTheme.of(context).copyWith(
+        container: trackColor,
+        content: colors.text,
+        accent: colors.primary,
+      ),
+      child: LiquidSegmentedControl(
+        selectedIndex: selectedIndex,
+        backdrop: backdrop,
+        height: 36,
+        thumbColor: thumbColor,
+        onSelected: (index) {
+          if (index < 0 || index >= values.length) return;
+          final next = values[index];
+          if (next == selected) return;
+          HapticFeedback.selectionClick();
+          onChanged(next);
         },
+        segments: [
+          for (final value in values)
+            AnimatedDefaultTextStyle(
+              duration: motionDuration(
+                Timings.micro,
+                disableAnimations: disable,
+              ),
+              curve: Curves2.out,
+              style: DefaultTextStyle.of(context).style.copyWith(
+                fontSize: 13,
+                fontWeight: value == selected
+                    ? FontWeight.w600
+                    : FontWeight.w500,
+                color: value == selected
+                    ? (accentActive ? colors.onPrimary : colors.text)
+                    : colors.text2,
+              ),
+              child: Text(
+                labelOf(value),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+        ],
       ),
     );
   }
 }
 
-/// 彩色超椭圆图标微标：用于「我的」与设置列表行，一眼区分功能模块。
+/// 彩色超椭圆图标微标：以轻微渐变区分分类与功能。
 class AppIconBadge extends StatelessWidget {
   const AppIconBadge({
     super.key,
@@ -1392,7 +1723,7 @@ class AppIconBadge extends StatelessWidget {
     required this.color,
     this.size = 32,
     this.iconSize = 17,
-    this.tinted = false,
+    this.tinted = true,
   });
 
   final IconData icon;
@@ -1406,19 +1737,30 @@ class AppIconBadge extends StatelessWidget {
     final colors = context.colors;
     final isDanger = color == colors.expense;
     final useTint = tinted || isDanger;
+    final shape = Radii.shape(size * 0.31);
     return Container(
       width: size,
       height: size,
       decoration: ShapeDecoration(
+        gradient: useTint
+            ? LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  color.withValues(alpha: colors.isDark ? 0.28 : 0.18),
+                  color.withValues(alpha: colors.isDark ? 0.16 : 0.09),
+                ],
+              )
+            : null,
         color: useTint
-            ? color.withValues(alpha: colors.isDark ? 0.20 : 0.11)
+            ? null
             : colors.block.withValues(alpha: colors.isDark ? 0.80 : 0.85),
-        shape: Radii.shape(size * 0.32).copyWith(
+        shape: shape.copyWith(
           side: BorderSide(
             color: useTint
-                ? color.withValues(alpha: colors.isDark ? 0.22 : 0.14)
+                ? color.withValues(alpha: colors.isDark ? 0.32 : 0.22)
                 : colors.divider.withValues(alpha: 0.75),
-            width: 0.7,
+            width: 0.75,
           ),
         ),
       ),
@@ -1427,52 +1769,17 @@ class AppIconBadge extends StatelessWidget {
   }
 }
 
-/// 页面顶部主题氛围微光：给浅/深画布顶部一层极轻的主题色径向光晕，
-/// 让内容界面与「时页」品牌光感自然衔接，不再是单调死板的纯灰底。
-class AmbientPageGlow extends StatelessWidget {
-  const AmbientPageGlow({super.key, required this.child});
+/// 页面画布使用系统分组背景色，为悬浮材质提供稳定对比。
+class AppPageBackground extends StatelessWidget {
+  const AppPageBackground({super.key, required this.child});
 
   final Widget child;
 
   @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
-    final pureBlack = colors.isDark && colors.page.toARGB32() == 0xFF000000;
-    final highContrast = MediaQuery.maybeOf(context)?.highContrast ?? false;
-    if (pureBlack || highContrast) return child;
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        Positioned(
-          top: -110,
-          left: -40,
-          right: -40,
-          height: 260,
-          child: IgnorePointer(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: RadialGradient(
-                  center: const Alignment(0.25, -0.7),
-                  radius: 1.0,
-                  colors: [
-                    colors.primary.withValues(
-                      alpha: colors.isDark ? 0.075 : 0.024,
-                    ),
-                    colors.primary.withValues(
-                      alpha: colors.isDark ? 0.02 : 0.008,
-                    ),
-                    colors.primary.withValues(alpha: 0.0),
-                  ],
-                  stops: const [0.0, 0.50, 1.0],
-                ),
-              ),
-            ),
-          ),
-        ),
-        child,
-      ],
-    );
-  }
+  Widget build(BuildContext context) => DecoratedBox(
+    decoration: BoxDecoration(color: context.colors.page),
+    child: child,
+  );
 }
 
 /// 液态玻璃拨动开关行：直接驱动 `fluid_glass` 的 [LiquidToggle]，
@@ -1577,7 +1884,7 @@ class SectionHeading extends StatelessWidget {
               fontSize: 12,
               fontWeight: FontWeight.w500,
               color: colors.text3,
-              letterSpacing: 0.3,
+              letterSpacing: 0,
             ),
           ),
           if (trailing != null) ...[const Spacer(), trailing!],
@@ -1614,6 +1921,8 @@ class MonthSwitchPill extends StatelessWidget {
       height: 36,
       radius: Radii.pill,
       bright: true,
+      interactive: true,
+      padding: const EdgeInsets.symmetric(horizontal: 2),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -1624,28 +1933,18 @@ class MonthSwitchPill extends StatelessWidget {
           ),
           Pressable(
             onTap: onPick,
-            shape: Radii.shape(8),
+            shape: Radii.pillShape,
+            pressedScale: 0.95,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 6),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  AnimatedMonthLabel(
-                    label: label,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: colors.text,
-                      fontFeatures: tabularFigures,
-                    ),
-                  ),
-                  const SizedBox(width: 2),
-                  Icon(
-                    Icons.keyboard_arrow_down_rounded,
-                    size: 14,
-                    color: colors.text3,
-                  ),
-                ],
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+              child: AnimatedMonthLabel(
+                label: label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: colors.text,
+                  fontFeatures: tabularFigures,
+                ),
               ),
             ),
           ),
@@ -1680,12 +1979,12 @@ class _MonthArrowButton extends StatelessWidget {
       excludeSemantics: true,
       child: Pressable(
         onTap: onTap,
-        shape: Radii.shape(10),
-        pressedScale: 0.92,
+        shape: Radii.pillShape,
+        pressedScale: 0.88,
         child: SizedBox(
-          width: 24,
-          height: 34,
-          child: Icon(icon, size: 16.5, color: context.colors.text2),
+          width: 26,
+          height: 32,
+          child: Icon(icon, size: 17, color: context.colors.text2),
         ),
       ),
     );
@@ -1711,8 +2010,8 @@ class AnimatedMonthLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     return AnimatedSwitcher(
-      duration: motionDuration(Timings.fast, disableAnimations: disable),
-      switchInCurve: Curves2.out,
+      duration: motionDuration(Timings.base, disableAnimations: disable),
+      switchInCurve: LiquidSprings.bouncyCurve,
       switchOutCurve: Curves2.out,
       layoutBuilder: (current, previous) =>
           Stack(alignment: alignment, children: [...previous, ?current]),
@@ -1721,10 +2020,13 @@ class AnimatedMonthLabel extends StatelessWidget {
           opacity: animation,
           child: SlideTransition(
             position: Tween<Offset>(
-              begin: const Offset(0, 0.18),
+              begin: const Offset(0, 0.20),
               end: Offset.zero,
             ).animate(animation),
-            child: child,
+            child: ScaleTransition(
+              scale: Tween<double>(begin: 0.94, end: 1.0).animate(animation),
+              child: child,
+            ),
           ),
         );
       },
@@ -2006,7 +2308,7 @@ class _NumberFieldState extends State<NumberField> {
                       fontSize: widget.fontSize,
                       fontWeight: FontWeight.w600,
                       color: colors.text,
-                      letterSpacing: -0.02,
+                      letterSpacing: 0,
                       fontFeatures: tabularFigures,
                     ),
                     decoration: InputDecoration(

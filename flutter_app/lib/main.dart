@@ -287,6 +287,7 @@ class _MyHoursAppState extends State<MyHoursApp> {
           theme: _lightTheme,
           darkTheme: _darkTheme,
           themeMode: settings.themeMode,
+          scrollBehavior: const _LiquidScrollBehavior(),
           // 主题切换是状态变化，不是空间动画；不要整页渐变 200ms。
           themeAnimationDuration: Duration.zero,
           locale: const Locale('zh', 'CN'),
@@ -335,43 +336,45 @@ class _MyHoursAppState extends State<MyHoursApp> {
               ),
             );
             // 状态栏图标颜色必须跟随主题，否则深色模式会出现"黑底黑字"。
-            return LiquidGlassTheme(
-              colors:
-                  LiquidGlassColors.forBrightness(
-                    isDark ? Brightness.dark : Brightness.light,
-                  ).copyWith(
-                    accent: colors.primary,
-                    toggleAccent: colors.primary,
-                    content: colors.text,
-                    container: colors.isDark
-                        ? colors.card.withValues(alpha: 0.56)
-                        : Colors.white.withValues(alpha: 0.72),
-                    track: colors.isDark
-                        ? const Color(0xFF3E4150)
-                        : const Color(0xFFD6DCE6),
+            return GlassLightScope(
+              child: LiquidGlassTheme(
+                colors:
+                    LiquidGlassColors.forBrightness(
+                      isDark ? Brightness.dark : Brightness.light,
+                    ).copyWith(
+                      accent: colors.primary,
+                      toggleAccent: colors.income,
+                      content: colors.text,
+                      container: colors.isDark
+                          ? const Color(0xFF1C1E26).withValues(alpha: 0.48)
+                          : Colors.white.withValues(alpha: 0.44),
+                      track: colors.isDark
+                          ? const Color(0xFF787880).withValues(alpha: 0.38)
+                          : const Color(0xFF787880).withValues(alpha: 0.22),
+                    ),
+                child: AnnotatedRegion<SystemUiOverlayStyle>(
+                  value: SystemUiOverlayStyle(
+                    statusBarColor: Colors.transparent,
+                    statusBarIconBrightness: isDark
+                        ? Brightness.light
+                        : Brightness.dark,
+                    statusBarBrightness: isDark
+                        ? Brightness.dark
+                        : Brightness.light,
+                    systemNavigationBarColor: Colors.transparent,
+                    systemNavigationBarDividerColor: Colors.transparent,
+                    systemNavigationBarIconBrightness: isDark
+                        ? Brightness.light
+                        : Brightness.dark,
+                    systemNavigationBarContrastEnforced: false,
                   ),
-              child: AnnotatedRegion<SystemUiOverlayStyle>(
-                value: SystemUiOverlayStyle(
-                  statusBarColor: Colors.transparent,
-                  statusBarIconBrightness: isDark
-                      ? Brightness.light
-                      : Brightness.dark,
-                  statusBarBrightness: isDark
-                      ? Brightness.dark
-                      : Brightness.light,
-                  systemNavigationBarColor: Colors.transparent,
-                  systemNavigationBarDividerColor: Colors.transparent,
-                  systemNavigationBarIconBrightness: isDark
-                      ? Brightness.light
-                      : Brightness.dark,
-                  systemNavigationBarContrastEnforced: false,
-                ),
-                child: GlassQualityScope(
-                  quality: globalGlassQualityFor(
-                    glassPreference,
-                    reduceEffects: reduceEffects,
+                  child: GlassQualityScope(
+                    quality: globalGlassQualityFor(
+                      glassPreference,
+                      reduceEffects: reduceEffects,
+                    ),
+                    child: gestureAwareContent,
                   ),
-                  child: gestureAwareContent,
                 ),
               ),
             );
@@ -381,6 +384,22 @@ class _MyHoursAppState extends State<MyHoursApp> {
       },
     );
   }
+}
+
+/// 全局 iOS 弹性橡皮筋滚动行为：消除 Android 发光拉伸，保持全站统一流体惯性。
+class _LiquidScrollBehavior extends MaterialScrollBehavior {
+  const _LiquidScrollBehavior();
+
+  @override
+  ScrollPhysics getScrollPhysics(BuildContext context) =>
+      const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics());
+
+  @override
+  Widget buildOverscrollIndicator(
+    BuildContext context,
+    Widget child,
+    ScrollableDetails details,
+  ) => child;
 }
 
 /// 首次启动先展示欢迎页；写入标记后用淡入过渡进入记工主页。

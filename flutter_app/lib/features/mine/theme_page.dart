@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:fluid_glass/fluid_glass.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/motion.dart';
 import '../../core/settings.dart';
 import '../../core/theme_tokens.dart';
+import '../../data/constants.dart';
 import '../../ui/dialog.dart';
 import '../../ui/glass_menu.dart';
 import '../../ui/pinned_header.dart';
@@ -30,363 +32,376 @@ class ThemePage extends ConsumerWidget {
         final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
         return Scaffold(
           backgroundColor: colors.page,
-          body: Stack(
-            children: [
-              Positioned.fill(
-                child: ListView(
-                  physics: const BouncingScrollPhysics(
-                    parent: AlwaysScrollableScrollPhysics(),
-                  ),
-                  padding: EdgeInsets.only(
-                    top: PinnedSubHeader.totalHeight(context) + 12,
-                    bottom: MediaQuery.paddingOf(context).bottom + 40,
-                  ),
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: Gaps.lg),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _ThemePreview(settings: settings),
-                          const SizedBox(height: Gaps.xl),
-                          const _SectionLabel(label: '主题模式'),
-                          const SizedBox(height: Gaps.sm),
-                          GlassCard(
-                            padding: const EdgeInsets.all(Gaps.md),
-                            child: Segmented<ThemeMode>(
-                              values: const [
-                                ThemeMode.system,
-                                ThemeMode.light,
-                                ThemeMode.dark,
-                              ],
-                              selected: settings.themeMode,
-                              labelOf: (mode) => switch (mode) {
-                                ThemeMode.system => '自动',
-                                ThemeMode.light => '浅色',
-                                ThemeMode.dark => '深色',
-                              },
-                              onChanged: settings.setThemeMode,
-                            ),
-                          ),
-                          const SizedBox(height: Gaps.md),
-                          GlassCard(
-                            padding: const EdgeInsets.symmetric(vertical: 4),
-                            child: LiquidSwitchRow(
-                              title: '纯黑模式',
-                              subtitle: settings.themeMode == ThemeMode.light
-                                  ? '仅深色模式生效'
-                                  : '深色模式下使用纯黑页面与深色卡片',
-                              leading: AppIconBadge(
-                                icon: Icons.contrast_rounded,
-                                color: colors.isDark
-                                    ? colors.text
-                                    : const Color(0xFF18181C),
-                              ),
-                              value: settings.pureBlack,
-                              onChanged: settings.themeMode == ThemeMode.light
-                                  ? null
-                                  : settings.setPureBlack,
-                            ),
-                          ),
-                          const SizedBox(height: Gaps.xl),
-                          Row(
+          body: AppPageBackground(
+            child: LiquidBackdropScaffold(
+              body: ListView(
+                physics: const BouncingScrollPhysics(
+                  parent: AlwaysScrollableScrollPhysics(),
+                ),
+                padding: EdgeInsets.only(
+                  top: PinnedSubHeader.totalHeight(context) + 12,
+                  bottom: MediaQuery.paddingOf(context).bottom + 40,
+                ),
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: Gaps.lg),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _ThemePreview(settings: settings),
+                        const SizedBox(height: Gaps.xl),
+                        const _SectionLabel(label: '主题模式'),
+                        const SizedBox(height: Gaps.sm),
+                        GlassCard(
+                          padding: const EdgeInsets.fromLTRB(0, Gaps.md, 0, 4),
+                          child: Column(
                             children: [
-                              const _SectionLabel(label: '主题色彩'),
-                              const Spacer(),
-                              AnimatedSwitcher(
-                                duration: motionDuration(
-                                  Timings.fast,
-                                  disableAnimations: disable,
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: Gaps.lg,
                                 ),
-                                switchInCurve: Curves2.out,
-                                switchOutCurve: Curves2.out,
-                                child: settings.isDefaultThemeColor
-                                    ? const SizedBox.shrink(
-                                        key: ValueKey('reset-hidden'),
-                                      )
-                                    : Pressable(
-                                        key: const ValueKey('reset-shown'),
-                                        onTap: () => _confirmResetColors(
-                                          context,
-                                          settings,
-                                        ),
-                                        shape: Radii.pillShape,
-                                        pressedScale: 0.94,
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 10,
-                                            vertical: 4,
-                                          ),
-                                          decoration: ShapeDecoration(
-                                            color: colors.primaryContainer,
-                                            shape: Radii.pillShape,
-                                          ),
-                                          child: Text(
-                                            '恢复默认',
-                                            style: TextStyle(
-                                              fontSize: 11.5,
-                                              fontWeight: FontWeight.w600,
-                                              color: colors.onPrimaryContainer,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
+                                child: Segmented<ThemeMode>(
+                                  values: const [
+                                    ThemeMode.system,
+                                    ThemeMode.light,
+                                    ThemeMode.dark,
+                                  ],
+                                  selected: settings.themeMode,
+                                  labelOf: (mode) => switch (mode) {
+                                    ThemeMode.system => '自动',
+                                    ThemeMode.light => '浅色',
+                                    ThemeMode.dark => '深色',
+                                  },
+                                  onChanged: settings.setThemeMode,
+                                ),
+                              ),
+                              const SizedBox(height: Gaps.md),
+                              Divider(
+                                height: 1,
+                                indent: Gaps.lg,
+                                endIndent: Gaps.lg,
+                                color: colors.divider,
+                              ),
+                              LiquidSwitchRow(
+                                title: '纯黑模式',
+                                subtitle: settings.themeMode == ThemeMode.light
+                                    ? '仅深色模式生效'
+                                    : '深色模式下使用纯黑页面与深色卡片',
+                                leading: AppIconBadge(
+                                  icon: Icons.contrast_rounded,
+                                  color: colors.isDark
+                                      ? colors.text
+                                      : const Color(0xFF18181C),
+                                ),
+                                value: settings.pureBlack,
+                                onChanged: settings.themeMode == ThemeMode.light
+                                    ? null
+                                    : settings.setPureBlack,
                               ),
                             ],
                           ),
-                          const SizedBox(height: Gaps.sm),
-                          GlassCard(
-                            padding: const EdgeInsets.all(Gaps.lg),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Wrap(
-                                  spacing: 14,
-                                  runSpacing: 12,
-                                  children: [
-                                    for (final color in palette)
-                                      _ColorDot(
-                                        color: color,
-                                        selected:
-                                            color.toARGB32() ==
-                                            settings.accentColor.toARGB32(),
-                                        onTap: () =>
-                                            settings.setAccentColor(color),
-                                        onLongPress: (pos) => _showSwatchMenu(
-                                          context,
-                                          settings: settings,
-                                          color: color,
-                                          canDelete: palette.length > 1,
-                                          globalPosition: pos,
+                        ),
+                        const SizedBox(height: Gaps.xl),
+                        Row(
+                          children: [
+                            const _SectionLabel(label: '主题色彩'),
+                            const Spacer(),
+                            AnimatedSwitcher(
+                              duration: motionDuration(
+                                Timings.fast,
+                                disableAnimations: disable,
+                              ),
+                              switchInCurve: Curves2.out,
+                              switchOutCurve: Curves2.out,
+                              child: settings.isDefaultThemeColor
+                                  ? const SizedBox.shrink(
+                                      key: ValueKey('reset-hidden'),
+                                    )
+                                  : Pressable(
+                                      key: const ValueKey('reset-shown'),
+                                      onTap: () => _confirmResetColors(
+                                        context,
+                                        settings,
+                                      ),
+                                      shape: Radii.pillShape,
+                                      pressedScale: 0.94,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 4,
+                                        ),
+                                        decoration: ShapeDecoration(
+                                          color: colors.primaryContainer,
+                                          shape: Radii.pillShape,
+                                        ),
+                                        child: Text(
+                                          '恢复默认',
+                                          style: TextStyle(
+                                            fontSize: 11.5,
+                                            fontWeight: FontWeight.w600,
+                                            color: colors.onPrimaryContainer,
+                                          ),
                                         ),
                                       ),
-                                    _AddColorDot(
+                                    ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: Gaps.sm),
+                        GlassCard(
+                          padding: const EdgeInsets.all(Gaps.lg),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Wrap(
+                                spacing: 10,
+                                runSpacing: 10,
+                                children: [
+                                  for (final color in palette)
+                                    _ColorDot(
+                                      color: color,
+                                      selected:
+                                          color.toARGB32() ==
+                                          settings.accentColor.toARGB32(),
                                       onTap: () =>
-                                          _showCustomColor(context, settings),
+                                          settings.setAccentColor(color),
+                                      onLongPress: (pos) => _showSwatchMenu(
+                                        context,
+                                        settings: settings,
+                                        color: color,
+                                        canDelete: palette.length > 1,
+                                        globalPosition: pos,
+                                      ),
+                                    ),
+                                  _AddColorDot(
+                                    onTap: () =>
+                                        _showCustomColor(context, settings),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              Text(
+                                '点「+」可按网格、光谱、滑块或 HEX 自由取色；长按色块可编辑或删除',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  color: colors.text3,
+                                ),
+                              ),
+                              const SizedBox(height: Gaps.lg),
+                              Divider(
+                                height: 1,
+                                thickness: 0.7,
+                                color: colors.divider,
+                              ),
+                              const SizedBox(height: Gaps.md),
+                              Row(
+                                children: [
+                                  Text(
+                                    '配色风格',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: colors.text,
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  GlassSelectMenu<AppColorStyle>(
+                                    values: AppColorStyle.values,
+                                    selected: settings.colorStyle,
+                                    labelOf: (style) => switch (style) {
+                                      AppColorStyle.vivid => '鲜明',
+                                      AppColorStyle.atmospheric => '氛围',
+                                      AppColorStyle.soft => '柔和',
+                                      AppColorStyle.monochrome => '单色',
+                                    },
+                                    onChanged: settings.setColorStyle,
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: Gaps.xl),
+                        const _SectionLabel(label: '布局与动效'),
+                        const SizedBox(height: Gaps.sm),
+                        GlassCard(
+                          padding: const EdgeInsets.fromLTRB(
+                            Gaps.lg,
+                            Gaps.lg,
+                            Gaps.lg,
+                            Gaps.md,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const _ControlLabel('选项卡动画'),
+                              const SizedBox(height: Gaps.sm),
+                              Segmented<AppTabTransition>(
+                                values: AppTabTransition.values,
+                                selected: settings.tabTransition,
+                                labelOf: (style) =>
+                                    style == AppTabTransition.slide
+                                    ? '滑动'
+                                    : '淡入',
+                                onChanged: settings.setTabTransition,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: Gaps.xl),
+                        const _SectionLabel(label: '字体与阅读'),
+                        const SizedBox(height: Gaps.sm),
+                        GlassCard(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: ListRow(
+                            title: '字体',
+                            subtitle: '系统默认字体 · 保持现有字形不变',
+                            leading: const AppIconBadge(
+                              icon: Icons.text_fields_rounded,
+                              color: Color(0xFF5856D6),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: Gaps.md),
+                        GlassCard(
+                          padding: const EdgeInsets.fromLTRB(
+                            Gaps.lg,
+                            Gaps.lg,
+                            Gaps.lg,
+                            Gaps.md,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _ControlLabel(
+                                settings.largeText
+                                    ? '大字模式 · 112%'
+                                    : '文本缩放 · ${(settings.textScale * 100).round()}%',
+                              ),
+                              const SizedBox(height: Gaps.sm),
+                              Segmented<bool>(
+                                values: const [true, false],
+                                selected: settings.followSystemText,
+                                labelOf: (follow) => follow ? '跟随系统' : '自定义',
+                                onChanged: (follow) {
+                                  if (settings.largeText) {
+                                    settings.setLargeText(false);
+                                  }
+                                  settings.setFollowSystemText(follow);
+                                },
+                              ),
+                              if (!settings.followSystemText) ...[
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    Text(
+                                      'A',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: colors.text2,
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: LiquidSlider(
+                                        value: settings.customTextScale,
+                                        valueRange: (start: 0.9, end: 1.3),
+                                        divisions: 8,
+                                        backdrop: AppBackdropScope.of(context),
+                                        semanticLabel: '自定义字体大小',
+                                        semanticFormatterCallback: (value) =>
+                                            '${(value * 100).round()}%',
+                                        onValueChanged: (value) {
+                                          if (settings.largeText) {
+                                            settings.setLargeText(false);
+                                          }
+                                          settings.setCustomTextScale(value);
+                                        },
+                                      ),
+                                    ),
+                                    Text(
+                                      'A',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        color: colors.text2,
+                                      ),
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 10),
                                 Text(
-                                  '点「+」可按网格、光谱、滑块或 HEX 自由取色；长按色块可编辑或删除',
+                                  '应用内文字会放大到 ${(settings.customTextScale * 100).round()}%',
                                   style: TextStyle(
                                     fontSize: 11.5,
                                     color: colors.text3,
                                   ),
                                 ),
-                                const SizedBox(height: Gaps.lg),
-                                Divider(
-                                  height: 1,
-                                  thickness: 0.7,
-                                  color: colors.divider,
-                                ),
-                                const SizedBox(height: Gaps.md),
-                                Row(
-                                  children: [
-                                    Text(
-                                      '配色风格',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w600,
-                                        color: colors.text,
-                                      ),
-                                    ),
-                                    const Spacer(),
-                                    GlassSelectMenu<AppColorStyle>(
-                                      values: AppColorStyle.values,
-                                      selected: settings.colorStyle,
-                                      labelOf: (style) => switch (style) {
-                                        AppColorStyle.vivid => '鲜明',
-                                        AppColorStyle.atmospheric => '氛围',
-                                        AppColorStyle.soft => '柔和',
-                                        AppColorStyle.monochrome => '单色',
-                                      },
-                                      onChanged: settings.setColorStyle,
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: Gaps.xl),
-                          const _SectionLabel(label: '布局与动效'),
-                          const SizedBox(height: Gaps.sm),
-                          GlassCard(
-                            padding: const EdgeInsets.fromLTRB(
-                              Gaps.lg,
-                              Gaps.lg,
-                              Gaps.lg,
-                              Gaps.md,
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const _ControlLabel('选项卡动画'),
-                                const SizedBox(height: Gaps.sm),
-                                Segmented<AppTabTransition>(
-                                  values: AppTabTransition.values,
-                                  selected: settings.tabTransition,
-                                  labelOf: (style) =>
-                                      style == AppTabTransition.slide
-                                      ? '滑动'
-                                      : '淡入',
-                                  onChanged: settings.setTabTransition,
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: Gaps.xl),
-                          const _SectionLabel(label: '字体与阅读'),
-                          const SizedBox(height: Gaps.sm),
-                          GlassCard(
-                            padding: const EdgeInsets.symmetric(vertical: 4),
-                            child: ListRow(
-                              title: '字体',
-                              subtitle: '系统默认字体 · 保持现有字形不变',
-                              leading: const AppIconBadge(
-                                icon: Icons.text_fields_rounded,
-                                color: Color(0xFF5856D6),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: Gaps.md),
-                          GlassCard(
-                            padding: const EdgeInsets.fromLTRB(
-                              Gaps.lg,
-                              Gaps.lg,
-                              Gaps.lg,
-                              Gaps.md,
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _ControlLabel(
+                              ] else
+                                Text(
                                   settings.largeText
-                                      ? '大字模式 · 112%'
-                                      : '文本缩放 · ${(settings.textScale * 100).round()}%',
+                                      ? '大字模式当前覆盖系统字号；切换缩放会关闭大字模式'
+                                      : '跟随系统字体大小；可在系统设置中调整',
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    color: colors.text3,
+                                  ),
                                 ),
-                                const SizedBox(height: Gaps.sm),
-                                Segmented<bool>(
-                                  values: const [true, false],
-                                  selected: settings.followSystemText,
-                                  labelOf: (follow) => follow ? '跟随系统' : '自定义',
-                                  onChanged: (follow) {
-                                    if (settings.largeText) {
-                                      settings.setLargeText(false);
-                                    }
-                                    settings.setFollowSystemText(follow);
-                                  },
-                                ),
-                                if (!settings.followSystemText) ...[
-                                  const SizedBox(height: 8),
-                                  Row(
-                                    children: [
-                                      Text(
-                                        'A',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: colors.text2,
-                                        ),
-                                      ),
-                                      Expanded(
-                                        child: Slider(
-                                          value: settings.customTextScale,
-                                          min: 0.9,
-                                          max: 1.3,
-                                          divisions: 8,
-                                          label:
-                                              '${(settings.customTextScale * 100).round()}%',
-                                          onChanged: (value) {
-                                            if (settings.largeText) {
-                                              settings.setLargeText(false);
-                                            }
-                                            settings.setCustomTextScale(value);
-                                          },
-                                        ),
-                                      ),
-                                      Text(
-                                        'A',
-                                        style: TextStyle(
-                                          fontSize: 18,
-                                          color: colors.text2,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  Text(
-                                    '应用内文字会放大到 ${(settings.customTextScale * 100).round()}%',
-                                    style: TextStyle(
-                                      fontSize: 11.5,
-                                      color: colors.text3,
-                                    ),
-                                  ),
-                                ] else
-                                  Text(
-                                    settings.largeText
-                                        ? '大字模式当前覆盖系统字号；切换缩放会关闭大字模式'
-                                        : '跟随系统字体大小；可在系统设置中调整',
-                                    style: TextStyle(
-                                      fontSize: 11.5,
-                                      color: colors.text3,
-                                    ),
-                                  ),
-                              ],
-                            ),
+                            ],
                           ),
-                          const SizedBox(height: Gaps.xl),
-                          const _SectionLabel(label: '液态玻璃与底栏'),
-                          const SizedBox(height: Gaps.sm),
-                          GlassCard(
-                            padding: const EdgeInsets.fromLTRB(
-                              Gaps.lg,
-                              Gaps.lg,
-                              Gaps.lg,
-                              Gaps.md,
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const _ControlLabel('玻璃材质档位'),
-                                const SizedBox(height: Gaps.sm),
-                                Segmented<AppGlassPreference>(
-                                  values: AppGlassPreference.values,
-                                  selected: settings.glassPreference,
-                                  labelOf: (pref) => switch (pref) {
-                                    AppGlassPreference.none => '纯色',
-                                    AppGlassPreference.standard => '标准',
-                                    AppGlassPreference.extreme => '极致折射',
-                                  },
-                                  onChanged: settings.setGlassPreference,
-                                ),
-                                const SizedBox(height: Gaps.lg),
-                                const _ControlLabel('底部导航样式'),
-                                const SizedBox(height: Gaps.sm),
-                                Segmented<AppDockStyle>(
-                                  values: AppDockStyle.values,
-                                  selected: settings.dockStyle,
-                                  labelOf: (style) =>
-                                      style == AppDockStyle.floating
-                                      ? '悬浮玻璃'
-                                      : '固定底栏',
-                                  onChanged: settings.setDockStyle,
-                                ),
-                              ],
-                            ),
+                        ),
+                        const SizedBox(height: Gaps.xl),
+                        const _SectionLabel(label: '液态玻璃与底栏'),
+                        const SizedBox(height: Gaps.sm),
+                        GlassCard(
+                          padding: const EdgeInsets.fromLTRB(
+                            Gaps.lg,
+                            Gaps.lg,
+                            Gaps.lg,
+                            Gaps.md,
                           ),
-                          const SizedBox(height: Gaps.xxl),
-                        ],
-                      ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const _ControlLabel('玻璃材质档位'),
+                              const SizedBox(height: Gaps.sm),
+                              Segmented<AppGlassPreference>(
+                                values: AppGlassPreference.values,
+                                selected: settings.glassPreference,
+                                labelOf: (pref) => switch (pref) {
+                                  AppGlassPreference.none => '纯色',
+                                  AppGlassPreference.standard => '标准',
+                                  AppGlassPreference.extreme => '极致折射',
+                                },
+                                onChanged: settings.setGlassPreference,
+                              ),
+                              const SizedBox(height: Gaps.lg),
+                              const _ControlLabel('底部导航样式'),
+                              const SizedBox(height: Gaps.sm),
+                              Segmented<AppDockStyle>(
+                                values: AppDockStyle.values,
+                                selected: settings.dockStyle,
+                                labelOf: (style) =>
+                                    style == AppDockStyle.floating
+                                    ? '悬浮玻璃'
+                                    : '固定底栏',
+                                onChanged: settings.setDockStyle,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: Gaps.xxl),
+                      ],
                     ),
-                  ],
+                  ),
+                ],
+              ),
+              overlays: [
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: PinnedSubHeader(title: '主题', onBack: onBack),
                 ),
-              ),
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                child: PinnedSubHeader(title: '主题', onBack: onBack),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       },
@@ -505,12 +520,18 @@ class _ThemePreviewState extends State<_ThemePreview> {
   int _direction = 1;
   late AppTabTransition _lastTransition = widget.settings.tabTransition;
 
-  static const _icons = [
-    Icons.schedule_rounded,
-    Icons.account_balance_wallet_rounded,
-    Icons.insights_rounded,
-    Icons.person_rounded,
-  ];
+  static const _icons = kHoursOnly
+      ? [
+          Icons.schedule_rounded,
+          Icons.pie_chart_rounded,
+          Icons.account_circle_rounded,
+        ]
+      : [
+          Icons.schedule_rounded,
+          Icons.account_balance_wallet_rounded,
+          Icons.pie_chart_rounded,
+          Icons.account_circle_rounded,
+        ];
 
   @override
   void initState() {
@@ -1022,8 +1043,8 @@ class _ColorDot extends StatelessWidget {
           child: AnimatedContainer(
             duration: motionDuration(Timings.micro, disableAnimations: disable),
             curve: Curves2.out,
-            width: 38,
-            height: 38,
+            width: 34,
+            height: 34,
             padding: const EdgeInsets.all(3),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
@@ -1071,14 +1092,14 @@ class _AddColorDot extends StatelessWidget {
       shape: const CircleBorder(),
       pressedScale: .88,
       child: Container(
-        width: 38,
-        height: 38,
+        width: 34,
+        height: 34,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: colors.inset,
           border: Border.all(color: colors.divider),
         ),
-        child: Icon(Icons.add_rounded, size: 18, color: colors.text2),
+        child: Icon(Icons.add_rounded, size: 17, color: colors.text2),
       ),
     );
   }

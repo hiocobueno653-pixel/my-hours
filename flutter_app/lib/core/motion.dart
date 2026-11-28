@@ -8,6 +8,8 @@
 /// 的部分（如面板曲线 0.32/0.72/0/1）保留原值。
 library;
 
+import 'dart:math' as math;
+
 import 'package:flutter/animation.dart';
 import 'package:flutter/physics.dart';
 
@@ -121,17 +123,10 @@ abstract final class FlClashSprings {
   static final Curve alertCurve = SpringCurve(alert, seconds: 0.40);
 
   /// 顶栏搜索展开 / 收起弹簧。
-  static final SpringDescription searchOpen = SpringDescription.withDampingRatio(
-    mass: 1,
-    stiffness: 390,
-    ratio: 0.75,
-  );
+  static final SpringDescription searchOpen =
+      SpringDescription.withDampingRatio(mass: 1, stiffness: 390, ratio: 0.75);
   static final SpringDescription searchClose =
-      SpringDescription.withDampingRatio(
-        mass: 1,
-        stiffness: 600,
-        ratio: 0.75,
-      );
+      SpringDescription.withDampingRatio(mass: 1, stiffness: 600, ratio: 0.75);
   static final Curve searchOpenCurve = SpringCurve(searchOpen, seconds: 0.45);
   static final Curve searchCloseCurve = SpringCurve(searchClose, seconds: 0.25);
 
@@ -141,6 +136,84 @@ abstract final class FlClashSprings {
     stiffness: 165,
     ratio: 0.80,
   );
+}
+
+/// 液态玻璃水滴弹簧体系：基于物理阻尼比与响应时长，
+/// 兼顾「轻触微弹、滑动跟手、离手承接初速」的流体手感。
+abstract final class LiquidSprings {
+  /// 水滴轻弹：胶囊展开、分段滑块、选中态落位、菜单绽放。
+  static final SpringDescription bouncy =
+      SpringDescription.withDurationAndBounce(
+        duration: const Duration(milliseconds: 380),
+        bounce: 0.22,
+      );
+
+  /// 干脆回弹：按压抬手、快捷按钮、卡片微震落定。
+  static final SpringDescription snappy =
+      SpringDescription.withDurationAndBounce(
+        duration: const Duration(milliseconds: 280),
+        bounce: 0.12,
+      );
+
+  /// 丝滑无过冲：页面推进、底部弹层升起、Tab 切换、卡片高度收拢。
+  static final SpringDescription smooth =
+      SpringDescription.withDurationAndBounce(
+        duration: const Duration(milliseconds: 400),
+        bounce: 0.04,
+      );
+
+  /// 承接手势初速的流体回归：弹层拖拽回弹、日历翻页落定、弹窗来源绽放。
+  static final SpringDescription fluid =
+      SpringDescription.withDurationAndBounce(
+        duration: const Duration(milliseconds: 440),
+        bounce: 0.16,
+      );
+
+  /// 按压抬手专属水滴弹簧：释放后柔和回弹不僵硬。
+  static final SpringDescription pressRelease =
+      SpringDescription.withDampingRatio(
+        mass: 1.0,
+        stiffness: 420.0,
+        ratio: 0.68,
+      );
+
+  /// 液滴菜单绽放弹簧：略带表面张力微过冲。
+  static final SpringDescription dropletBloom =
+      SpringDescription.withDampingRatio(
+        mass: 1.0,
+        stiffness: 255.0,
+        ratio: 0.70,
+      );
+
+  static final Curve bouncyCurve = SpringCurve(bouncy, seconds: 0.42);
+  static final Curve snappyCurve = SpringCurve(snappy, seconds: 0.30);
+  static final Curve smoothCurve = SpringCurve(smooth, seconds: 0.40);
+  static final Curve fluidCurve = SpringCurve(fluid, seconds: 0.44);
+  static final Curve dropletCurve = SpringCurve(dropletBloom, seconds: 0.42);
+
+  /// Apple Designing Fluid Interfaces 指数衰减动量投影：
+  /// 用松手瞬时速度预测惯性落点，而不是生硬按当前位移阈值裁决。
+  static double projectMomentum(
+    double velocityPxPerSec, {
+    double decelerationRate = 0.996,
+  }) {
+    return (velocityPxPerSec / 1000.0) *
+        decelerationRate /
+        (1.0 - decelerationRate);
+  }
+
+  /// Apple 经典橡皮筋软边界阻力：越拉越沉，永不撞墙卡死。
+  static double rubberBandOffset(
+    double overshoot,
+    double dimension, {
+    double constant = 0.55,
+  }) {
+    final safeDim = math.max(1.0, dimension);
+    final absOver = overshoot.abs();
+    final damped =
+        (absOver * safeDim * constant) / (safeDim + constant * absOver);
+    return overshoot < 0 ? -damped : damped;
+  }
 }
 
 /// 统一入口：把时长折叠为 0（系统「移除动画」或应用内关闭动效）。

@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -93,6 +92,7 @@ class WorkBentoHeader extends StatelessWidget {
           summary: summary,
           monthPay: monthPay,
           settlement: settlement,
+          workdays: workdays,
           onTap: onOpenWage,
         ),
         DashboardCardIds.ledgerBalance => _MonthBalanceMiniCard(
@@ -406,7 +406,11 @@ class _TodayWorkspaceCardState extends ConsumerState<_TodayWorkspaceCard> {
         : colors.income;
     final statusBg = active
         ? (running ? colors.primaryContainer : colors.warningSoft)
-        : Colors.transparent;
+        : settled
+        ? colors.incomeSoft
+        : current != null && current.hours > 0
+        ? colors.incomeSoft
+        : colors.block;
     final consoleShape = Radii.shape(Radii.hero);
     final loggedHours = current?.hours ?? 0.0;
     final dialArcColor = active && running
@@ -417,240 +421,252 @@ class _TodayWorkspaceCardState extends ConsumerState<_TodayWorkspaceCard> {
         ? colors.warning
         : colors.primary;
     final progressPct = ((loggedHours / 8.0) * 100).round().clamp(0, 999);
+    final dailyProgress = (loggedHours / 8.0).clamp(0.0, 1.0);
 
     return Container(
       key: const ValueKey('today-bento-card'),
       decoration: studioHeroDecoration(colors, radius: Radii.hero),
       child: ClipPath(
         clipper: ShapeBorderClipper(shape: consoleShape),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 15, 18, 14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Flexible(
-                              child: Text(
-                                dateLabel,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: colors.text2,
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w600,
-                                  letterSpacing: 0.1,
-                                ),
-                              ),
+                  Expanded(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            dateLabel,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: colors.text2,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
                             ),
-                            const SizedBox(width: 8),
-                            AnimatedContainer(
-                              duration: motionDuration(
-                                Timings.fast,
-                                disableAnimations: disable,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        AnimatedContainer(
+                          duration: motionDuration(
+                            Timings.fast,
+                            disableAnimations: disable,
+                          ),
+                          curve: Curves2.soft,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: ShapeDecoration(
+                            color: statusBg,
+                            shape: Radii.pillShape,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _LiveStatusDot(
+                                color: statusColor,
+                                pulsing: active && running,
                               ),
-                              curve: Curves2.soft,
-                              padding: active
-                                  ? const EdgeInsets.symmetric(
-                                      horizontal: 7,
-                                      vertical: 2.5,
-                                    )
-                                  : EdgeInsets.zero,
-                              decoration: active
-                                  ? ShapeDecoration(
-                                      color: statusBg,
-                                      shape: Radii.pillShape,
-                                    )
-                                  : null,
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  _LiveStatusDot(
-                                    color: statusColor,
-                                    pulsing: active && running,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  AnimatedSwitcher(
-                                    duration: motionDuration(
-                                      Timings.fast,
-                                      disableAnimations: disable,
-                                    ),
-                                    switchInCurve: Curves2.out,
-                                    switchOutCurve: Curves2.out,
-                                    child: Text(
-                                      statusText,
-                                      key: ValueKey(statusText),
-                                      style: TextStyle(
-                                        color: active
-                                            ? statusColor
-                                            : colors.text3,
-                                        fontSize: 11.5,
-                                        fontWeight: active
-                                            ? FontWeight.w600
-                                            : FontWeight.w500,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            if (crossDay) ...[
-                              const SizedBox(width: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 3,
+                              const SizedBox(width: 4),
+                              AnimatedSwitcher(
+                                duration: motionDuration(
+                                  Timings.fast,
+                                  disableAnimations: disable,
                                 ),
-                                decoration: ShapeDecoration(
-                                  color: colors.warningSoft,
-                                  shape: Radii.pillShape,
-                                ),
+                                switchInCurve: Curves2.out,
+                                switchOutCurve: Curves2.out,
                                 child: Text(
-                                  '跨日',
+                                  statusText,
+                                  key: ValueKey(statusText),
                                   style: TextStyle(
-                                    color: colors.warning,
-                                    fontSize: TypeScale.micro,
+                                    color: active || settled || loggedHours > 0
+                                        ? statusColor
+                                        : colors.text3,
+                                    fontSize: 11,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
                               ),
                             ],
-                          ],
+                          ),
                         ),
-                      ),
-                      if (!kHoursOnly && activeProfile != null)
-                        ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 168),
-                          child: Pressable(
-                            onTap: widget.onOpenWorkManager,
-                            shape: Radii.pillShape,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 9,
-                                vertical: 4,
-                              ),
-                              decoration: ShapeDecoration(
-                                color: colors.block,
-                                shape: Radii.pillShape,
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Flexible(
-                                    child: Text(
-                                      activeRate <= 0
-                                          ? '设置${context.unit.rateName}'
-                                          : '${activeProfile.name} · ¥${formatRate(activeRate)}/${context.unit.rateShort}',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        fontSize: 11.5,
-                                        fontWeight: FontWeight.w500,
-                                        color: colors.text2,
-                                        fontFeatures: tabularFigures,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 2),
-                                  Icon(
-                                    Icons.chevron_right_rounded,
-                                    size: 13.5,
-                                    color: colors.text3,
-                                  ),
-                                ],
+                        if (crossDay) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: ShapeDecoration(
+                              color: colors.warningSoft,
+                              shape: Radii.pillShape,
+                            ),
+                            child: Text(
+                              '跨日',
+                              style: TextStyle(
+                                color: colors.warning,
+                                fontSize: TypeScale.micro,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                           ),
-                        ),
-                    ],
+                        ],
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 12),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Expanded(
-                        child: Pressable(
-                          onTap: widget.onOpenToday,
-                          shape: Radii.shape(10),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 2),
-                            child: AnimatedSize(
-                              alignment: Alignment.topLeft,
-                              duration: motionDuration(
-                                Timings.fast,
-                                disableAnimations: disable,
-                              ),
-                              curve: Curves2.out,
-                              child: AnimatedSwitcher(
-                                duration: motionDuration(
-                                  Timings.base,
-                                  disableAnimations: disable,
+                  if (!kHoursOnly && activeProfile != null)
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 168),
+                      child: Pressable(
+                        onTap: widget.onOpenWorkManager,
+                        shape: Radii.pillShape,
+                        pressedScale: 0.93,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4.5,
+                          ),
+                          decoration: ShapeDecoration(
+                            color: activeRate <= 0
+                                ? colors.primaryContainer
+                                : colors.block,
+                            shape: Radii.pillShape,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  activeRate <= 0
+                                      ? '设置${context.unit.rateName}'
+                                      : '${activeProfile.name} · ¥${formatRate(activeRate)}/${context.unit.rateShort}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: activeRate <= 0
+                                        ? FontWeight.w600
+                                        : FontWeight.w500,
+                                    color: activeRate <= 0
+                                        ? colors.primary
+                                        : colors.text2,
+                                    fontFeatures: tabularFigures,
+                                  ),
                                 ),
-                                switchInCurve: Curves2.out,
-                                switchOutCurve: Curves2.out,
-                                layoutBuilder:
-                                    (currentChild, previousChildren) => Stack(
-                                      alignment: Alignment.centerLeft,
-                                      children: [
-                                        ...previousChildren,
-                                        ?currentChild,
-                                      ],
+                              ),
+                              const SizedBox(width: 2),
+                              Icon(
+                                Icons.chevron_right_rounded,
+                                size: 13.5,
+                                color: activeRate <= 0
+                                    ? colors.primary.withValues(alpha: 0.78)
+                                    : colors.text3,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    Text(
+                      loggedHours > 8
+                          ? '加班 +${formatHoursValue(loggedHours - 8)}${context.unit.short}'
+                          : '日标 8${context.unit.short}',
+                      style: TextStyle(
+                        color: loggedHours > 8 ? colors.warning : colors.text3,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w500,
+                        fontFeatures: tabularFigures,
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: Pressable(
+                      onTap: widget.onOpenToday,
+                      shape: Radii.shape(10),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        child: AnimatedSize(
+                          alignment: Alignment.topLeft,
+                          duration: motionDuration(
+                            Timings.fast,
+                            disableAnimations: disable,
+                          ),
+                          curve: Curves2.out,
+                          child: AnimatedSwitcher(
+                            duration: motionDuration(
+                              Timings.base,
+                              disableAnimations: disable,
+                            ),
+                            switchInCurve: Curves2.out,
+                            switchOutCurve: Curves2.out,
+                            layoutBuilder: (currentChild, previousChildren) =>
+                                Stack(
+                                  alignment: Alignment.centerLeft,
+                                  children: [
+                                    ...previousChildren,
+                                    ?currentChild,
+                                  ],
+                                ),
+                            transitionBuilder: (child, animation) =>
+                                FadeTransition(
+                                  opacity: animation,
+                                  child: SlideTransition(
+                                    position: Tween<Offset>(
+                                      begin: const Offset(0, 0.08),
+                                      end: Offset.zero,
+                                    ).animate(animation),
+                                    child: child,
+                                  ),
+                                ),
+                            child: active
+                                ? KeyedSubtree(
+                                    key: const ValueKey('today-readout-timer'),
+                                    child: _LiveTimerReadout(
+                                      timer: timer,
+                                      currentHours: current?.hours ?? 0,
+                                      activeRate: activeRate,
+                                      crossDay: crossDay,
                                     ),
-                                transitionBuilder: (child, animation) =>
-                                    FadeTransition(
-                                      opacity: animation,
-                                      child: SlideTransition(
-                                        position: Tween<Offset>(
-                                          begin: const Offset(0, 0.08),
-                                          end: Offset.zero,
-                                        ).animate(animation),
-                                        child: child,
-                                      ),
-                                    ),
-                                child: active
-                                    ? KeyedSubtree(
-                                        key: const ValueKey(
-                                          'today-readout-timer',
-                                        ),
-                                        child: _LiveTimerReadout(
-                                          timer: timer,
-                                          currentHours: current?.hours ?? 0,
-                                          activeRate: activeRate,
-                                          crossDay: crossDay,
-                                        ),
-                                      )
-                                    : Column(
-                                        key: const ValueKey(
-                                          'today-readout-hours',
-                                        ),
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Row(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.baseline,
-                                            textBaseline:
-                                                TextBaseline.alphabetic,
-                                            children: [
-                                              if (current == null)
-                                                Text(
-                                                  '—',
+                                  )
+                                : Row(
+                                    key: const ValueKey('today-readout-hours'),
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.baseline,
+                                    textBaseline: TextBaseline.alphabetic,
+                                    children: [
+                                      Flexible(
+                                        child: FittedBox(
+                                          fit: BoxFit.scaleDown,
+                                          alignment: Alignment.centerLeft,
+                                          child: current == null
+                                              ? Text(
+                                                  '0',
                                                   style: TextStyle(
-                                                    color: colors.text3,
-                                                    fontSize: 44,
-                                                    height: 0.96,
-                                                    fontWeight: FontWeight.w600,
+                                                    color: colors.text3
+                                                        .withValues(
+                                                          alpha: 0.55,
+                                                        ),
+                                                    fontSize: 42,
+                                                    height: 0.98,
+                                                    fontWeight: FontWeight.w700,
+                                                    letterSpacing: -0.8,
+                                                    fontFeatures:
+                                                        tabularFigures,
                                                   ),
                                                 )
-                                              else
-                                                AnimatedNumericText(
+                                              : AnimatedNumericText(
                                                   value: current.hours,
                                                   formatter: (value) =>
                                                       formatHoursValue(
@@ -658,166 +674,164 @@ class _TodayWorkspaceCardState extends ConsumerState<_TodayWorkspaceCard> {
                                                       ),
                                                   style: TextStyle(
                                                     color: colors.text,
-                                                    fontSize: 44,
-                                                    height: 0.96,
-                                                    fontWeight: FontWeight.w600,
-                                                    letterSpacing: -1.5,
+                                                    fontSize: 42,
+                                                    height: 0.98,
+                                                    fontWeight: FontWeight.w700,
+                                                    letterSpacing: -0.8,
                                                   ),
                                                 ),
-                                              const SizedBox(width: 6),
-                                              Text(
-                                                context.unit.name,
-                                                style: TextStyle(
-                                                  color: colors.text3,
-                                                  fontSize: 14,
-                                                  fontWeight: FontWeight.w500,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 9),
-                                          Wrap(
-                                            spacing: 8,
-                                            runSpacing: 4,
-                                            crossAxisAlignment:
-                                                WrapCrossAlignment.center,
-                                            children: [
-                                              if (!kHoursOnly && pay > 0)
-                                                Container(
-                                                  padding:
-                                                      const EdgeInsets.symmetric(
-                                                        horizontal: 8,
-                                                        vertical: 3,
-                                                      ),
-                                                  decoration: ShapeDecoration(
-                                                    color: colors.incomeSoft,
-                                                    shape: Radii.pillShape
-                                                        .copyWith(
-                                                          side: BorderSide(
-                                                            color: colors.income
-                                                                .withValues(
-                                                                  alpha:
-                                                                      colors
-                                                                          .isDark
-                                                                      ? 0.24
-                                                                      : 0.14,
-                                                                ),
-                                                            width: 0.75,
-                                                          ),
-                                                        ),
-                                                  ),
-                                                  child: AnimatedNumericText(
-                                                    value: pay,
-                                                    formatter: (value) =>
-                                                        '今日工资 ${formatAmount(value.toDouble(), withSymbol: true)}',
-                                                    style: TextStyle(
-                                                      color: colors.income,
-                                                      fontSize: 11.5,
-                                                      fontWeight:
-                                                          FontWeight.w600,
-                                                    ),
-                                                  ),
-                                                ),
-                                              Text(
-                                                loggedHours > 8
-                                                    ? '加班 +${formatHoursValue(loggedHours - 8)}${context.unit.short}'
-                                                    : '日标 $progressPct%',
-                                                style: TextStyle(
-                                                  color: loggedHours > 8
-                                                      ? colors.warning
-                                                      : colors.text3,
-                                                  fontSize: 11.5,
-                                                  fontWeight: FontWeight.w500,
-                                                  fontFeatures: tabularFigures,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ],
+                                        ),
                                       ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      AnimatedSize(
-                        duration: motionDuration(
-                          Timings.base,
-                          disableAnimations: disable,
-                        ),
-                        curve: Curves2.out,
-                        alignment: Alignment.centerRight,
-                        child: AnimatedSwitcher(
-                          duration: motionDuration(
-                            Timings.base,
-                            disableAnimations: disable,
-                          ),
-                          switchInCurve: Curves2.out,
-                          switchOutCurve: Curves2.out,
-                          child: !active
-                              ? _ChronographDialTrigger(
-                                  key: ValueKey(
-                                    'dial-idle-$timerDisabled-$readOnly',
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        context.unit.name,
+                                        style: TextStyle(
+                                          color: colors.text2,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  hours: loggedHours,
-                                  arcColor: dialArcColor,
-                                  label: timerDisabled
-                                      ? (readOnly ? '只读' : '已锁定')
-                                      : '开始计时',
-                                  icon: timerDisabled
-                                      ? Icons.lock_outline_rounded
-                                      : Icons.play_arrow_rounded,
-                                  disabled: timerDisabled,
-                                  onTap: timerDisabled ? null : _startOrResume,
-                                )
-                              : Column(
-                                  key: const ValueKey('timer-active-controls'),
-                                  mainAxisSize: MainAxisSize.min,
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    _TimerCompactButton(
-                                      label: running ? '暂停' : '继续',
-                                      icon: running
-                                          ? Icons.pause_rounded
-                                          : Icons.play_arrow_rounded,
-                                      primary: true,
-                                      onTap: running ? _pause : _startOrResume,
-                                    ),
-                                    const SizedBox(height: 6),
-                                    _TimerCompactButton(
-                                      label: canFinish ? '完成' : '放弃',
-                                      icon: canFinish
-                                          ? Icons.check_rounded
-                                          : Icons.close_rounded,
-                                      primary: false,
-                                      positive: canFinish,
-                                      onTap: canFinish ? _stop : _discardTimer,
-                                    ),
-                                  ],
-                                ),
+                          ),
                         ),
                       ),
-                    ],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  AnimatedSize(
+                    duration: motionDuration(
+                      Timings.base,
+                      disableAnimations: disable,
+                    ),
+                    curve: LiquidSprings.smoothCurve,
+                    alignment: Alignment.centerRight,
+                    child: AnimatedSwitcher(
+                      duration: motionDuration(
+                        Timings.base,
+                        disableAnimations: disable,
+                      ),
+                      switchInCurve: Curves2.out,
+                      switchOutCurve: Curves2.out,
+                      child: !active
+                          ? _TimerStartPill(
+                              key: ValueKey(
+                                'timer-idle-$timerDisabled-$readOnly',
+                              ),
+                              label: timerDisabled
+                                  ? (readOnly ? '只读' : '已锁定')
+                                  : '开始计时',
+                              icon: timerDisabled
+                                  ? Icons.lock_outline_rounded
+                                  : Icons.play_arrow_rounded,
+                              disabled: timerDisabled,
+                              onTap: timerDisabled ? null : _startOrResume,
+                            )
+                          : Row(
+                              key: const ValueKey('timer-active-controls'),
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                _TimerCompactButton(
+                                  label: running ? '暂停' : '继续',
+                                  icon: running
+                                      ? Icons.pause_rounded
+                                      : Icons.play_arrow_rounded,
+                                  primary: true,
+                                  onTap: running ? _pause : _startOrResume,
+                                ),
+                                const SizedBox(width: 6),
+                                _TimerCompactButton(
+                                  label: canFinish ? '完成' : '放弃',
+                                  icon: canFinish
+                                      ? Icons.check_rounded
+                                      : Icons.close_rounded,
+                                  primary: false,
+                                  positive: canFinish,
+                                  onTap: canFinish ? _stop : _discardTimer,
+                                ),
+                              ],
+                            ),
+                    ),
                   ),
                 ],
               ),
-            ),
-            Divider(height: 1, thickness: 0.7, color: colors.divider),
-            ColoredBox(
-              color: colors.heroWell,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(14, 9, 12, 10),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
+              AnimatedSize(
+                duration: motionDuration(
+                  Timings.slow,
+                  disableAnimations: disable,
+                ),
+                curve: LiquidSprings.smoothCurve,
+                alignment: Alignment.topCenter,
+                child: active
+                    ? const SizedBox.shrink()
+                    : Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            ProgressBar(
+                              ratio: dailyProgress,
+                              color: dialArcColor,
+                              height: 5,
+                            ),
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                Text(
+                                  loggedHours > 8
+                                      ? '已超日标 +${formatHoursValue(loggedHours - 8)}${context.unit.short}'
+                                      : '今日进度 $progressPct%',
+                                  style: TextStyle(
+                                    color: loggedHours > 8
+                                        ? colors.warning
+                                        : colors.text3,
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w500,
+                                    fontFeatures: tabularFigures,
+                                  ),
+                                ),
+                                const Spacer(),
+                                if (!kHoursOnly && pay > 0)
+                                  AnimatedNumericText(
+                                    value: pay,
+                                    formatter: (value) =>
+                                        '预计工资 ${formatAmount(value.toDouble(), withSymbol: true)}',
+                                    style: TextStyle(
+                                      color: colors.income,
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: ShapeDecoration(
+                          color: colors.isDark
+                              ? Colors.white.withValues(alpha: 0.07)
+                              : colors.block,
+                          shape: Radii.pillShape,
+                        ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             for (var i = 0; i < quickSteps.length; i++) ...[
-                              if (i > 0) const SizedBox(width: 6),
+                              if (i > 0)
+                                Container(
+                                  width: 0.5,
+                                  height: 16,
+                                  color: colors.divider.withValues(alpha: 0.9),
+                                ),
                               _QuickStepChip(
                                 label:
                                     '${i == quickSteps.length - 1 ? '' : '+'}'
@@ -837,27 +851,18 @@ class _TodayWorkspaceCardState extends ConsumerState<_TodayWorkspaceCard> {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 6),
-                    if (!kHoursOnly && widget.onOpenLedger != null) ...[
-                      _ToolbarMiniAction(
-                        icon: Icons.add_rounded,
-                        label: widget.entryCount > 0
-                            ? '账目 ${widget.entryCount}'
-                            : '记账',
-                        onTap: widget.onOpenLedger!,
-                      ),
-                      const SizedBox(width: 2),
-                    ],
-                    _ToolbarMiniAction(
-                      icon: Icons.edit_outlined,
-                      label: '编辑',
-                      onTap: widget.onOpenToday,
-                    ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(width: 8),
+                  _ToolbarMiniAction(
+                    icon: Icons.edit_rounded,
+                    label: '编辑',
+                    accent: true,
+                    onTap: widget.onOpenToday,
+                  ),
+                ],
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -962,22 +967,26 @@ class _LiveTimerReadoutState extends State<_LiveTimerReadout> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        ValueListenableBuilder<String>(
-          valueListenable: _clockText,
-          builder: (context, value, _) => RepaintBoundary(
-            child: RollingDigitsText(
-              text: value,
-              style: TextStyle(
-                color: running ? colors.primary : colors.text,
-                fontSize: 36,
-                height: 1.0,
-                fontWeight: FontWeight.w600,
-                letterSpacing: -1.0,
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: ValueListenableBuilder<String>(
+            valueListenable: _clockText,
+            builder: (context, value, _) => RepaintBoundary(
+              child: RollingDigitsText(
+                text: value,
+                style: TextStyle(
+                  color: running ? colors.primary : colors.text,
+                  fontSize: 34,
+                  height: 1.02,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.6,
+                ),
               ),
             ),
           ),
         ),
-        const SizedBox(height: 5),
+        const SizedBox(height: 4),
         Text(
           subText,
           maxLines: 1,
@@ -1126,15 +1135,15 @@ class _TimerCompactButton extends StatelessWidget {
         : positive
         ? colors.income
         : colors.text2;
-    final shape = Radii.shape(Radii.md);
+    final shape = Radii.pillShape;
     return Pressable(
       onTap: onTap,
       haptic: false,
       shape: shape,
-      pressedScale: 0.94,
+      pressedScale: 0.96,
       child: Container(
-        height: 40,
-        padding: const EdgeInsets.symmetric(horizontal: 14),
+        height: 38,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: ShapeDecoration(color: bg, shape: shape),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -1160,13 +1169,13 @@ class _TimerCompactButton extends StatelessWidget {
                 key: ValueKey('$label-${icon.codePoint}'),
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(icon, size: 17, color: fg),
-                  const SizedBox(width: 4),
+                  Icon(icon, size: 16, color: fg),
+                  const SizedBox(width: 3),
                   Text(
                     label,
                     style: TextStyle(
                       color: fg,
-                      fontSize: 13.5,
+                      fontSize: 13,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -1195,49 +1204,30 @@ class _QuickStepChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final disable = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
-    final shape = Radii.shape(9.5);
+    final shape = Radii.pillShape;
     return AnimatedOpacity(
       duration: motionDuration(Timings.instant, disableAnimations: disable),
       curve: Curves2.soft,
-      opacity: enabled ? 1 : 0.45,
+      opacity: enabled ? 1 : 0.42,
       child: Pressable(
         onTap: enabled ? onTap : null,
         haptic: false,
         shape: shape,
-        pressedScale: 0.94,
-        child: Container(
-          constraints: const BoxConstraints(minWidth: 42, minHeight: 30),
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          alignment: Alignment.center,
-          decoration: ShapeDecoration(
-            color: colors.isDark
-                ? Color.lerp(colors.card, Colors.white, 0.05)!
-                : colors.card,
-            shape: shape.copyWith(
-              side: BorderSide(
-                color: colors.isDark
-                    ? Colors.white.withValues(alpha: 0.08)
-                    : colors.cardBorder,
-                width: 0.75,
+        pressedScale: 0.96,
+        child: SizedBox(
+          height: 32,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Center(
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: colors.text,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  fontFeatures: tabularFigures,
+                ),
               ),
-            ),
-            shadows: colors.isDark
-                ? null
-                : [
-                    BoxShadow(
-                      color: const Color(0xFF141519).withValues(alpha: 0.04),
-                      blurRadius: 3,
-                      offset: const Offset(0, 1),
-                    ),
-                  ],
-          ),
-          child: Text(
-            label,
-            style: TextStyle(
-              color: colors.text,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              fontFeatures: tabularFigures,
             ),
           ),
         ),
@@ -1251,33 +1241,40 @@ class _ToolbarMiniAction extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onTap,
+    this.accent = false,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback onTap;
+  final bool accent;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    final bg = accent
+        ? colors.primaryContainer
+        : (colors.isDark ? Colors.white.withValues(alpha: 0.08) : colors.block);
+    final fg = accent ? colors.primary : colors.text;
     return Pressable(
       onTap: onTap,
-      shape: Radii.shape(9),
-      pressedScale: 0.94,
+      shape: Radii.pillShape,
+      pressedScale: 0.96,
       child: Container(
-        constraints: const BoxConstraints(minHeight: 32),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        constraints: const BoxConstraints(minHeight: 34),
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+        decoration: ShapeDecoration(color: bg, shape: Radii.pillShape),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 14, color: colors.text2),
-            const SizedBox(width: 3),
+            Icon(icon, size: 14, color: accent ? colors.primary : colors.text2),
+            const SizedBox(width: 4),
             Text(
               label,
               style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: colors.text2,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: fg,
               ),
             ),
           ],
@@ -1287,21 +1284,16 @@ class _ToolbarMiniAction extends StatelessWidget {
   }
 }
 
-/// 360° 精密制表圆盘 + 实体表冠启停钮：
-/// 从 12 点顺时针扫掠表达今日相对 8h 标准进度，超 8h 转琥珀金，克制不抢读数重心。
-class _ChronographDialTrigger extends StatelessWidget {
-  const _ChronographDialTrigger({
+/// 今日计时主操作胶囊：清晰醒目的 Apple 胶囊按钮，替代繁杂的多圈刻度表盘。
+class _TimerStartPill extends StatelessWidget {
+  const _TimerStartPill({
     super.key,
-    required this.hours,
-    required this.arcColor,
     required this.label,
     required this.icon,
     required this.disabled,
     required this.onTap,
   });
 
-  final double hours;
-  final Color arcColor;
   final String label;
   final IconData icon;
   final bool disabled;
@@ -1310,203 +1302,94 @@ class _ChronographDialTrigger extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final crownTop = disabled
-        ? colors.block
-        : colors.isDark
-        ? Color.lerp(colors.block, Colors.white, 0.08)!
-        : colors.card;
-    final crownBottom = disabled
-        ? colors.block
-        : colors.isDark
-        ? colors.card
-        : Color.lerp(colors.card, colors.block, 0.35)!;
-    return Pressable(
+    final shape = Radii.pillShape;
+    return Semantics(
+      button: true,
+      enabled: !disabled,
+      label: label,
       onTap: onTap,
-      haptic: false,
-      shape: Radii.shape(16),
-      pressedScale: 0.94,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(
-              width: 86,
-              height: 86,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  RepaintBoundary(
-                    child: CustomPaint(
-                      size: const Size(86, 86),
-                      painter: _ChronographDialPainter(
-                        ratio: (hours / 8.0).clamp(0.0, 1.0),
-                        arcColor: arcColor,
-                        trackColor: colors.isDark
-                            ? Colors.white.withValues(alpha: 0.09)
-                            : colors.block,
-                        tickColor: colors.isDark
-                            ? Colors.white.withValues(alpha: 0.20)
-                            : colors.outline.withValues(alpha: 0.52),
-                        wellColor: colors.heroWell.withValues(
-                          alpha: colors.isDark ? 0.52 : 0.65,
-                        ),
-                      ),
-                    ),
+      excludeSemantics: true,
+      child: Pressable(
+        onTap: onTap,
+        haptic: false,
+        shape: shape,
+        pressedScale: 0.96,
+        child: Container(
+          height: 44,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: ShapeDecoration(
+            color: disabled ? colors.block : null,
+            gradient: disabled
+                ? null
+                : LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Color.lerp(
+                        colors.primary,
+                        Colors.white,
+                        colors.isDark ? 0.07 : 0.09,
+                      )!,
+                      colors.primary,
+                    ],
                   ),
-                  Container(
-                    width: 46,
-                    height: 46,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [crownTop, crownBottom],
+            shape: shape,
+            shadows: disabled
+                ? null
+                : [
+                    BoxShadow(
+                      color: colors.primary.withValues(
+                        alpha: colors.isDark ? 0.20 : 0.13,
                       ),
-                      border: Border.all(
-                        color: disabled
-                            ? colors.divider
-                            : colors.isDark
-                            ? Colors.white.withValues(alpha: 0.14)
-                            : colors.cardBorder,
-                        width: 1.0,
-                      ),
-                      boxShadow: disabled
-                          ? null
-                          : [
-                              BoxShadow(
-                                color: const Color(0xFF141519).withValues(
-                                  alpha: colors.isDark ? 0.42 : 0.10,
-                                ),
-                                blurRadius: 10,
-                                offset: const Offset(0, 3),
-                              ),
-                              if (!colors.isDark)
-                                BoxShadow(
-                                  color: const Color(0xFF141519)
-                                      .withValues(alpha: 0.04),
-                                  blurRadius: 2,
-                                  offset: const Offset(0, 1),
-                                ),
-                            ],
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
                     ),
-                    child: Transform.translate(
-                      offset: icon == Icons.play_arrow_rounded
-                          ? const Offset(1.2, 0)
-                          : Offset.zero,
-                      child: Icon(
-                        icon,
-                        size: 22,
-                        color: disabled ? colors.text3 : arcColor,
-                      ),
-                    ),
-                  ),
-                ],
+                  ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                size: 19,
+                color: disabled ? colors.text3 : colors.onPrimary,
               ),
-            ),
-            const SizedBox(height: 3),
-            Text(
-              label,
-              style: TextStyle(
-                color: disabled ? colors.text3 : colors.text2,
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-                letterSpacing: 0.2,
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  color: disabled ? colors.text3 : colors.onPrimary,
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _ChronographDialPainter extends CustomPainter {
-  const _ChronographDialPainter({
-    required this.ratio,
-    required this.arcColor,
-    required this.trackColor,
-    required this.tickColor,
-    required this.wellColor,
-  });
+class _BentoMicroBadge extends StatelessWidget {
+  const _BentoMicroBadge({required this.icon, required this.color});
 
-  final double ratio;
-  final Color arcColor;
-  final Color trackColor;
-  final Color tickColor;
-  final Color wellColor;
+  final IconData icon;
+  final Color color;
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final outerRadius = size.width / 2 - 1.5;
-    final arcRadius = outerRadius - 7.5;
-    const startAngle = -math.pi / 2;
-    const sweepTotal = math.pi * 2;
-    const ticks = 24;
-
-    canvas.drawCircle(center, arcRadius - 2.2, Paint()..color = wellColor);
-
-    final filledTicks = ratio <= 0 ? 0 : (ratio * ticks).floor();
-    for (var i = 0; i < ticks; i++) {
-      final angle = startAngle + sweepTotal * (i / ticks);
-      final isMajor = i % 6 == 0;
-      final innerR = outerRadius - (isMajor ? 4.2 : 2.2);
-      final p0 = Offset(
-        center.dx + math.cos(angle) * innerR,
-        center.dy + math.sin(angle) * innerR,
-      );
-      final p1 = Offset(
-        center.dx + math.cos(angle) * outerRadius,
-        center.dy + math.sin(angle) * outerRadius,
-      );
-      final lit = ratio > 0 && (i == 0 || i <= filledTicks);
-      canvas.drawLine(
-        p0,
-        p1,
-        Paint()
-          ..strokeWidth = isMajor ? 1.35 : 0.85
-          ..strokeCap = StrokeCap.round
-          ..color = lit
-              ? arcColor.withValues(alpha: isMajor ? 0.92 : 0.55)
-              : tickColor.withValues(alpha: isMajor ? 0.82 : 0.36),
-      );
-    }
-
-    final arcRect = Rect.fromCircle(center: center, radius: arcRadius);
-    canvas.drawCircle(
-      center,
-      arcRadius,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 3.4
-        ..color = trackColor,
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return Container(
+      width: 24,
+      height: 24,
+      decoration: ShapeDecoration(
+        color: color.withValues(alpha: colors.isDark ? 0.20 : 0.12),
+        shape: Radii.shape(7.5),
+      ),
+      child: Icon(icon, size: 13.5, color: color),
     );
-
-    if (ratio > 0.005) {
-      final sweep = sweepTotal * ratio;
-      canvas.drawArc(
-        arcRect,
-        startAngle,
-        sweep,
-        false,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 3.6
-          ..strokeCap = StrokeCap.round
-          ..color = arcColor,
-      );
-    }
   }
-
-  @override
-  bool shouldRepaint(_ChronographDialPainter old) =>
-      old.ratio != ratio ||
-      old.arcColor != arcColor ||
-      old.trackColor != trackColor ||
-      old.tickColor != tickColor ||
-      old.wellColor != wellColor;
 }
 
 class _MonthHoursCard extends StatelessWidget {
@@ -1533,39 +1416,36 @@ class _MonthHoursCard extends StatelessWidget {
     return Pressable(
       onTap: onTap,
       shape: const RoundedRectangleBorder(),
+      pressedScale: 0.975,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 13, 14, 13),
+        padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Container(
-                  width: 6,
-                  height: 6,
-                  decoration: BoxDecoration(
-                    color: colors.primary,
-                    shape: BoxShape.circle,
-                  ),
+                _BentoMicroBadge(
+                  icon: Icons.schedule_rounded,
+                  color: colors.primary,
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: 7),
                 Text(
                   '本月${context.unit.quantity}',
                   style: TextStyle(
                     color: colors.text2,
-                    fontSize: 12,
+                    fontSize: 12.5,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
                 const Spacer(),
                 Icon(
                   Icons.chevron_right_rounded,
-                  size: 14.5,
+                  size: 15,
                   color: colors.text3,
                 ),
               ],
             ),
-            const SizedBox(height: 9),
+            const SizedBox(height: 10),
             Row(
               crossAxisAlignment: CrossAxisAlignment.baseline,
               textBaseline: TextBaseline.alphabetic,
@@ -1579,10 +1459,10 @@ class _MonthHoursCard extends StatelessWidget {
                       formatter: (value) => formatHoursValue(value.toDouble()),
                       style: TextStyle(
                         color: colors.text,
-                        fontSize: 25,
+                        fontSize: 24,
                         height: 1.05,
                         fontWeight: FontWeight.w700,
-                        letterSpacing: -0.9,
+                        letterSpacing: -0.5,
                       ),
                     ),
                   ),
@@ -1590,12 +1470,16 @@ class _MonthHoursCard extends StatelessWidget {
                 const SizedBox(width: 3),
                 Text(
                   context.unit.short,
-                  style: TextStyle(fontSize: 11.5, color: colors.text3),
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: colors.text3,
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: 8),
-            ProgressBar(ratio: progress, color: colors.primary, height: 2.5),
+            ProgressBar(ratio: progress, color: colors.primary, height: 4),
             const SizedBox(height: 6),
             Text(
               '${summary.workDays}天 · 日均 ${formatHoursValue(summary.averageHours)}${context.unit.short}',
@@ -1619,12 +1503,14 @@ class _MonthSalaryCard extends StatelessWidget {
     required this.summary,
     required this.monthPay,
     required this.settlement,
+    required this.workdays,
     required this.onTap,
   });
 
   final MonthSummary summary;
   final double monthPay;
   final SettlementSummary settlement;
+  final int workdays;
   final VoidCallback onTap;
 
   @override
@@ -1632,101 +1518,112 @@ class _MonthSalaryCard extends StatelessWidget {
     final colors = context.colors;
     final allSettled =
         !kHoursOnly && settlement.total > 0 && settlement.pending <= 0;
-    final settleRatio = settlement.total <= 0
-        ? 0.0
-        : (settlement.settled / settlement.total).clamp(0.0, 1.0);
+    final ratio = kHoursOnly
+        ? (workdays <= 0 ? 0.0 : (summary.workDays / workdays).clamp(0.0, 1.0))
+        : (settlement.total <= 0
+              ? 0.0
+              : (settlement.settled / settlement.total).clamp(0.0, 1.0));
     return Pressable(
       onTap: onTap,
       shape: const RoundedRectangleBorder(),
+      pressedScale: 0.975,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 13, 14, 13),
+        padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Container(
-                  width: 6,
-                  height: 6,
-                  decoration: BoxDecoration(
-                    color: colors.income,
-                    shape: BoxShape.circle,
-                  ),
+                _BentoMicroBadge(
+                  icon: kHoursOnly
+                      ? Icons.event_available_rounded
+                      : Icons.account_balance_wallet_rounded,
+                  color: colors.income,
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: 7),
                 Text(
                   kHoursOnly ? '本月出勤' : '本月工资',
                   style: TextStyle(
                     color: colors.text2,
-                    fontSize: 12,
+                    fontSize: 12.5,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
                 const Spacer(),
                 Icon(
                   Icons.chevron_right_rounded,
-                  size: 14.5,
+                  size: 15,
                   color: colors.text3,
                 ),
               ],
             ),
-            const SizedBox(height: 9),
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerLeft,
-              child: kHoursOnly
-                  ? AnimatedNumericText(
-                      value: summary.workDays,
-                      formatter: (value) => '${value.toInt()} 天',
-                      style: TextStyle(
-                        color: colors.text,
-                        fontSize: 25,
-                        height: 1.05,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: -0.9,
-                      ),
-                    )
-                  : Row(
-                      crossAxisAlignment: CrossAxisAlignment.baseline,
-                      textBaseline: TextBaseline.alphabetic,
-                      children: [
-                        Text(
-                          '¥',
-                          style: TextStyle(
-                            color: colors.text2,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(width: 1.5),
-                        AnimatedNumericText(
-                          value: monthPay,
-                          formatter: (value) =>
-                              formatAmount(value.toDouble(), withSymbol: false),
-                          style: TextStyle(
-                            color: colors.text,
-                            fontSize: 25,
-                            height: 1.05,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: -0.9,
-                          ),
-                        ),
-                      ],
+            const SizedBox(height: 10),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                if (!kHoursOnly) ...[
+                  Text(
+                    '¥',
+                    style: TextStyle(
+                      color: colors.text2,
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w600,
                     ),
+                  ),
+                  const SizedBox(width: 1.5),
+                ],
+                Flexible(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: kHoursOnly
+                        ? AnimatedNumericText(
+                            value: summary.workDays,
+                            formatter: (value) => '${value.toInt()}',
+                            style: TextStyle(
+                              color: colors.text,
+                              fontSize: 24,
+                              height: 1.05,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.5,
+                            ),
+                          )
+                        : AnimatedNumericText(
+                            value: monthPay,
+                            formatter: (value) => formatAmount(
+                              value.toDouble(),
+                              withSymbol: false,
+                            ),
+                            style: TextStyle(
+                              color: colors.text,
+                              fontSize: 24,
+                              height: 1.05,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.5,
+                            ),
+                          ),
+                  ),
+                ),
+                if (kHoursOnly) ...[
+                  const SizedBox(width: 3),
+                  Text(
+                    '天',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: colors.text3,
+                    ),
+                  ),
+                ],
+              ],
             ),
             const SizedBox(height: 8),
-            if (!kHoursOnly) ...[
-              ProgressBar(
-                ratio: settleRatio,
-                color: colors.income,
-                height: 2.5,
-              ),
-              const SizedBox(height: 6),
-            ] else
-              const Spacer(),
+            ProgressBar(ratio: ratio, color: colors.income, height: 4),
+            const SizedBox(height: 6),
             Text(
               kHoursOnly
-                  ? '工作日出勤 ${summary.workDays} 天'
+                  ? '出勤率 ${workdays <= 0 ? 0 : ((summary.workDays / workdays) * 100).round().clamp(0, 100)}% · 应出勤 $workdays 天'
                   : allSettled
                   ? '已全部结算入账'
                   : '待结算 ${formatAmount(settlement.pending, withSymbol: true)}',
@@ -1759,36 +1656,36 @@ class _MonthBalanceMiniCard extends StatelessWidget {
     return Pressable(
       onTap: onTap,
       shape: const RoundedRectangleBorder(),
+      pressedScale: 0.975,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 13, 14, 13),
+        padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Icon(
-                  Icons.account_balance_wallet_outlined,
-                  size: 14,
-                  color: colors.chart[1],
+                _BentoMicroBadge(
+                  icon: Icons.savings_rounded,
+                  color: colors.income,
                 ),
-                const SizedBox(width: 5),
+                const SizedBox(width: 7),
                 Text(
                   '本月结余',
                   style: TextStyle(
                     color: colors.text2,
-                    fontSize: 12,
+                    fontSize: 12.5,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
                 const Spacer(),
                 Icon(
                   Icons.chevron_right_rounded,
-                  size: 14.5,
+                  size: 15,
                   color: colors.text3,
                 ),
               ],
             ),
-            const SizedBox(height: 9),
+            const SizedBox(height: 10),
             FittedBox(
               fit: BoxFit.scaleDown,
               alignment: Alignment.centerLeft,
@@ -1799,7 +1696,7 @@ class _MonthBalanceMiniCard extends StatelessWidget {
                   fontSize: 23,
                   height: 1.05,
                   fontWeight: FontWeight.w700,
-                  letterSpacing: -0.6,
+                  letterSpacing: -0.5,
                   fontFeatures: tabularFigures,
                 ),
               ),
@@ -1841,36 +1738,36 @@ class _TodayLedgerMiniCard extends StatelessWidget {
     return Pressable(
       onTap: onTap,
       shape: const RoundedRectangleBorder(),
+      pressedScale: 0.975,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 13, 14, 13),
+        padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Icon(
-                  Icons.receipt_long_outlined,
-                  size: 14,
+                _BentoMicroBadge(
+                  icon: Icons.receipt_long_rounded,
                   color: colors.warning,
                 ),
-                const SizedBox(width: 5),
+                const SizedBox(width: 7),
                 Text(
                   '今日账目',
                   style: TextStyle(
                     color: colors.text2,
-                    fontSize: 12,
+                    fontSize: 12.5,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
                 const Spacer(),
                 Icon(
                   Icons.chevron_right_rounded,
-                  size: 14.5,
+                  size: 15,
                   color: colors.text3,
                 ),
               ],
             ),
-            const SizedBox(height: 9),
+            const SizedBox(height: 10),
             Text(
               entryCount == 0 ? '暂无收支' : '$entryCount 笔',
               style: TextStyle(
@@ -1924,22 +1821,17 @@ class _TodayLedgerStrip extends StatelessWidget {
     return Pressable(
       onTap: onTap,
       shape: const RoundedRectangleBorder(),
+      pressedScale: 0.985,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         child: Row(
           children: [
-            Container(
-              width: 26,
-              height: 26,
-              decoration: ShapeDecoration(
-                color: colors.block,
-                shape: Radii.shape(8),
-              ),
-              child: Icon(
-                Icons.receipt_long_outlined,
-                size: 14.5,
-                color: colors.text2,
-              ),
+            const AppIconBadge(
+              icon: Icons.receipt_long_rounded,
+              color: Color(0xFF5856D6),
+              size: 28,
+              iconSize: 15,
+              tinted: true,
             ),
             const SizedBox(width: 9),
             Text(
@@ -1990,14 +1882,17 @@ class _MonthBalanceStrip extends StatelessWidget {
     return Pressable(
       onTap: onTap,
       shape: const RoundedRectangleBorder(),
+      pressedScale: 0.985,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
         child: Row(
           children: [
-            Icon(
-              Icons.account_balance_wallet_outlined,
-              size: 16,
-              color: colors.text2,
+            AppIconBadge(
+              icon: Icons.account_balance_wallet_rounded,
+              color: colors.income,
+              size: 28,
+              iconSize: 15,
+              tinted: true,
             ),
             const SizedBox(width: 8),
             Text(

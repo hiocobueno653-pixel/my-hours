@@ -47,15 +47,15 @@ class AppSettings extends ChangeNotifier {
   static const _kTimer = 'my-hours.timer';
   static const _kDashboardCards = 'my-hours.dashboardCards';
 
-  static const Color defaultAccentColor = Color(0xFF2A57C4);
+  static const Color defaultAccentColor = Color(0xFF007AFF);
 
   static const List<Color> defaultAccentPalette = [
-    Color(0xFF2A57C4),
-    Color(0xFFC4454B),
-    Color(0xFF1B7A58),
-    Color(0xFF6250B8),
-    Color(0xFFBE6F1D),
-    Color(0xFF262932),
+    Color(0xFF007AFF),
+    Color(0xFFFF2D55),
+    Color(0xFF1B9A58),
+    Color(0xFF5856D6),
+    Color(0xFFFF9500),
+    Color(0xFF1C1C1E),
   ];
 
   static Future<AppSettings> load() async {
@@ -315,8 +315,9 @@ class AppSettings extends ChangeNotifier {
   AppGlassPreference get glassPreference {
     return switch (_prefs.getString(_kGlassPreference)) {
       'none' => AppGlassPreference.none,
+      'standard' => AppGlassPreference.standard,
       'extreme' => AppGlassPreference.extreme,
-      _ => AppGlassPreference.standard,
+      _ => AppGlassPreference.extreme,
     };
   }
 

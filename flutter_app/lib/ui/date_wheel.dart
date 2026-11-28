@@ -5,6 +5,7 @@
 library;
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
 
 import '../core/theme_tokens.dart';
 import '../data/constants.dart';
@@ -97,10 +98,31 @@ class _DateWheelSheetState extends State<_DateWheelSheet> {
     Navigator.of(context).pop(value);
   }
 
+  void _jumpToday() {
+    final today = todayISO();
+    final parts = today.split('-').map(int.parse).toList();
+    final nextYear = parts[0].clamp(_minYear, _maxYear);
+    final nextMonth = parts[1].clamp(1, 12);
+    final nextDay = parts[2].clamp(1, daysInMonth(nextYear, nextMonth));
+    HapticFeedback.selectionClick();
+    setState(() {
+      _year = nextYear;
+      _month = nextMonth;
+      _day = nextDay;
+    });
+    _yearCtrl.jumpToItem(nextYear - _minYear);
+    _monthCtrl.jumpToItem(nextMonth - 1);
+    _dayCtrl.jumpToItem(nextDay - 1);
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
     final maxDay = daysInMonth(_year, _month);
+    final today = todayISO();
+    final canJumpToday =
+        _selectedDate != today &&
+        (widget.maxDate == null || today.compareTo(widget.maxDate!) <= 0);
 
     Widget column({
       required FixedExtentScrollController controller,
@@ -122,7 +144,10 @@ class _DateWheelSheetState extends State<_DateWheelSheet> {
               shape: Radii.shape(Radii.sm),
             ),
           ),
-          onSelectedItemChanged: onChanged,
+          onSelectedItemChanged: (index) {
+            HapticFeedback.selectionClick();
+            onChanged(index);
+          },
           children: [
             for (var i = 0; i < count; i++)
               Center(
@@ -144,6 +169,9 @@ class _DateWheelSheetState extends State<_DateWheelSheet> {
     return SheetScaffold(
       title: '选择日期',
       maxHeightFactor: 0.72,
+      actions: [
+        if (canJumpToday) TextActionButton(label: '今天', onPressed: _jumpToday),
+      ],
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
