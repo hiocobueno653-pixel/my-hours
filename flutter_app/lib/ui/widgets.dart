@@ -1187,7 +1187,7 @@ class GlassIconButton extends StatelessWidget {
     this.tooltip,
     this.selected = false,
     this.iconSize = 18,
-    this.size = 36,
+    this.size = 44,
     this.radius = Radii.pill,
     this.bright = true,
     this.iconOffset = Offset.zero,
@@ -1291,10 +1291,10 @@ class GlassGroupIconAction extends StatelessWidget {
     final item = Pressable(
       onTap: onTap,
       shape: Radii.pillShape,
-      pressedScale: 0.90,
+      pressedScale: 0.96,
       child: SizedBox(
-        width: 38,
-        height: 36,
+        width: 44,
+        height: 44,
         child: Icon(
           icon,
           size: iconSize,
@@ -1901,11 +1901,13 @@ class MonthSwitchPill extends StatelessWidget {
     required this.month,
     required this.onChanged,
     required this.onPick,
+    this.embedded = false,
   });
 
   final String month;
   final ValueChanged<String> onChanged;
   final VoidCallback onPick;
+  final bool embedded;
 
   @override
   Widget build(BuildContext context) {
@@ -1917,44 +1919,53 @@ class MonthSwitchPill extends StatelessWidget {
     final label = compact && parsed != null
         ? '${parsed.month}月'
         : formatMonthLabel(month);
-    return HeaderGlassSurface(
-      height: 36,
-      radius: Radii.pill,
-      bright: true,
-      interactive: true,
-      padding: const EdgeInsets.symmetric(horizontal: 2),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _MonthArrowButton(
-            icon: Icons.chevron_left_rounded,
-            label: '上个月',
-            onTap: () => onChanged(shiftMonth(month, -1)),
-          ),
-          Pressable(
-            onTap: onPick,
-            shape: Radii.pillShape,
-            pressedScale: 0.95,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-              child: AnimatedMonthLabel(
-                label: label,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: colors.text,
-                  fontFeatures: tabularFigures,
+    final content = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _MonthArrowButton(
+          icon: Icons.chevron_left_rounded,
+          label: '上个月',
+          onTap: () => onChanged(shiftMonth(month, -1)),
+        ),
+        Pressable(
+          onTap: onPick,
+          shape: Radii.pillShape,
+          pressedScale: 0.98,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: SizedBox(
+              height: 44,
+              child: Center(
+                child: AnimatedMonthLabel(
+                  label: label,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: colors.text,
+                    fontFeatures: tabularFigures,
+                  ),
                 ),
               ),
             ),
           ),
-          _MonthArrowButton(
-            icon: Icons.chevron_right_rounded,
-            label: '下个月',
-            onTap: () => onChanged(shiftMonth(month, 1)),
-          ),
-        ],
-      ),
+        ),
+        _MonthArrowButton(
+          icon: Icons.chevron_right_rounded,
+          label: '下个月',
+          onTap: () => onChanged(shiftMonth(month, 1)),
+        ),
+      ],
+    );
+    if (embedded) {
+      return SizedBox(height: 44, child: content);
+    }
+    return HeaderGlassSurface(
+      height: 44,
+      radius: Radii.pill,
+      bright: true,
+      interactive: true,
+      padding: const EdgeInsets.symmetric(horizontal: 2),
+      child: content,
     );
   }
 }
@@ -1980,10 +1991,10 @@ class _MonthArrowButton extends StatelessWidget {
       child: Pressable(
         onTap: onTap,
         shape: Radii.pillShape,
-        pressedScale: 0.88,
+        pressedScale: 0.96,
         child: SizedBox(
-          width: 26,
-          height: 32,
+          width: 44,
+          height: 44,
           child: Icon(icon, size: 17, color: context.colors.text2),
         ),
       ),

@@ -359,92 +359,107 @@ class _MonthViewState extends ConsumerState<MonthView> {
                   ),
                 )
               else ...[
-                MonthSwitchPill(
-                  month: month,
-                  onChanged: _changeMonth,
-                  onPick: () async {
-                    final picked = await showMonthPicker(
-                      context,
-                      initialMonth: month,
-                    );
-                    if (picked != null && context.mounted) {
-                      _changeMonth(picked);
-                    }
-                  },
-                ),
-                GlassMenuButton(
-                  tooltip: '更多操作',
-                  items: [
-                    GlassMenuAction(
-                      label: '导出本月数据',
-                      icon: Icons.download_rounded,
-                      onSelected: () => showExportSheet(
-                        context,
-                        month: month,
-                        records: records,
-                        entries: entries,
-                        includeLedger: !kHoursOnly,
-                      ),
+                GlassActionGroup(
+                  height: 46,
+                  children: [
+                    MonthSwitchPill(
+                      month: month,
+                      embedded: true,
+                      onChanged: _changeMonth,
+                      onPick: () async {
+                        final picked = await showMonthPicker(
+                          context,
+                          initialMonth: month,
+                        );
+                        if (picked != null && context.mounted) {
+                          _changeMonth(picked);
+                        }
+                      },
                     ),
-                    if (!kHoursOnly)
-                      GlassMenuAction(
-                        label: '快速记一笔账',
-                        icon: Icons.add_card_rounded,
-                        onSelected: () =>
-                            showLedgerEditor(context, presetDate: activeDate),
-                      ),
-                    GlassMenuAction(
-                      label: '工作与${context.unit.rateName}',
-                      icon: Icons.work_outline_rounded,
-                      dividerBefore: true,
-                      sectionTitle: '快捷管理',
-                      onSelected: () => showWorkManager(context),
-                    ),
-                    if (!kHoursOnly) ...[
-                      GlassMenuAction(
-                        label: '工资结算明细',
-                        icon: Icons.payments_outlined,
-                        onSelected: () => showWagePanel(context, month),
-                      ),
-                      GlassMenuAction(
-                        label: '预算与月目标',
-                        icon: Icons.track_changes_rounded,
-                        onSelected: () => showBudgetPanel(context),
-                      ),
-                    ],
-                    if (settings != null)
-                      GlassMenuAction(
-                        label: '首页指标卡',
-                        subtitle: '已启用 ${dashboardCards.length} 项',
-                        icon: Icons.dashboard_customize_outlined,
-                        dividerBefore: true,
-                        children: [
-                          GlassMenuAction(
-                            label: '编辑顺序与卡片',
-                            icon: Icons.drag_indicator_rounded,
-                            onSelected: () =>
-                                setState(() => _editingLayout = true),
+                    GlassMenuButton(
+                      clustered: true,
+                      tooltip: '更多操作',
+                      items: [
+                        GlassMenuAction(
+                          label: '导出本月数据',
+                          icon: Icons.download_rounded,
+                          onSelected: () => showExportSheet(
+                            context,
+                            month: month,
+                            records: records,
+                            entries: entries,
+                            includeLedger: !kHoursOnly,
                           ),
-                          for (final cardId in DashboardCardIds.all)
-                            if (!kHoursOnly ||
-                                (cardId != DashboardCardIds.ledgerBalance &&
-                                    cardId != DashboardCardIds.todayLedger))
-                              GlassMenuAction(
-                                label: _dashboardCardLabel(context, cardId),
-                                selected: dashboardCards.contains(cardId),
-                                onSelected: () {
-                                  final next = List<String>.of(dashboardCards);
-                                  if (next.contains(cardId)) {
-                                    if (next.length > 1) next.remove(cardId);
-                                  } else {
-                                    next.add(cardId);
-                                  }
-                                  unawaited(settings.setDashboardCards(next));
-                                  if (mounted) setState(() {});
-                                },
-                              ),
+                        ),
+                        if (!kHoursOnly)
+                          GlassMenuAction(
+                            label: '快速记一笔账',
+                            icon: Icons.add_card_rounded,
+                            onSelected: () => showLedgerEditor(
+                              context,
+                              presetDate: activeDate,
+                            ),
+                          ),
+                        GlassMenuAction(
+                          label: '工作与${context.unit.rateName}',
+                          icon: Icons.work_outline_rounded,
+                          dividerBefore: true,
+                          sectionTitle: '快捷管理',
+                          onSelected: () => showWorkManager(context),
+                        ),
+                        if (!kHoursOnly) ...[
+                          GlassMenuAction(
+                            label: '工资结算明细',
+                            icon: Icons.payments_outlined,
+                            onSelected: () => showWagePanel(context, month),
+                          ),
+                          GlassMenuAction(
+                            label: '预算与月目标',
+                            icon: Icons.track_changes_rounded,
+                            onSelected: () => showBudgetPanel(context),
+                          ),
                         ],
-                      ),
+                        if (settings != null)
+                          GlassMenuAction(
+                            label: '首页指标卡',
+                            subtitle: '已启用 ${dashboardCards.length} 项',
+                            icon: Icons.dashboard_customize_outlined,
+                            dividerBefore: true,
+                            children: [
+                              GlassMenuAction(
+                                label: '编辑顺序与卡片',
+                                icon: Icons.drag_indicator_rounded,
+                                onSelected: () =>
+                                    setState(() => _editingLayout = true),
+                              ),
+                              for (final cardId in DashboardCardIds.all)
+                                if (!kHoursOnly ||
+                                    (cardId != DashboardCardIds.ledgerBalance &&
+                                        cardId != DashboardCardIds.todayLedger))
+                                  GlassMenuAction(
+                                    label: _dashboardCardLabel(context, cardId),
+                                    selected: dashboardCards.contains(cardId),
+                                    onSelected: () {
+                                      final next = List<String>.of(
+                                        dashboardCards,
+                                      );
+                                      if (next.contains(cardId)) {
+                                        if (next.length > 1) {
+                                          next.remove(cardId);
+                                        }
+                                      } else {
+                                        next.add(cardId);
+                                      }
+                                      unawaited(
+                                        settings.setDashboardCards(next),
+                                      );
+                                      if (mounted) setState(() {});
+                                    },
+                                  ),
+                            ],
+                          ),
+                      ],
+                    ),
                   ],
                 ),
               ],

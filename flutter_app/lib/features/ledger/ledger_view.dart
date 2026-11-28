@@ -591,65 +591,80 @@ class _LedgerViewState extends ConsumerState<LedgerView> {
               _search.clear();
               setState(() => _searchQuery = '');
             },
-            middleAction: MonthSwitchPill(
-              month: month,
-              onChanged: (value) =>
-                  ref.read(selectedMonthProvider.notifier).setMonth(value),
-              onPick: () async {
-                final picked = await showMonthPicker(
-                  context,
-                  initialMonth: month,
-                );
-                if (picked != null && context.mounted) {
-                  ref.read(selectedMonthProvider.notifier).setMonth(picked);
-                }
-              },
-            ),
-            trailingAction: GlassMenuButton(
-              tooltip: '更多操作',
-              items: [
-                GlassMenuAction(
-                  label: '导出本月账本',
-                  icon: Icons.download_rounded,
-                  onSelected: () => showExportSheet(
-                    context,
-                    month: month,
-                    records: ref.read(recordsProvider),
-                    entries: ref.read(entriesProvider),
-                  ),
+            idleActionCluster: GlassActionGroup(
+              height: 46,
+              children: [
+                MonthSwitchPill(
+                  month: month,
+                  embedded: true,
+                  onChanged: (value) =>
+                      ref.read(selectedMonthProvider.notifier).setMonth(value),
+                  onPick: () async {
+                    final picked = await showMonthPicker(
+                      context,
+                      initialMonth: month,
+                    );
+                    if (picked != null && context.mounted) {
+                      ref.read(selectedMonthProvider.notifier).setMonth(picked);
+                    }
+                  },
                 ),
-                GlassMenuAction(
-                  label: '回到本月',
-                  icon: Icons.today_rounded,
-                  onSelected: () => ref
-                      .read(selectedMonthProvider.notifier)
-                      .setMonth(currentMonthKey()),
+                GlassGroupIconAction(
+                  icon: Icons.search_rounded,
+                  tooltip: '搜索',
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    setState(() => _searching = true);
+                  },
                 ),
-                GlassMenuAction(
-                  label: '分类管理',
-                  icon: Icons.sell_outlined,
-                  dividerBefore: true,
-                  sectionTitle: '快捷管理',
-                  onSelected: () => showCategoryManager(context),
+                GlassMenuButton(
+                  clustered: true,
+                  tooltip: '更多操作',
+                  items: [
+                    GlassMenuAction(
+                      label: '导出本月账本',
+                      icon: Icons.download_rounded,
+                      onSelected: () => showExportSheet(
+                        context,
+                        month: month,
+                        records: ref.read(recordsProvider),
+                        entries: ref.read(entriesProvider),
+                      ),
+                    ),
+                    GlassMenuAction(
+                      label: '回到本月',
+                      icon: Icons.today_rounded,
+                      onSelected: () => ref
+                          .read(selectedMonthProvider.notifier)
+                          .setMonth(currentMonthKey()),
+                    ),
+                    GlassMenuAction(
+                      label: '分类管理',
+                      icon: Icons.sell_outlined,
+                      dividerBefore: true,
+                      sectionTitle: '快捷管理',
+                      onSelected: () => showCategoryManager(context),
+                    ),
+                    GlassMenuAction(
+                      label: '预算设置',
+                      icon: Icons.track_changes_rounded,
+                      onSelected: () => showBudgetPanel(context),
+                    ),
+                    if (_categoryFilter.isNotEmpty || _searchQuery.isNotEmpty)
+                      GlassMenuAction(
+                        label: '清除筛选',
+                        icon: Icons.filter_alt_off_rounded,
+                        dividerBefore: true,
+                        onSelected: () => setState(() {
+                          _searchTimer?.cancel();
+                          _categoryFilter = '';
+                          _search.clear();
+                          _searchQuery = '';
+                          _searching = false;
+                        }),
+                      ),
+                  ],
                 ),
-                GlassMenuAction(
-                  label: '预算设置',
-                  icon: Icons.track_changes_rounded,
-                  onSelected: () => showBudgetPanel(context),
-                ),
-                if (_categoryFilter.isNotEmpty || _searchQuery.isNotEmpty)
-                  GlassMenuAction(
-                    label: '清除筛选',
-                    icon: Icons.filter_alt_off_rounded,
-                    dividerBefore: true,
-                    onSelected: () => setState(() {
-                      _searchTimer?.cancel();
-                      _categoryFilter = '';
-                      _search.clear();
-                      _searchQuery = '';
-                      _searching = false;
-                    }),
-                  ),
               ],
             ),
           ),

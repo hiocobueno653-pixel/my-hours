@@ -314,6 +314,7 @@ class MorphingSearchHeader extends StatefulWidget {
     required this.onSearchingChanged,
     required this.onQueryChanged,
     required this.onClearQuery,
+    this.idleActionCluster,
     this.middleAction,
     this.trailingAction,
     this.height = Gaps.headerHeight,
@@ -326,6 +327,7 @@ class MorphingSearchHeader extends StatefulWidget {
   final ValueChanged<bool> onSearchingChanged;
   final ValueChanged<String> onQueryChanged;
   final VoidCallback onClearQuery;
+  final Widget? idleActionCluster;
   final Widget? middleAction;
   final Widget? trailingAction;
   final double height;
@@ -507,22 +509,26 @@ class _MorphingSearchHeaderState extends State<MorphingSearchHeader> {
                               ),
                             ),
                           ),
-                          if (widget.middleAction != null) ...[
+                          if (widget.idleActionCluster != null)
+                            widget.idleActionCluster!
+                          else ...[
+                            if (widget.middleAction != null) ...[
+                              const SizedBox(width: 6),
+                              widget.middleAction!,
+                            ],
                             const SizedBox(width: 6),
-                            widget.middleAction!,
-                          ],
-                          const SizedBox(width: 6),
-                          GlassIconButton(
-                            icon: Icons.search_rounded,
-                            tooltip: '搜索',
-                            onTap: () {
-                              HapticFeedback.selectionClick();
-                              widget.onSearchingChanged(true);
-                            },
-                          ),
-                          if (widget.trailingAction != null) ...[
-                            const SizedBox(width: 6),
-                            widget.trailingAction!,
+                            GlassIconButton(
+                              icon: Icons.search_rounded,
+                              tooltip: '搜索',
+                              onTap: () {
+                                HapticFeedback.selectionClick();
+                                widget.onSearchingChanged(true);
+                              },
+                            ),
+                            if (widget.trailingAction != null) ...[
+                              const SizedBox(width: 6),
+                              widget.trailingAction!,
+                            ],
                           ],
                         ],
                       ),

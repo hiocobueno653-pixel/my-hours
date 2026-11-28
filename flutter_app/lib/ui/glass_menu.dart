@@ -1068,12 +1068,14 @@ class GlassMenuButton extends StatelessWidget {
     this.icon = Icons.more_horiz_rounded,
     this.tooltip = '更多操作',
     this.panelWidth = 188,
+    this.clustered = false,
   });
 
   final List<GlassMenuAction> items;
   final IconData icon;
   final String tooltip;
   final double panelWidth;
+  final bool clustered;
 
   void _open(BuildContext context) {
     final box = context.findRenderObject() as RenderBox?;
@@ -1093,11 +1095,17 @@ class GlassMenuButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Builder(
-      builder: (anchorContext) => GlassIconButton(
-        icon: icon,
-        tooltip: tooltip,
-        onTap: () => _open(anchorContext),
-      ),
+      builder: (anchorContext) => clustered
+          ? GlassGroupIconAction(
+              icon: icon,
+              tooltip: tooltip,
+              onTap: () => _open(anchorContext),
+            )
+          : GlassIconButton(
+              icon: icon,
+              tooltip: tooltip,
+              onTap: () => _open(anchorContext),
+            ),
     );
   }
 }
