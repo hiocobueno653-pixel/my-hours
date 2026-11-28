@@ -126,7 +126,7 @@ void main() {
     final expandedSize = title().style!.fontSize!;
     expect(
       tester.getSemantics(find.text('工时')),
-      containsSemantics(isHeader: true, label: '工时'),
+      isSemantics(isHeader: true, label: '工时'),
     );
 
     await tester.dragFrom(const Offset(195, 420), const Offset(0, -90));
